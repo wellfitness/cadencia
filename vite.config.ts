@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Vatios con Ritmo',
         short_name: 'VatiosRitmo',
         description: 'Playlists de Spotify ordenadas segun el perfil de potencia de tu ruta GPX',
-        theme_color: '#0d0d0d',
-        background_color: '#0d0d0d',
+        theme_color: '#00bec8',
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
         icons: [

@@ -244,10 +244,16 @@ Scope: `playlist-modify-private`.
 
 ## Diseño UI
 
-- **Estética**: dark mode, inspiración en dashboards de ciclismo (Garmin Connect / Strava). Nada genérico.
-- **Paleta**: fondo `#0d0d0d`, gradiente de zonas `Z1 azul → Z2 verde → Z3 amarillo → Z4 naranja → Z5 rojo` (ya definidos en `tailwind.config.ts` como `colors.zone.{1..5}`).
-- **Tipografía**: display bold para métricas numéricas, sans condensada para labels.
-- **Componentes clave**: drag & drop GPX, gráfico de elevación con bandas por zona (Recharts), cards de tracks con badge de zona, stepper *Datos → Ruta → Música → Resultado*.
+- **Estética**: light mode, design-system de Movimiento Funcional (`.claude/skills/design-system/SKILL.md`). Optimizado para legibilidad, accesibilidad WCAG 2.1 AA y zonas táctiles ≥44px.
+- **Paleta UI**:
+  - Primary: `turquesa-600 #00bec8` (CTAs, navegación, focus rings).
+  - Critical: `rosa-600 #e11d48` (acciones destructivas, máx 1-2 por pantalla).
+  - Info: `tulipTree-500 #eab308` (tips, datos complementarios).
+  - Neutrales: paleta `gris-{50..900}` (texto principal `gris-800` sobre fondo blanco).
+- **Paleta de zonas Z1-Z5** (`colors.zone.{1..5}` en `tailwind.config.ts`): **exclusivamente para visualización de datos** — gauges de potencia, bandas en charts de elevación (Recharts), `ZoneBadge`. **No se usa para UI general**.
+- **Tipografía**: `Righteous` (display, solo H1/H2 y logos) + `ABeeZee` (sans, cuerpo y formularios). Importadas desde Google Fonts en `index.html`. Tamaño base 16px móvil / 18px desktop, escala 1.25.
+- **Iconografía**: Material Icons (`<MaterialIcon name="..."/>`). **Nunca emojis** en componentes UI.
+- **Componentes clave**: drag & drop GPX, gráfico de elevación con bandas por zona (Recharts), cards de tracks con `ZoneBadge`, stepper *Datos → Ruta → Música → Resultado*.
 
 ---
 

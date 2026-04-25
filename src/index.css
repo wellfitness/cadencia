@@ -2,10 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Tokens del design-system Movimiento Funcional como CSS custom properties.
+ * Disponibles tanto desde Tailwind (mediante config) como desde CSS plano.
+ */
+:root {
+  --turquesa-50: #e6fffd;
+  --turquesa-100: #cdfffb;
+  --turquesa-400: #18f8f6;
+  --turquesa-500: #04dadb;
+  --turquesa-600: #00bec8;
+  --turquesa-700: #088b96;
+  --rosa-500: #e11d48;
+  --rosa-600: #e11d48;
+  --rosa-700: #be123c;
+  --tulip-tree-400: #facc15;
+  --tulip-tree-500: #eab308;
+  --tulip-tree-600: #ca8a04;
+  --gris-50: #f9fafb;
+  --gris-100: #f3f4f6;
+  --gris-200: #e5e7eb;
+  --gris-300: #d1d5db;
+  --gris-400: #9ca3af;
+  --gris-500: #6b7280;
+  --gris-600: #4b5563;
+  --gris-700: #374151;
+  --gris-800: #1f2937;
+  --gris-900: #111827;
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-success-dark: #047857;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  --color-warning-dark: #d97706;
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  --color-error-dark: #dc2626;
+
+  /* Zonas: solo visualizacion de datos */
+  --zone-1: #3b82f6;
+  --zone-2: #22c55e;
+  --zone-3: #eab308;
+  --zone-4: #f97316;
+  --zone-5: #ef4444;
+
+  /* Tipografia */
+  --font-display: 'Righteous', system-ui, sans-serif;
+  --font-sans: 'ABeeZee', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-base: 16px;
+  --font-size-h3: 1.25rem;
+  --font-size-h2: 1.5625rem;
+  --font-size-h1: 1.9375rem;
+
+  /* Espaciado escala 8px */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 40px;
+  --space-6: 48px;
+  --space-8: 64px;
+  --space-10: 80px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --font-size-base: 18px;
+    --font-size-h3: 1.4375rem;
+    --font-size-h2: 1.75rem;
+    --font-size-h1: 2.1875rem;
+  }
+}
+
 @layer base {
   html,
   body,
   #root {
     height: 100%;
+  }
+
+  html {
+    font-size: var(--font-size-base);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--gris-800);
+    background-color: #ffffff;
+    text-align: left;
+    hyphens: none;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    line-height: 1.2;
+  }
+
+  /* Focus visible global accesible (WCAG AA) */
+  :focus-visible {
+    outline: 2px solid var(--turquesa-400);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Inputs numericos: ocultar spinners para que el unit pegado se vea limpio */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer utilities {
+  .animate-spin-slow {
+    animation: spin 1.2s linear infinite;
   }
 }
