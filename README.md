@@ -1,8 +1,8 @@
-# Spoty Cycling
+# Vatios con Ritmo
 
-Webapp + APK Android (via Capacitor) que genera playlists de Spotify ordenadas segun el perfil de esfuerzo de una ruta GPX.
+Webapp + APK Android (via Capacitor) que genera playlists de Spotify ordenadas segun el perfil de **potencia (vatios)** de una ruta GPX, sincronizando el **BPM (ritmo)** musical con la intensidad del esfuerzo.
 
-> **Esto es un prototipo open source en bootstrap.** No hay backend, no hay base de datos, no hay registros: toda la logica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist). Strava y Komoot se importan como GPX manual.
+> **Source-available, open a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la logica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist). Strava y Komoot se importan como GPX manual.
 
 ## Stack
 

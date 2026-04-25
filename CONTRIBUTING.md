@@ -1,4 +1,4 @@
-# Contributing to Spoty Cycling
+# Contributing to Vatios con Ritmo
 
 ¡Gracias por querer colaborar! Antes de abrir un PR lee esto.
 

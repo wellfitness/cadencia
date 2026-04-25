@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Objetivo
 
-App **source-available** (PolyForm Noncommercial — colaboración abierta, uso comercial reservado a la autora) que recibe un archivo **GPX** de una ruta ciclista, estima el perfil de esfuerzo por segmentos y genera una **playlist de Spotify ordenada** donde el BPM/energy de cada track encaja con la intensidad del segmento correspondiente.
+**Vatios con Ritmo** — App **source-available** (PolyForm Noncommercial — colaboración abierta, uso comercial reservado a la autora) que recibe un archivo **GPX** de una ruta ciclista, estima el perfil de **potencia (vatios)** por segmentos y genera una **playlist de Spotify ordenada** donde el BPM/energy (**ritmo**) de cada track encaja con la intensidad del segmento correspondiente.
 
 Sin registros, sin base de datos, sin backend. Toda la lógica corre en cliente.
 

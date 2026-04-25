@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.spoty_cycling',
-  appName: 'Spoty Cycling',
+  appId: 'com.wellfitness.vatiosconritmo',
+  appName: 'Vatios con Ritmo',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

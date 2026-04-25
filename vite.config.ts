@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
-        name: 'Spoty Cycling',
-        short_name: 'SpotyCycling',
-        description: 'Playlists de Spotify ordenadas segun el perfil de tu ruta GPX',
+        name: 'Vatios con Ritmo',
+        short_name: 'VatiosRitmo',
+        description: 'Playlists de Spotify ordenadas segun el perfil de potencia de tu ruta GPX',
         theme_color: '#0d0d0d',
         background_color: '#0d0d0d',
         display: 'standalone',
