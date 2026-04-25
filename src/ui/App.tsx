@@ -1,8 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
+import {
+  EMPTY_USER_INPUTS,
+  loadUserInputsFromSession,
+  saveUserInputsToSession,
+  validateUserInputs,
+  type UserInputsRaw,
+} from '@core/user';
+import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { UserDataStep } from '@ui/pages/UserDataStep';
+import { RouteStep } from '@ui/pages/RouteStep';
+import { userInputsReducer } from '@ui/state/userInputsReducer';
 
 const STEPS: readonly StepperStep[] = [
   { label: 'Datos', icon: 'person' },
@@ -15,9 +25,47 @@ export function App(): JSX.Element {
   const [currentStep, setCurrentStep] = useState<number>(0);
   const [completedSteps, setCompletedSteps] = useState<readonly number[]>([]);
 
+  // State del usuario lifteado aqui para que pasos posteriores (Ruta, Resultado)
+  // puedan leerlo y, en el caso de Resultado, editarlo en linea sin volver atras.
+  const [inputs, dispatch] = useReducer(
+    userInputsReducer,
+    null,
+    (): UserInputsRaw => loadUserInputsFromSession() ?? EMPTY_USER_INPUTS,
+  );
+
+  // currentYear cacheado en una sesion (no cambia significativamente durante el uso normal).
+  const [currentYear] = useState(() => new Date().getFullYear());
+
+  // Persistencia debounceada en sessionStorage
+  useEffect(() => {
+    const id = setTimeout(() => {
+      saveUserInputsToSession(inputs);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [inputs]);
+
+  const validation = useMemo(
+    () => validateUserInputs(inputs, currentYear),
+    [inputs, currentYear],
+  );
+
+  // Estado de la ruta procesada (vive en App para que la fase 4 "Resultado"
+  // pueda leerlo sin volver atras).
+  const [, setRouteSegments] = useState<readonly ClassifiedSegment[] | null>(null);
+  const [, setRouteMeta] = useState<RouteMeta | null>(null);
+
   const handleNext = (): void => {
     setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
     setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1));
+  };
+
+  const handleBack = (): void => {
+    setCurrentStep((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleRouteProcessed = (segments: ClassifiedSegment[], meta: RouteMeta): void => {
+    setRouteSegments(segments);
+    setRouteMeta(meta);
   };
 
   return (
@@ -30,9 +78,27 @@ export function App(): JSX.Element {
       </div>
 
       <main className="flex-1">
-        {currentStep === 0 ? (
-          <UserDataStep onNext={handleNext} />
-        ) : (
+        {currentStep === 0 && (
+          <UserDataStep
+            inputs={inputs}
+            dispatch={dispatch}
+            validation={validation}
+            currentYear={currentYear}
+            onNext={handleNext}
+          />
+        )}
+        {currentStep === 1 && validation.ok && (
+          <RouteStep
+            validatedInputs={validation.data}
+            onProcessed={handleRouteProcessed}
+            onBack={handleBack}
+            onNext={handleNext}
+          />
+        )}
+        {currentStep === 1 && !validation.ok && (
+          <NeedsDataMessage onBack={handleBack} />
+        )}
+        {currentStep > 1 && (
           <PlaceholderStep
             label={STEPS[currentStep]?.label ?? 'Próximo paso'}
             icon={STEPS[currentStep]?.icon ?? 'construction'}
@@ -41,6 +107,30 @@ export function App(): JSX.Element {
       </main>
 
       <Footer />
+    </div>
+  );
+}
+
+interface NeedsDataMessageProps {
+  onBack: () => void;
+}
+
+function NeedsDataMessage({ onBack }: NeedsDataMessageProps): JSX.Element {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+      <Card variant="info" title="Necesitamos tus datos primero" titleIcon="warning">
+        <p className="text-gris-700 mb-4">
+          Vuelve al paso anterior para introducir tu peso y FTP o frecuencia cardíaca.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-turquesa-700 font-semibold hover:underline"
+        >
+          <MaterialIcon name="arrow_back" size="small" />
+          Volver al paso de Datos
+        </button>
+      </Card>
     </div>
   );
 }
@@ -60,7 +150,7 @@ function Header(): JSX.Element {
             Vatios con Ritmo
           </h1>
           <p className="text-xs md:text-sm text-gris-500 mt-1">
-            Tu ruta GPX, tu playlist al ritmo de tu potencia.
+            Tu ruta GPX, tu música al ritmo de tu potencia.
           </p>
         </div>
       </div>

@@ -1,6 +1,9 @@
 import { calculateMaxHeartRateGulati } from '../physiology/maxHeartRate';
 import {
+  BIKE_TYPES,
+  DEFAULTS,
   VALIDATION_LIMITS,
+  type BikeType,
   type UserInputsRaw,
   type ValidatedUserInputs,
 } from './userInputs';
@@ -13,7 +16,9 @@ export type ValidationError =
   | { code: 'BIRTH_YEAR_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'MAX_HR_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'RESTING_HR_OUT_OF_RANGE'; min: number; max: number }
-  | { code: 'RESTING_GE_MAX_HR' };
+  | { code: 'RESTING_GE_MAX_HR' }
+  | { code: 'BIKE_WEIGHT_OUT_OF_RANGE'; min: number; max: number }
+  | { code: 'BIKE_TYPE_INVALID' };
 
 export type ValidationResult =
   | { ok: true; data: ValidatedUserInputs }
@@ -101,6 +106,23 @@ export function validateUserInputs(
     });
   }
 
+  // 7. bikeWeightKg (si esta, debe ser valido)
+  if (
+    raw.bikeWeightKg !== null &&
+    !inRange(raw.bikeWeightKg, limits.bikeWeightKg.min, limits.bikeWeightKg.max)
+  ) {
+    errors.push({
+      code: 'BIKE_WEIGHT_OUT_OF_RANGE',
+      min: limits.bikeWeightKg.min,
+      max: limits.bikeWeightKg.max,
+    });
+  }
+
+  // 8. bikeType (si esta, debe ser uno de los valores aceptados)
+  if (raw.bikeType !== null && !BIKE_TYPES.includes(raw.bikeType)) {
+    errors.push({ code: 'BIKE_TYPE_INVALID' });
+  }
+
   if (errors.length > 0) {
     return { ok: false, errors };
   }
@@ -127,6 +149,10 @@ export function validateUserInputs(
 
   const hasHeartRateZones = effectiveMaxHr !== null && raw.restingHeartRate !== null;
 
+  // Defaults razonables para bici si el usuario no toca los campos
+  const bikeType: BikeType = raw.bikeType ?? DEFAULTS.bikeType;
+  const bikeWeightKg = raw.bikeWeightKg ?? DEFAULTS.bikeWeightByType[bikeType];
+
   return {
     ok: true,
     data: {
@@ -135,6 +161,8 @@ export function validateUserInputs(
       effectiveMaxHr,
       restingHeartRate: raw.restingHeartRate,
       birthYear: raw.birthYear,
+      bikeWeightKg,
+      bikeType,
       hasFtp,
       hasHeartRateZones,
     },
@@ -160,5 +188,9 @@ export function describeValidationError(err: ValidationError): string {
       return `La FC en reposo debe estar entre ${err.min} y ${err.max} bpm.`;
     case 'RESTING_GE_MAX_HR':
       return 'La FC en reposo no puede ser mayor o igual que la FC máxima.';
+    case 'BIKE_WEIGHT_OUT_OF_RANGE':
+      return `El peso de la bici debe estar entre ${err.min} y ${err.max} kg.`;
+    case 'BIKE_TYPE_INVALID':
+      return 'Tipo de bici no reconocido.';
   }
 }

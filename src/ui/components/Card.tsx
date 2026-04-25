@@ -34,14 +34,14 @@ export function Card({
 }: CardProps): JSX.Element {
   return (
     <section
-      className={`rounded-xl p-4 md:p-6 ${VARIANT_CLASSES[variant]} ${className}`.trim()}
+      className={`rounded-xl p-3 md:p-5 ${VARIANT_CLASSES[variant]} ${className}`.trim()}
       {...rest}
     >
       {title && (
         <h3
-          className={`flex items-center gap-2 text-lg font-semibold mb-3 ${TITLE_COLOR[variant]}`}
+          className={`flex items-center gap-2 text-base md:text-lg font-semibold mb-2 md:mb-3 ${TITLE_COLOR[variant]}`}
         >
-          {titleIcon && <MaterialIcon name={titleIcon} size="medium" />}
+          {titleIcon && <MaterialIcon name={titleIcon} size="small" />}
           {title}
         </h3>
       )}

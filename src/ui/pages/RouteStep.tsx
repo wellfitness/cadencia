@@ -1,0 +1,231 @@
+import { useCallback, useMemo, useState } from 'react';
+import { parseGpx } from '@core/gpx/parser';
+import {
+  segmentInto60SecondBlocks,
+  type ClassifiedSegment,
+  type RouteMeta,
+} from '@core/segmentation';
+import type { ValidatedUserInputs } from '@core/user/userInputs';
+import { calculateKarvonenZones, type KarvonenZoneRange } from '@core/physiology/karvonen';
+import { Button } from '@ui/components/Button';
+import { Card } from '@ui/components/Card';
+import { ElevationChart } from '@ui/components/ElevationChart';
+import { FileDropzone } from '@ui/components/FileDropzone';
+import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { RouteSummary } from '@ui/components/RouteSummary';
+
+export interface RouteStepProps {
+  validatedInputs: ValidatedUserInputs;
+  onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
+  onBack: () => void;
+  onNext: () => void;
+}
+
+type Phase = 'idle' | 'parsing' | 'ready' | 'error';
+
+export function RouteStep({
+  validatedInputs,
+  onProcessed,
+  onBack,
+  onNext,
+}: RouteStepProps): JSX.Element {
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [segments, setSegments] = useState<ClassifiedSegment[] | null>(null);
+  const [meta, setMeta] = useState<RouteMeta | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Calcular zonas Karvonen una vez si el usuario tiene los datos. Estas zonas
+  // se pasan al chart y al summary para mostrar BPM esperados por zona.
+  const karvonenZones = useMemo<KarvonenZoneRange[] | undefined>(() => {
+    if (
+      !validatedInputs.hasHeartRateZones ||
+      validatedInputs.effectiveMaxHr === null ||
+      validatedInputs.restingHeartRate === null
+    ) {
+      return undefined;
+    }
+    return calculateKarvonenZones(
+      validatedInputs.effectiveMaxHr,
+      validatedInputs.restingHeartRate,
+    );
+  }, [validatedInputs]);
+
+  const processFile = useCallback(
+    async (file: File): Promise<void> => {
+      setPhase('parsing');
+      setErrorMessage(null);
+      try {
+        const text = await file.text();
+        const track = parseGpx(text);
+        const result = segmentInto60SecondBlocks(track, validatedInputs);
+        if (result.segments.length === 0) {
+          throw new Error('No se pudo procesar la ruta: GPX demasiado corto.');
+        }
+        setSegments(result.segments);
+        setMeta(result.meta);
+        setPhase('ready');
+        onProcessed(result.segments, result.meta);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error desconocido al procesar la ruta.';
+        setErrorMessage(message);
+        setPhase('error');
+      }
+    },
+    [validatedInputs, onProcessed],
+  );
+
+  const handleReset = useCallback((): void => {
+    setSegments(null);
+    setMeta(null);
+    setErrorMessage(null);
+    setPhase('idle');
+  }, []);
+
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10 space-y-4 md:space-y-6 pb-32 md:pb-10">
+      {phase === 'idle' && (
+        <>
+          <FileDropzone
+            onFile={(f) => void processFile(f)}
+            onError={(msg) => {
+              setErrorMessage(msg);
+              setPhase('error');
+            }}
+          />
+          <Card variant="tip" title="¿Qué pasa con tu archivo?" titleIcon="lock">
+            <ul className="text-gris-700 space-y-1 list-disc pl-5">
+              <li>Tu GPX no sale de tu dispositivo. Todo se procesa en tu navegador.</li>
+              <li>
+                Calculamos la potencia estimada en cada tramo de ~60 s con tus datos físicos.
+              </li>
+              <li>
+                Asignamos cada tramo a una zona Z1-Z5{' '}
+                {validatedInputs.hasHeartRateZones && <>(con su rango de BPM esperado) </>}
+                para luego elegir canciones de Spotify con el BPM y la energía adecuados.
+              </li>
+            </ul>
+          </Card>
+        </>
+      )}
+
+      {phase === 'parsing' && (
+        <Card>
+          <div className="flex items-center gap-3 py-6 justify-center text-gris-700">
+            <MaterialIcon
+              name="progress_activity"
+              size="medium"
+              className="text-turquesa-600 animate-spin-slow"
+            />
+            <span className="font-medium">Procesando tu ruta…</span>
+          </div>
+        </Card>
+      )}
+
+      {phase === 'error' && (
+        <Card variant="info" title="No se pudo procesar el archivo" titleIcon="error_outline">
+          <p className="text-gris-700 mb-4">
+            {errorMessage ?? 'Ha ocurrido un error inesperado.'}
+          </p>
+          <Button variant="primary" iconLeft="refresh" onClick={handleReset}>
+            Probar de nuevo
+          </Button>
+        </Card>
+      )}
+
+      {phase === 'ready' && segments && meta && (
+        <>
+          <Card title="Perfil de la ruta" titleIcon="terrain">
+            {karvonenZones === undefined && (
+              <p className="text-xs text-gris-500 mb-3 flex items-start gap-1.5">
+                <MaterialIcon name="info" size="small" className="text-gris-400 mt-0.5" />
+                Pasa el cursor sobre el gráfico para ver la potencia y zona de cada tramo.
+              </p>
+            )}
+            {karvonenZones !== undefined && (
+              <p className="text-xs text-gris-500 mb-3 flex items-start gap-1.5">
+                <MaterialIcon name="info" size="small" className="text-gris-400 mt-0.5" />
+                Pasa el cursor para ver potencia, zona y BPM esperados en cada tramo.
+              </p>
+            )}
+            {karvonenZones !== undefined ? (
+              <ElevationChart segments={segments} karvonenZones={karvonenZones} />
+            ) : (
+              <ElevationChart segments={segments} />
+            )}
+          </Card>
+          {karvonenZones !== undefined ? (
+            <RouteSummary meta={meta} karvonenZones={karvonenZones} />
+          ) : (
+            <RouteSummary meta={meta} />
+          )}
+        </>
+      )}
+
+      <FooterActions
+        onBack={onBack}
+        onReset={handleReset}
+        onNext={onNext}
+        canGoNext={phase === 'ready'}
+        canReset={phase === 'ready' || phase === 'error'}
+      />
+    </div>
+  );
+}
+
+interface FooterActionsProps {
+  onBack: () => void;
+  onReset: () => void;
+  onNext: () => void;
+  canGoNext: boolean;
+  canReset: boolean;
+}
+
+function FooterActions({
+  onBack,
+  onReset,
+  onNext,
+  canGoNext,
+  canReset,
+}: FooterActionsProps): JSX.Element {
+  return (
+    <>
+      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gris-200 px-4 py-3 flex items-center justify-between gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
+        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+          Atrás
+        </Button>
+        {canReset && (
+          <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
+            Otra
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          iconRight="arrow_forward"
+          disabled={!canGoNext}
+          onClick={onNext}
+          fullWidth
+        >
+          Siguiente: Música
+        </Button>
+      </div>
+      <div className="hidden md:flex items-center justify-end gap-3 pt-2">
+        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+          Atrás
+        </Button>
+        {canReset && (
+          <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
+            Subir otra ruta
+          </Button>
+        )}
+        <Button
+          variant="primary"
+          iconRight="arrow_forward"
+          disabled={!canGoNext}
+          onClick={onNext}
+        >
+          Siguiente: Música
+        </Button>
+      </div>
+    </>
+  );
+}

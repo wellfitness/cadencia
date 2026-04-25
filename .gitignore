@@ -54,3 +54,6 @@ android/app/debug/
 
 # TS incremental build cache
 tsconfig.tsbuildinfo
+
+# GPX files (rutas personales que no deben caer al repo publico)
+*.gpx

@@ -1,36 +1,29 @@
-import { useEffect, useMemo, useReducer, useState, type ChangeEvent } from 'react';
+import { useMemo, useState, type ChangeEvent, type Dispatch } from 'react';
 import {
-  EMPTY_USER_INPUTS,
+  BIKE_TYPES,
+  DEFAULTS,
   VALIDATION_LIMITS,
-  clearUserInputsFromSession,
   describeValidationError,
-  loadUserInputsFromSession,
-  saveUserInputsToSession,
-  validateUserInputs,
+  type BikeType,
   type UserInputsRaw,
   type ValidationError,
   type ValidationResult,
 } from '@core/user';
+import { BIKE_TYPE_ICONS, BIKE_TYPE_LABELS } from '@core/power';
 import { calculateMaxHeartRateGulati } from '@core/physiology';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { Input } from '@ui/components/Input';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import type { UserInputsAction } from '@ui/state/userInputsReducer';
 
-type FieldKey = keyof UserInputsRaw;
-
-type Action =
-  | { type: 'SET'; field: FieldKey; value: number | null }
-  | { type: 'RESET' };
-
-function reducer(state: UserInputsRaw, action: Action): UserInputsRaw {
-  switch (action.type) {
-    case 'SET':
-      return { ...state, [action.field]: action.value };
-    case 'RESET':
-      return EMPTY_USER_INPUTS;
-  }
-}
+type NumericFieldKey =
+  | 'weightKg'
+  | 'ftpWatts'
+  | 'maxHeartRate'
+  | 'restingHeartRate'
+  | 'birthYear'
+  | 'bikeWeightKg';
 
 function parseNumberInput(value: string): number | null {
   const trimmed = value.trim();
@@ -44,36 +37,22 @@ function numberToInputValue(n: number | null): string {
 }
 
 export interface UserDataStepProps {
+  inputs: UserInputsRaw;
+  dispatch: Dispatch<UserInputsAction>;
+  validation: ValidationResult;
+  currentYear: number;
   onNext: () => void;
-  currentYear?: number;
 }
 
 export function UserDataStep({
+  inputs,
+  dispatch,
+  validation,
+  currentYear,
   onNext,
-  currentYear = new Date().getFullYear(),
 }: UserDataStepProps): JSX.Element {
-  // Carga inicial perezosa desde sessionStorage
-  const [inputs, dispatch] = useReducer(
-    reducer,
-    null,
-    (): UserInputsRaw => loadUserInputsFromSession() ?? EMPTY_USER_INPUTS,
-  );
-
   // Para mostrar errores de "campo vacio" solo despues de un intento de submit
   const [showAllErrors, setShowAllErrors] = useState(false);
-
-  // Persistencia debounceada
-  useEffect(() => {
-    const id = setTimeout(() => {
-      saveUserInputsToSession(inputs);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [inputs]);
-
-  const validation = useMemo<ValidationResult>(
-    () => validateUserInputs(inputs, currentYear),
-    [inputs, currentYear],
-  );
 
   // FC max estimada en vivo (Gulati) cuando hay birthYear y no hay maxHeartRate
   const estimatedMaxHr: number | null = useMemo(() => {
@@ -84,13 +63,19 @@ export function UserDataStep({
     return calculateMaxHeartRateGulati(currentYear - inputs.birthYear);
   }, [inputs.birthYear, inputs.maxHeartRate, currentYear]);
 
-  const setField = (field: FieldKey) => (e: ChangeEvent<HTMLInputElement>) => {
-    dispatch({ type: 'SET', field, value: parseNumberInput(e.target.value) });
+  const setField = (field: NumericFieldKey) => (e: ChangeEvent<HTMLInputElement>) => {
+    dispatch({ type: 'SET_NUMBER', field, value: parseNumberInput(e.target.value) });
   };
+
+  const setBikeType = (value: BikeType): void => {
+    dispatch({ type: 'SET_BIKE_TYPE', value });
+  };
+
+  const effectiveBikeType: BikeType = inputs.bikeType ?? DEFAULTS.bikeType;
+  const bikeWeightPlaceholder = String(DEFAULTS.bikeWeightByType[effectiveBikeType]);
 
   const handleCancel = (): void => {
     dispatch({ type: 'RESET' });
-    clearUserInputsFromSession();
     setShowAllErrors(false);
   };
 
@@ -128,88 +113,101 @@ export function UserDataStep({
   const submitDisabled = !validation.ok;
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6 md:py-10 space-y-4 md:space-y-6 pb-32 md:pb-10">
-      <header className="space-y-2">
-        <h2 className="text-ds-h2 md:text-ds-h1 font-display text-gris-800">Tus datos</h2>
-        <p className="text-gris-600">
-          Necesitamos tu peso y o bien tu FTP, o tu FC máxima/año de nacimiento para estimar las
-          zonas de intensidad de la ruta.
-        </p>
-      </header>
-
-      <Card title="Datos básicos" titleIcon="person">
-        <Input
-          label="Peso corporal"
-          type="number"
-          step="0.1"
-          min={VALIDATION_LIMITS.weightKg.min}
-          max={VALIDATION_LIMITS.weightKg.max}
-          unit="kg"
-          required
-          value={numberToInputValue(inputs.weightKg)}
-          onChange={setField('weightKg')}
-          {...fieldFeedback(
-            ['WEIGHT_REQUIRED', 'WEIGHT_OUT_OF_RANGE'],
-            'Tu peso corporal sin equipamiento.',
-          )}
-        />
-      </Card>
-
-      <Card variant="tip" title="¿FTP o frecuencia cardíaca?" titleIcon="lightbulb">
-        <p className="text-gris-700">
-          Si conoces tu <strong>FTP</strong> (potencia umbral en vatios), las zonas se calculan con
-          el método Coggan. Si no, usamos tu <strong>FC máxima</strong> y FC en reposo (método
-          Karvonen). Necesitas <em>una de las dos</em>.
-        </p>
-      </Card>
-
-      <Card title="Potencia (recomendado si la tienes)" titleIcon="bolt">
-        <Input
-          label="FTP"
-          type="number"
-          step="1"
-          min={VALIDATION_LIMITS.ftpWatts.min}
-          max={VALIDATION_LIMITS.ftpWatts.max}
-          unit="W"
-          value={numberToInputValue(inputs.ftpWatts)}
-          onChange={setField('ftpWatts')}
-          {...fieldFeedback(
-            ['FTP_OUT_OF_RANGE'],
-            'Functional Threshold Power. Si la dejas vacía, usaremos tu FC.',
-          )}
-        />
+    <div className="mx-auto w-full max-w-2xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      <Card title="Bici y peso" titleIcon="directions_bike">
+        <div className="space-y-3">
+          <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo de bici">
+            {BIKE_TYPES.map((type) => {
+              const selected = effectiveBikeType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setBikeType(type)}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-lg border-2 px-1 py-2 min-h-[60px] transition-colors duration-200 ${
+                    selected
+                      ? 'border-turquesa-600 bg-turquesa-50 text-turquesa-800'
+                      : 'border-gris-200 bg-white text-gris-700 hover:border-turquesa-400 hover:bg-turquesa-50/40'
+                  }`}
+                >
+                  <MaterialIcon
+                    name={BIKE_TYPE_ICONS[type]}
+                    size="small"
+                    className={selected ? 'text-turquesa-600' : 'text-gris-500'}
+                  />
+                  <span className="text-xs md:text-sm font-semibold">
+                    {BIKE_TYPE_LABELS[type]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Tu peso"
+              type="number"
+              step="0.1"
+              min={VALIDATION_LIMITS.weightKg.min}
+              max={VALIDATION_LIMITS.weightKg.max}
+              unit="kg"
+              required
+              value={numberToInputValue(inputs.weightKg)}
+              onChange={setField('weightKg')}
+              {...fieldFeedback(
+                ['WEIGHT_REQUIRED', 'WEIGHT_OUT_OF_RANGE'],
+                'Sin equipamiento.',
+              )}
+            />
+            <Input
+              label="Peso bici"
+              type="number"
+              step="0.1"
+              min={VALIDATION_LIMITS.bikeWeightKg.min}
+              max={VALIDATION_LIMITS.bikeWeightKg.max}
+              unit="kg"
+              placeholder={bikeWeightPlaceholder}
+              value={numberToInputValue(inputs.bikeWeightKg)}
+              onChange={setField('bikeWeightKg')}
+              {...fieldFeedback(
+                ['BIKE_WEIGHT_OUT_OF_RANGE'],
+                `Si lo dejas vacío: ${bikeWeightPlaceholder} kg`,
+              )}
+            />
+          </div>
+        </div>
       </Card>
 
       <Card title="Frecuencia cardíaca" titleIcon="favorite">
-        <div className="space-y-4">
-          <Input
-            label="FC máxima"
-            type="number"
-            step="1"
-            min={VALIDATION_LIMITS.maxHeartRate.min}
-            max={VALIDATION_LIMITS.maxHeartRate.max}
-            unit="bpm"
-            value={numberToInputValue(inputs.maxHeartRate)}
-            onChange={setField('maxHeartRate')}
-            {...fieldFeedback(
-              ['MAX_HR_OUT_OF_RANGE'],
-              'Tu FC máxima medida en pulsómetro o en prueba de esfuerzo.',
-            )}
-          />
-          <Input
-            label="FC en reposo"
-            type="number"
-            step="1"
-            min={VALIDATION_LIMITS.restingHeartRate.min}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="FC máxima"
+              type="number"
+              step="1"
+              min={VALIDATION_LIMITS.maxHeartRate.min}
+              max={VALIDATION_LIMITS.maxHeartRate.max}
+              unit="bpm"
+              value={numberToInputValue(inputs.maxHeartRate)}
+              onChange={setField('maxHeartRate')}
+              {...fieldFeedback(['MAX_HR_OUT_OF_RANGE'], 'Medida en pulsómetro.')}
+            />
+            <Input
+              label="FC en reposo"
+              type="number"
+              step="1"
+              min={VALIDATION_LIMITS.restingHeartRate.min}
             max={VALIDATION_LIMITS.restingHeartRate.max}
             unit="bpm"
             value={numberToInputValue(inputs.restingHeartRate)}
             onChange={setField('restingHeartRate')}
             {...fieldFeedback(
               ['RESTING_HR_OUT_OF_RANGE'],
-              'Tu FC en reposo nada más despertar, antes de levantarte.',
+              'Al despertar.',
             )}
           />
+          </div>
 
           <details
             className="group rounded-lg border border-gris-200 bg-gris-50 open:bg-white open:border-turquesa-300"
@@ -262,6 +260,38 @@ export function UserDataStep({
           )}
         </div>
       </Card>
+
+      <details
+        className="group rounded-xl border border-gris-200 bg-white p-3 md:p-5 open:border-turquesa-300"
+        open={inputs.ftpWatts !== null}
+      >
+        <summary className="flex cursor-pointer items-center gap-2 text-base md:text-lg font-semibold text-gris-800 select-none min-h-[44px]">
+          <MaterialIcon name="bolt" size="small" className="text-turquesa-600" />
+          ¿Tienes potenciómetro? Mete tu FTP
+          <MaterialIcon
+            name="expand_more"
+            size="small"
+            className="ml-auto text-gris-500 transition-transform duration-200 group-open:rotate-180"
+          />
+        </summary>
+        <div className="mt-3 pt-3 border-t border-gris-100 space-y-2">
+          <p className="text-sm text-gris-600">
+            Con FTP afinamos las zonas con Coggan. Sin esto usamos tu FC.
+          </p>
+          <Input
+            label="FTP"
+            hideLabel
+            type="number"
+            step="1"
+            min={VALIDATION_LIMITS.ftpWatts.min}
+            max={VALIDATION_LIMITS.ftpWatts.max}
+            unit="W"
+            value={numberToInputValue(inputs.ftpWatts)}
+            onChange={setField('ftpWatts')}
+            {...fieldFeedback(['FTP_OUT_OF_RANGE'], 'Functional Threshold Power.')}
+          />
+        </div>
+      </details>
 
       {globalNeedHrError && showAllErrors && (
         <Card variant="info" title="Faltan datos para calcular las zonas" titleIcon="info">

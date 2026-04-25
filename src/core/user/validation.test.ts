@@ -198,6 +198,58 @@ describe('validateUserInputs', () => {
     });
   });
 
+  describe('bici', () => {
+    it('por defecto: bikeType=gravel y bikeWeightKg=10', () => {
+      const result = validateUserInputs(buildRaw({ weightKg: 70, ftpWatts: 220 }), CURRENT_YEAR);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.bikeType).toBe('gravel');
+        expect(result.data.bikeWeightKg).toBe(10);
+      }
+    });
+
+    it('si el usuario elige carretera sin tocar peso, default 8 kg', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, ftpWatts: 220, bikeType: 'road' }),
+        CURRENT_YEAR,
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.bikeType).toBe('road');
+        expect(result.data.bikeWeightKg).toBe(8);
+      }
+    });
+
+    it('si el usuario elige MTB sin tocar peso, default 13 kg', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, ftpWatts: 220, bikeType: 'mtb' }),
+        CURRENT_YEAR,
+      );
+      if (result.ok) expect(result.data.bikeWeightKg).toBe(13);
+    });
+
+    it('peso de bici fuera de rango -> BIKE_WEIGHT_OUT_OF_RANGE', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, ftpWatts: 220, bikeWeightKg: 50 }),
+        CURRENT_YEAR,
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.map((e) => e.code)).toContain('BIKE_WEIGHT_OUT_OF_RANGE');
+      }
+    });
+
+    it('peso de bici manual prevalece sobre default del tipo', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, ftpWatts: 220, bikeType: 'road', bikeWeightKg: 7 }),
+        CURRENT_YEAR,
+      );
+      if (result.ok) {
+        expect(result.data.bikeWeightKg).toBe(7);
+      }
+    });
+  });
+
   describe('determinismo', () => {
     it('misma entrada produce misma salida (funcion pura)', () => {
       const raw = buildRaw({ weightKg: 70, birthYear: 1980, restingHeartRate: 55 });
