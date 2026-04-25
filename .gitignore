@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Tests / coverage
+coverage/
+playwright-report/
+test-results/
+.vitest-cache/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Capacitor / Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/.idea/
+android/captures/
+android/app/release/
+android/app/debug/
+*.keystore
+!debug.keystore
+
+# Claude / Agent local config (per-user, not project-specific)
+.claude/
+.agent/
+.claudehooks/
+
+# TS incremental build cache
+tsconfig.tsbuildinfo

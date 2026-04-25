@@ -1,0 +1,13 @@
+echo "🔍 TypeScript check..."
+pnpm typecheck || {
+  echo "❌ TypeScript compilation failed. Fix errors before committing."
+  exit 1
+}
+
+echo "🔍 ESLint..."
+pnpm lint || {
+  echo "❌ ESLint failed. Fix errors before committing."
+  exit 1
+}
+
+echo "✅ All checks passed!"
