@@ -84,20 +84,19 @@ function isSpotifyPlaylist(v: unknown): v is SpotifyPlaylist {
 /**
  * Crea una playlist en la cuenta del token.
  *
- * Notas de la API de Spotify (Dev Mode hardening 2025):
+ * Endpoint: `POST /v1/me/playlists` (no `/users/{id}/playlists`). El antiguo
+ * endpoint con `user_id` explicito fue retirado el 11 de febrero de 2026 y
+ * devuelve 403 Forbidden silencioso. El nuevo endpoint `/me/playlists`
+ * deduce el dueno del token.
  *
- * 1. Usa `POST /v1/me/playlists` (no `/users/{id}/playlists`). El endpoint
- *    con `user_id` explicito devuelve 403 silencioso aunque token, scope y
- *    user_id sean validos. El endpoint `/me/playlists` deduce el dueno del
- *    token y no aplica esa restriccion.
+ * Notas adicionales: Spotify ignora actualmente el campo `public:false` y
+ * crea la playlist como publica (la respuesta inmediata dice `public:false`
+ * pero un GET posterior la muestra como `public:true`). Para anadir tracks
+ * a la playlist resultante el cliente necesita scope `playlist-modify-public`
+ * ademas de `playlist-modify-private`. Mantenemos `public:false` aqui por
+ * intencion documental para cuando Spotify lo respete.
  *
- * 2. `public: false` es ignorado en silencio: la respuesta inmediata dice
- *    `public:false` pero un GET a la misma playlist devuelve `public:true`,
- *    y un PUT con `public:false` no la convierte. Por eso el cliente debe
- *    pedir tambien scope `playlist-modify-public` (sino el POST a
- *    /playlists/{id}/tracks devuelve 403). Mantenemos `public:false` aqui
- *    por intencion documental: si Spotify revierte la restriccion en el
- *    futuro funcionara como queremos sin cambiar codigo.
+ * Referencia: https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide
  */
 export async function createPlaylist(
   accessToken: string,
@@ -123,6 +122,16 @@ export async function createPlaylist(
  * Anade URIs a una playlist existente. Si hay mas de 100 URIs las pagina
  * (Spotify tiene limite duro de 100 por peticion). Las URIs ya deben venir
  * en formato `spotify:track:XXX`.
+ *
+ * Endpoint: `POST /v1/playlists/{id}/items` (no `/tracks`).
+ *
+ * En la migracion de Web API del 11 de febrero de 2026 Spotify renombro
+ * el endpoint de `tracks` a `items` (para soportar tambien episodios de
+ * podcast en playlists). El antiguo `/tracks` devuelve 403 Forbidden
+ * silencioso para apps en Development Mode aunque token, scope y body
+ * sean correctos. El nuevo `/items` funciona perfectamente.
+ *
+ * Referencia: https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide
  */
 export async function addTracksToPlaylist(
   accessToken: string,
@@ -131,7 +140,7 @@ export async function addTracksToPlaylist(
 ): Promise<void> {
   for (let i = 0; i < uris.length; i += ADD_TRACKS_BATCH_SIZE) {
     const batch = uris.slice(i, i + ADD_TRACKS_BATCH_SIZE);
-    await fetchSpotify(accessToken, `/playlists/${encodeURIComponent(playlistId)}/tracks`, {
+    await fetchSpotify(accessToken, `/playlists/${encodeURIComponent(playlistId)}/items`, {
       method: 'POST',
       body: JSON.stringify({ uris: batch }),
     });

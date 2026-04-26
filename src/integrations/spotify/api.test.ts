@@ -39,6 +39,13 @@ describe('addTracksToPlaylist', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 201 }));
   });
 
+  it('POST a /playlists/{id}/items, NO /tracks (deprecado feb-2026)', async () => {
+    await addTracksToPlaylist('AT', 'pl123', ['spotify:track:a']);
+    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
+    expect(url).toContain('/v1/playlists/pl123/items');
+    expect(url).not.toMatch(/\/tracks($|\?)/);
+  });
+
   it('una sola peticion para <=100 URIs', async () => {
     const uris = Array.from({ length: 50 }, (_, i) => `spotify:track:${i}`);
     await addTracksToPlaylist('AT', 'pl123', uris);
