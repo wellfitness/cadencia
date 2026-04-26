@@ -1,0 +1,305 @@
+import { useState } from 'react';
+import type { SessionBlock, SessionItem } from '@core/segmentation';
+import { MaterialIcon } from '../MaterialIcon';
+import { ZoneBadge } from '../ZoneBadge';
+import { BlockEditor } from './BlockEditor';
+import { RepeatGroup } from './RepeatGroup';
+
+export interface BlockListProps {
+  items: readonly SessionItem[];
+  onItemsChange: (next: SessionItem[]) => void;
+}
+
+const PHASE_ICONS: Record<string, string> = {
+  warmup: 'whatshot',
+  work: 'fitness_center',
+  recovery: 'self_improvement',
+  rest: 'pause_circle',
+  cooldown: 'ac_unit',
+  main: 'directions_bike',
+};
+
+const PHASE_LABELS: Record<string, string> = {
+  warmup: 'Calentamiento',
+  work: 'Trabajo',
+  recovery: 'Recuperación',
+  rest: 'Descanso',
+  cooldown: 'Vuelta a la calma',
+  main: 'Principal',
+};
+
+/**
+ * Lista de items del plan editable. Cada item es un bloque suelto o un
+ * grupo con repeticiones × N. Soporta editar inline, reordenar con flechas
+ * y eliminar.
+ *
+ * El editor en linea identifica el bloque a editar por una clave compuesta
+ * `${itemIndex}-${blockId}` para distinguir bloques dentro de grupos.
+ */
+export function BlockList({ items, onItemsChange }: BlockListProps): JSX.Element {
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const editKey = (itemIndex: number, blockId: string): string => `${itemIndex}-${blockId}`;
+
+  const updateItem = (index: number, next: SessionItem): void => {
+    const updated = items.map((item, i) => (i === index ? next : item));
+    onItemsChange(updated);
+  };
+
+  const removeItem = (index: number): void => {
+    onItemsChange(items.filter((_, i) => i !== index));
+  };
+
+  const moveItem = (index: number, direction: -1 | 1): void => {
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    const a = next[index];
+    const b = next[target];
+    if (a === undefined || b === undefined) return;
+    next[index] = b;
+    next[target] = a;
+    onItemsChange(next);
+  };
+
+  const handleSaveEdit = (itemIndex: number, blockIndex: number | null) => (block: SessionBlock): void => {
+    const item = items[itemIndex];
+    if (item === undefined) return;
+    if (item.type === 'block') {
+      updateItem(itemIndex, { type: 'block', block });
+    } else {
+      // Edicion de bloque dentro de un grupo
+      if (blockIndex === null) return;
+      const updatedBlocks = item.blocks.map((b, i) => (i === blockIndex ? block : b));
+      updateItem(itemIndex, { ...item, blocks: updatedBlocks });
+    }
+    setEditingKey(null);
+  };
+
+  const handleRepeatChange = (itemIndex: number) => (next: number): void => {
+    const item = items[itemIndex];
+    if (item === undefined || item.type !== 'group') return;
+    updateItem(itemIndex, { ...item, repeat: next });
+  };
+
+  const handleUngroup = (itemIndex: number) => (): void => {
+    const item = items[itemIndex];
+    if (item === undefined || item.type !== 'group') return;
+    // Sustituye el grupo por sus bloques sueltos
+    const blockItems: SessionItem[] = item.blocks.map((b) => ({ type: 'block', block: b }));
+    const next = [...items.slice(0, itemIndex), ...blockItems, ...items.slice(itemIndex + 1)];
+    onItemsChange(next);
+  };
+
+  const removeBlockFromGroup = (itemIndex: number, blockIndex: number): void => {
+    const item = items[itemIndex];
+    if (item === undefined || item.type !== 'group') return;
+    const updatedBlocks = item.blocks.filter((_, i) => i !== blockIndex);
+    if (updatedBlocks.length === 0) {
+      // Si vacia el grupo, elimina el grupo entero
+      removeItem(itemIndex);
+    } else {
+      updateItem(itemIndex, { ...item, blocks: updatedBlocks });
+    }
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-lg border-2 border-dashed border-gris-300 bg-gris-50 p-6 text-center text-sm text-gris-500">
+        Aún no hay bloques. Carga una plantilla o pulsa "Añadir bloque".
+      </div>
+    );
+  }
+
+  return (
+    <ul className="space-y-2 md:space-y-2.5">
+      {items.map((item, itemIndex) => {
+        const canMoveUp = itemIndex > 0;
+        const canMoveDown = itemIndex < items.length - 1;
+
+        if (item.type === 'block') {
+          const block = item.block;
+          const isEditing = editingKey === editKey(itemIndex, block.id);
+          if (isEditing) {
+            return (
+              <li key={block.id}>
+                <BlockEditor
+                  block={block}
+                  onSave={handleSaveEdit(itemIndex, null)}
+                  onCancel={() => setEditingKey(null)}
+                />
+              </li>
+            );
+          }
+          return (
+            <li key={block.id}>
+              <BlockRow
+                block={block}
+                onEdit={() => setEditingKey(editKey(itemIndex, block.id))}
+                onRemove={() => removeItem(itemIndex)}
+                {...(canMoveUp ? { onMoveUp: () => moveItem(itemIndex, -1) } : {})}
+                {...(canMoveDown ? { onMoveDown: () => moveItem(itemIndex, 1) } : {})}
+              />
+            </li>
+          );
+        }
+
+        // Grupo
+        const groupExpandedSec =
+          item.blocks.reduce((acc, b) => acc + b.durationSec, 0) * Math.max(1, item.repeat);
+        return (
+          <li key={item.id}>
+            <div className="flex items-stretch gap-2">
+              <div className="flex flex-col items-center gap-1 pt-2">
+                <button
+                  type="button"
+                  onClick={canMoveUp ? () => moveItem(itemIndex, -1) : undefined}
+                  disabled={!canMoveUp}
+                  aria-label="Mover grupo arriba"
+                  className="w-7 h-7 rounded-md border border-gris-300 bg-white text-gris-600 hover:bg-gris-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  <MaterialIcon name="arrow_upward" size="small" />
+                </button>
+                <button
+                  type="button"
+                  onClick={canMoveDown ? () => moveItem(itemIndex, 1) : undefined}
+                  disabled={!canMoveDown}
+                  aria-label="Mover grupo abajo"
+                  className="w-7 h-7 rounded-md border border-gris-300 bg-white text-gris-600 hover:bg-gris-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  <MaterialIcon name="arrow_downward" size="small" />
+                </button>
+              </div>
+              <RepeatGroup
+                repeat={item.repeat}
+                onRepeatChange={handleRepeatChange(itemIndex)}
+                onUngroup={handleUngroup(itemIndex)}
+                onRemove={() => removeItem(itemIndex)}
+                expandedDurationSec={groupExpandedSec}
+                className="flex-1 min-w-0"
+              >
+                {item.blocks.map((block, blockIndex) => {
+                  const isEditing = editingKey === editKey(itemIndex, block.id);
+                  if (isEditing) {
+                    return (
+                      <BlockEditor
+                        key={block.id}
+                        block={block}
+                        onSave={handleSaveEdit(itemIndex, blockIndex)}
+                        onCancel={() => setEditingKey(null)}
+                      />
+                    );
+                  }
+                  return (
+                    <BlockRow
+                      key={block.id}
+                      block={block}
+                      onEdit={() => setEditingKey(editKey(itemIndex, block.id))}
+                      onRemove={() => removeBlockFromGroup(itemIndex, blockIndex)}
+                      compact
+                    />
+                  );
+                })}
+              </RepeatGroup>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+interface BlockRowProps {
+  block: SessionBlock;
+  onEdit: () => void;
+  onRemove: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  compact?: boolean;
+}
+
+function BlockRow({
+  block,
+  onEdit,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+  compact = false,
+}: BlockRowProps): JSX.Element {
+  return (
+    <div
+      className={`flex items-center gap-2 rounded-md border bg-white px-2.5 py-2 ${
+        compact ? 'border-gris-200' : 'border-gris-300 shadow-sm'
+      }`}
+    >
+      {!compact && (
+        <div className="flex flex-col items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={onMoveUp === undefined}
+            aria-label="Mover arriba"
+            className="w-6 h-6 rounded text-gris-500 hover:bg-gris-100 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            <MaterialIcon name="arrow_upward" size="small" />
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={onMoveDown === undefined}
+            aria-label="Mover abajo"
+            className="w-6 h-6 rounded text-gris-500 hover:bg-gris-100 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            <MaterialIcon name="arrow_downward" size="small" />
+          </button>
+        </div>
+      )}
+
+      <MaterialIcon
+        name={PHASE_ICONS[block.phase] ?? 'circle'}
+        size="small"
+        className="text-gris-500 flex-shrink-0"
+      />
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <ZoneBadge zone={block.zone} size="sm" />
+          <span className="text-sm font-semibold text-gris-800">
+            {formatDuration(block.durationSec)}
+          </span>
+          <span className="text-xs text-gris-500">{PHASE_LABELS[block.phase] ?? block.phase}</span>
+        </div>
+        {block.description !== undefined && (
+          <p className="text-xs text-gris-500 italic truncate mt-0.5">{block.description}</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          type="button"
+          onClick={onEdit}
+          aria-label="Editar bloque"
+          className="w-8 h-8 rounded-md text-gris-600 hover:bg-gris-100 flex items-center justify-center"
+        >
+          <MaterialIcon name="edit" size="small" />
+        </button>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Eliminar bloque"
+          className="w-8 h-8 rounded-md text-rosa-600 hover:bg-rosa-50 flex items-center justify-center"
+        >
+          <MaterialIcon name="delete" size="small" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  if (sec === 0) return `${min}'`;
+  return `${min}'${sec.toString().padStart(2, '0')}"`;
+}

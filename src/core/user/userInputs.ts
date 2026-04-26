@@ -1,7 +1,15 @@
-/** Tipos de bici soportados para el modelo fisico. Eléctrica fuera por ahora. */
-export type BikeType = 'road' | 'gravel' | 'mtb' | 'urban';
+/**
+ * Tipos de bici soportados para el modelo fisico.
+ *
+ * No incluimos "urbana" deliberadamente: la app pide al ciclista llevar
+ * auriculares y eso es arriesgado en ciudad (no oyes el trafico). Para
+ * trayectos urbanos recomendamos no usar la app.
+ *
+ * Electrica fuera por ahora (la asistencia rompe la ecuacion de potencia).
+ */
+export type BikeType = 'road' | 'gravel' | 'mtb';
 
-export const BIKE_TYPES: readonly BikeType[] = ['road', 'gravel', 'mtb', 'urban'] as const;
+export const BIKE_TYPES: readonly BikeType[] = ['road', 'gravel', 'mtb'] as const;
 
 /**
  * Datos fisiologicos crudos tal cual los introduce el usuario en el formulario.
@@ -57,7 +65,6 @@ export const DEFAULTS = {
     road: 8,
     gravel: 10,
     mtb: 13,
-    urban: 15,
   } as const satisfies Record<BikeType, number>,
 };
 

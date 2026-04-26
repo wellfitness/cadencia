@@ -32,7 +32,6 @@ export const DEFAULT_POWER_CONSTANTS: PowerConstants = {
  * - road: tubeless carretera, postura aerodinamica con manillar bajo.
  * - gravel: neumatico mixto, postura erguida-relajada.
  * - mtb: tacos anchos, postura erguida.
- * - urban: neumatico mixto urbano, postura muy erguida.
  */
 export interface BikePreset {
   crr: number;
@@ -43,14 +42,12 @@ export const BIKE_PRESETS: Record<BikeType, BikePreset> = {
   road: { crr: 0.003, cdaM2: 0.28 },
   gravel: { crr: 0.005, cdaM2: 0.36 },
   mtb: { crr: 0.012, cdaM2: 0.48 },
-  urban: { crr: 0.008, cdaM2: 0.5 },
 };
 
 export const BIKE_TYPE_LABELS: Record<BikeType, string> = {
   road: 'Carretera',
   gravel: 'Gravel',
   mtb: 'Montaña',
-  urban: 'Urbana',
 };
 
 /** Material icon name por tipo de bici (todos disponibles en Material Icons). */
@@ -58,7 +55,6 @@ export const BIKE_TYPE_ICONS: Record<BikeType, string> = {
   road: 'directions_bike',
   gravel: 'terrain',
   mtb: 'landscape',
-  urban: 'pedal_bike',
 };
 
 /**

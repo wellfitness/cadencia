@@ -3,6 +3,7 @@ import { parseGpx } from '@core/gpx/parser';
 import {
   segmentInto60SecondBlocks,
   type ClassifiedSegment,
+  type EditableSessionPlan,
   type RouteMeta,
 } from '@core/segmentation';
 import type { ValidatedUserInputs } from '@core/user/userInputs';
@@ -13,29 +14,77 @@ import { ElevationChart } from '@ui/components/ElevationChart';
 import { FileDropzone } from '@ui/components/FileDropzone';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { RouteSummary } from '@ui/components/RouteSummary';
+import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import { SessionBuilder } from '@ui/pages/SessionBuilder';
 
 export interface RouteStepProps {
+  validatedInputs: ValidatedUserInputs;
+  /** Origen ya elegido en el paso "Tipo". Define que sub-flujo renderiza. */
+  sourceType: RouteSourceChoice;
+  /** Plan de sesion previamente guardado (restaurado de sessionStorage). */
+  initialSessionPlan?: EditableSessionPlan | undefined;
+  onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
+  /** Callback cuando el plan de sesion editable cambia. */
+  onSessionPlanChange: (plan: EditableSessionPlan | null) => void;
+  onBack: () => void;
+  onNext: () => void;
+}
+
+type GpxPhase = 'idle' | 'parsing' | 'ready' | 'error';
+
+export function RouteStep({
+  validatedInputs,
+  sourceType,
+  initialSessionPlan,
+  onProcessed,
+  onSessionPlanChange,
+  onBack,
+  onNext,
+}: RouteStepProps): JSX.Element {
+  if (sourceType === 'session') {
+    return (
+      <SessionBuilder
+        validatedInputs={validatedInputs}
+        initialPlan={initialSessionPlan}
+        onProcessed={(segments, meta, plan) => {
+          onSessionPlanChange(plan);
+          onProcessed(segments, meta);
+        }}
+        onChange={onSessionPlanChange}
+        onBack={onBack}
+        onNext={onNext}
+      />
+    );
+  }
+
+  return (
+    <GpxRouteFlow
+      validatedInputs={validatedInputs}
+      onProcessed={onProcessed}
+      onBack={onBack}
+      onNext={onNext}
+    />
+  );
+}
+
+interface GpxRouteFlowProps {
   validatedInputs: ValidatedUserInputs;
   onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
   onBack: () => void;
   onNext: () => void;
 }
 
-type Phase = 'idle' | 'parsing' | 'ready' | 'error';
-
-export function RouteStep({
+function GpxRouteFlow({
   validatedInputs,
   onProcessed,
   onBack,
   onNext,
-}: RouteStepProps): JSX.Element {
-  const [phase, setPhase] = useState<Phase>('idle');
+}: GpxRouteFlowProps): JSX.Element {
+  const [phase, setPhase] = useState<GpxPhase>('idle');
   const [segments, setSegments] = useState<ClassifiedSegment[] | null>(null);
   const [meta, setMeta] = useState<RouteMeta | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Calcular zonas Karvonen una vez si el usuario tiene los datos. Estas zonas
-  // se pasan al chart y al summary para mostrar BPM esperados por zona.
   const karvonenZones = useMemo<KarvonenZoneRange[] | undefined>(() => {
     if (
       !validatedInputs.hasHeartRateZones ||

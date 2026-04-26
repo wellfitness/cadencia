@@ -2,6 +2,7 @@ import { useMemo, useReducer, type ChangeEvent } from 'react';
 import {
   EMPTY_PREFERENCES,
   matchTracksToSegments,
+  type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
 } from '@core/matching';
@@ -42,6 +43,14 @@ export interface MusicStepProps {
   onBack: () => void;
   /** Estado inicial de preferencias (si el usuario vuelve atrás y entra otra vez). */
   initialPreferences?: MatchPreferences;
+  /**
+   * Modo de matching frente a las zonas:
+   * - 'overlap' (default): un track cubre los siguientes segmentos aunque
+   *   cambien de zona. Adecuado para GPX (rutas continuas).
+   * - 'discrete': cada bloque arranca con su propio track de su zona.
+   *   Adecuado para sesiones indoor por intervalos.
+   */
+  crossZoneMode?: CrossZoneMode;
 }
 
 export function MusicStep({
@@ -50,6 +59,7 @@ export function MusicStep({
   onMatched,
   onBack,
   initialPreferences,
+  crossZoneMode = 'overlap',
 }: MusicStepProps): JSX.Element {
   const [preferences, dispatch] = useReducer(
     preferencesReducer,
@@ -63,8 +73,8 @@ export function MusicStep({
   // Matching en vivo: cada cambio de preferencias recalcula. <50ms para 142
   // tracks y rutas tipicas, no necesita debounce.
   const matched = useMemo(
-    () => matchTracksToSegments(segments, tracks, preferences),
-    [segments, tracks, preferences],
+    () => matchTracksToSegments(segments, tracks, preferences, { crossZoneMode }),
+    [segments, tracks, preferences, crossZoneMode],
   );
 
   const setGenres = (genres: string[]): void => {

@@ -272,4 +272,84 @@ describe('validateUserInputs', () => {
       }
     });
   });
+
+  describe("modo 'session' (sesion indoor)", () => {
+    it('sin ningun dato fisiologico es valido (peso default 70)', () => {
+      const result = validateUserInputs(buildRaw({}), CURRENT_YEAR, 'session');
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.weightKg).toBe(70);
+        expect(result.data.hasFtp).toBe(false);
+        expect(result.data.hasHeartRateZones).toBe(false);
+        expect(result.data.effectiveMaxHr).toBeNull();
+      }
+    });
+
+    it('peso opcional pero validado si se rellena', () => {
+      const tooLow = validateUserInputs(buildRaw({ weightKg: 5 }), CURRENT_YEAR, 'session');
+      expect(tooLow.ok).toBe(false);
+      const valid = validateUserInputs(buildRaw({ weightKg: 80 }), CURRENT_YEAR, 'session');
+      expect(valid.ok).toBe(true);
+      if (valid.ok) expect(valid.data.weightKg).toBe(80);
+    });
+
+    it('FTP opcional pero validado si se rellena', () => {
+      const result = validateUserInputs(
+        buildRaw({ ftpWatts: 220 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.ftpWatts).toBe(220);
+        expect(result.data.hasFtp).toBe(true);
+      }
+    });
+
+    it('FC max + reposo activan hasHeartRateZones', () => {
+      const result = validateUserInputs(
+        buildRaw({ maxHeartRate: 185, restingHeartRate: 60 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.hasHeartRateZones).toBe(true);
+        expect(result.data.effectiveMaxHr).toBe(185);
+        expect(result.data.restingHeartRate).toBe(60);
+      }
+    });
+
+    it('FC reposo >= FC max (ambos en rango) -> error RESTING_GE_MAX_HR', () => {
+      // Valores en rango: maxHR min=100, restingHR max=100. Igualdad dispara la regla.
+      const result = validateUserInputs(
+        buildRaw({ maxHeartRate: 100, restingHeartRate: 100 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'RESTING_GE_MAX_HR')).toBe(true);
+      }
+    });
+
+    it('NO exige FTP/FC/birthYear (a diferencia de modo gpx)', () => {
+      const session = validateUserInputs(buildRaw({}), CURRENT_YEAR, 'session');
+      const gpx = validateUserInputs(buildRaw({}), CURRENT_YEAR);
+      expect(session.ok).toBe(true);
+      expect(gpx.ok).toBe(false);
+    });
+
+    it('birthYear sin FC max calcula effectiveMaxHr via Gulati', () => {
+      const result = validateUserInputs(
+        buildRaw({ birthYear: 1980 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.effectiveMaxHr).toBeCloseTo(181.56, 2);
+      }
+    });
+  });
 });

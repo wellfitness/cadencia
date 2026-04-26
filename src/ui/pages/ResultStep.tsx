@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type Dispatch } from 'react';
 import {
   matchTracksToSegments,
   replaceTrackInSegment,
+  type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
 } from '@core/matching';
@@ -55,6 +56,12 @@ export interface ResultStepProps {
   /** Callback al cambiar matched o preferences (App.tsx persiste). */
   onMatchedChange: (matched: MatchedSegment[], preferences: MatchPreferences) => void;
   onBack: () => void;
+  /** Si la ruta vino de una sesion indoor, callback para abrir el modo TV. */
+  onEnterTVMode?: () => void;
+  /** Modo del formulario de "Ajustar mis datos": gpx (default) o session. */
+  mode?: 'gpx' | 'session';
+  /** Modo de matching: overlap (GPX, default) o discrete (sesion indoor). */
+  crossZoneMode?: CrossZoneMode;
 }
 
 type Phase = 'idle' | 'authorizing' | 'exchanging' | 'creating' | 'done' | 'error';
@@ -71,6 +78,9 @@ export function ResultStep({
   preferences,
   onMatchedChange,
   onBack,
+  onEnterTVMode,
+  mode = 'gpx',
+  crossZoneMode = 'overlap',
 }: ResultStepProps): JSX.Element {
   const clientId = getSpotifyClientId();
   const tracks = useMemo(() => loadNativeTracks(), []);
@@ -89,7 +99,9 @@ export function ResultStep({
   // El indice de "reemplazados manualmente" se reinicia.
   useEffect(() => {
     if (!validation.ok) return;
-    const fresh = matchTracksToSegments(routeSegments, tracks, preferences);
+    const fresh = matchTracksToSegments(routeSegments, tracks, preferences, {
+      crossZoneMode,
+    });
     if (
       fresh.length !== matched.length ||
       fresh.some((m, i) => m.track?.uri !== matched[i]?.track?.uri)
@@ -98,7 +110,7 @@ export function ResultStep({
       setReplacedIndices(new Set());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: recalculamos solo al cambiar inputs validados o ruta
-  }, [validatedInputs, routeSegments, preferences]);
+  }, [validatedInputs, routeSegments, preferences, crossZoneMode]);
 
   // Detecta `?code=...&state=...` en URL al volver del callback web.
   useEffect(() => {
@@ -135,7 +147,7 @@ export function ResultStep({
   };
 
   const handlePreferencesChange = (next: MatchPreferences): void => {
-    const fresh = matchTracksToSegments(routeSegments, tracks, next);
+    const fresh = matchTracksToSegments(routeSegments, tracks, next, { crossZoneMode });
     onMatchedChange(fresh, next);
     setReplacedIndices(new Set());
   };
@@ -209,6 +221,17 @@ export function ResultStep({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      {onEnterTVMode !== undefined && (
+        <Card variant="tip" title="Modo sesión" titleIcon="cast">
+          <p className="text-sm text-gris-700 mb-3">
+            Tu sesión tiene fases con duración programada. Activa el modo sesión para
+            seguirla con cronómetro y avisos sonoros mientras suena la lista en Spotify.
+          </p>
+          <Button variant="primary" iconLeft="play_circle" onClick={onEnterTVMode}>
+            Iniciar modo sesión
+          </Button>
+        </Card>
+      )}
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex items-baseline justify-between gap-2 mb-3">
           <p className="text-sm text-gris-600">
@@ -245,6 +268,7 @@ export function ResultStep({
         dispatch={dispatch}
         validation={validation}
         currentYear={currentYear}
+        mode={mode}
       />
 
       <MusicPreferencesPanel

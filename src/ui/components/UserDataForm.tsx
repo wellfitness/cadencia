@@ -42,6 +42,14 @@ export interface UserDataFormProps {
   currentYear: number;
   /** True para mostrar errores de campos vacios (tras intentar avanzar). */
   showAllErrors?: boolean;
+  /**
+   * Modo del formulario:
+   * - 'gpx' (default): pide peso, bici, FTP/FC. Todo orientado a calcular
+   *   potencia desde la ecuacion fisica al procesar el GPX.
+   * - 'session': pide solo FTP y FC (todo opcional). El peso y la bici no
+   *   se usan en la pipeline indoor, asi que no se piden.
+   */
+  mode?: 'gpx' | 'session';
 }
 
 /**
@@ -56,7 +64,9 @@ export function UserDataForm({
   validation,
   currentYear,
   showAllErrors = false,
+  mode = 'gpx',
 }: UserDataFormProps): JSX.Element {
+  const isSession = mode === 'session';
   const [internalShowAllErrors] = useState(showAllErrors);
   const showVacios = showAllErrors || internalShowAllErrors;
 
@@ -100,6 +110,16 @@ export function UserDataForm({
 
   return (
     <div className="space-y-3 md:space-y-4">
+      {isSession && (
+        <Card variant="tip" titleIcon="info" title="Datos opcionales">
+          <p className="text-sm text-gris-700">
+            Para una sesión indoor todos los datos de abajo son opcionales. Si los rellenas
+            podremos mostrarte tus rangos de FC objetivo durante la sesión y afinar mejor
+            la potencia estimada de cada bloque.
+          </p>
+        </Card>
+      )}
+      {!isSession && (
       <Card title="Bici y peso" titleIcon="directions_bike">
         <div className="space-y-3">
           <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Tipo de bici">
@@ -164,6 +184,7 @@ export function UserDataForm({
           </div>
         </div>
       </Card>
+      )}
 
       <Card title="Frecuencia cardíaca" titleIcon="favorite">
         <div className="space-y-3">
@@ -276,7 +297,7 @@ export function UserDataForm({
         </div>
       </details>
 
-      {globalNeedHrError && showVacios && (
+      {globalNeedHrError && showVacios && !isSession && (
         <Card variant="info" title="Faltan datos para calcular las zonas" titleIcon="info">
           <p className="text-gris-700">
             {describeValidationError(globalNeedHrError)} Rellena uno de los tres campos: FTP, FC

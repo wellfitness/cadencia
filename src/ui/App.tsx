@@ -6,31 +6,54 @@ import {
   validateUserInputs,
   type UserInputsRaw,
 } from '@core/user';
-import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
+import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/segmentation';
 import { EMPTY_PREFERENCES, type MatchPreferences, type MatchedSegment } from '@core/matching';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import { Landing } from '@ui/pages/Landing';
+import { SourceTypeStep } from '@ui/pages/SourceTypeStep';
 import { UserDataStep } from '@ui/pages/UserDataStep';
 import { RouteStep } from '@ui/pages/RouteStep';
 import { MusicStep } from '@ui/pages/MusicStep';
 import { ResultStep } from '@ui/pages/ResultStep';
+import { SessionTVMode } from '@ui/pages/SessionTVMode';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
-import { loadWizardState, saveWizardState } from '@ui/state/wizardStorage';
+import { loadWizardState, saveWizardState, type RouteSourceType } from '@ui/state/wizardStorage';
 
 const STEPS: readonly StepperStep[] = [
+  { label: 'Tipo', icon: 'tune' },
   { label: 'Datos', icon: 'person' },
   { label: 'Ruta', icon: 'route' },
   { label: 'Música', icon: 'music_note' },
   { label: 'Resultado', icon: 'playlist_play' },
 ] as const;
 
+const STEP_TYPE = 0;
+const STEP_DATA = 1;
+const STEP_ROUTE = 2;
+const STEP_MUSIC = 3;
+const STEP_RESULT = 4;
+
 export function App(): JSX.Element {
   // Carga lazy del state del wizard desde sessionStorage. Necesario para
   // sobrevivir al redirect de Spotify en /callback (full page navigation).
   const persisted = useState(() => loadWizardState())[0];
 
-  const [currentStep, setCurrentStep] = useState<number>(persisted?.currentStep ?? 0);
+  // Vista activa: la landing es la pantalla de inicio para usuarios nuevos
+  // o sesiones limpias. Si hay progreso persistido (vuelta de OAuth Spotify
+  // o refresh a media tarea) saltamos directos al wizard para no interrumpir.
+  const hasPersistedProgress =
+    persisted !== null &&
+    (persisted.currentStep > 0 ||
+      persisted.completedSteps.length > 0 ||
+      persisted.sourceType !== undefined);
+  const [view, setView] = useState<'landing' | 'wizard'>(
+    hasPersistedProgress ? 'wizard' : 'landing',
+  );
+
+  const [currentStep, setCurrentStep] = useState<number>(persisted?.currentStep ?? STEP_TYPE);
   const [completedSteps, setCompletedSteps] = useState<readonly number[]>(
     persisted?.completedSteps ?? [],
   );
@@ -54,9 +77,20 @@ export function App(): JSX.Element {
     return () => clearTimeout(id);
   }, [inputs]);
 
+  // Origen de la ruta y plan de sesion editable (rama indoor cycling).
+  const [sourceType, setSourceType] = useState<RouteSourceType | null>(
+    persisted?.sourceType ?? null,
+  );
+  const [sessionPlan, setSessionPlan] = useState<EditableSessionPlan | null>(
+    persisted?.sessionPlan ?? null,
+  );
+
+  // La validacion depende del sourceType: en modo 'session' relajamos las
+  // reglas (peso/bici opcionales, sin requisito de FTP/FC/birthYear).
+  const validationMode = sourceType === 'session' ? 'session' : 'gpx';
   const validation = useMemo(
-    () => validateUserInputs(inputs, currentYear),
-    [inputs, currentYear],
+    () => validateUserInputs(inputs, currentYear, validationMode),
+    [inputs, currentYear, validationMode],
   );
 
   // Estado de la ruta procesada (vive en App para que la fase 4 "Resultado"
@@ -67,9 +101,10 @@ export function App(): JSX.Element {
   );
   const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(persisted?.routeMeta ?? null);
 
+  // Modo TV: overlay activable solo cuando hay sessionPlan
+  const [tvModeActive, setTvModeActive] = useState(false);
+
   // Estado de la lista de musica generada (preferencias + segmentos casados).
-  // Se setea cuando el usuario pulsa Siguiente en MusicStep y se actualiza
-  // desde ResultStep si el usuario edita inputs/preferencias o sustituye temas.
   const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(
     persisted?.matchedList ?? null,
   );
@@ -77,9 +112,7 @@ export function App(): JSX.Element {
     persisted?.musicPreferences ?? EMPTY_PREFERENCES,
   );
 
-  // Persistir el wizard state en sessionStorage en cada cambio. Necesario para
-  // que el redirect OAuth de Spotify (que hace full page navigation) no
-  // pierda el progreso.
+  // Persistir el wizard state en sessionStorage en cada cambio.
   useEffect(() => {
     saveWizardState({
       currentStep,
@@ -88,8 +121,19 @@ export function App(): JSX.Element {
       routeMeta,
       matchedList,
       musicPreferences,
+      ...(sourceType !== null ? { sourceType } : {}),
+      ...(sessionPlan !== null ? { sessionPlan } : {}),
     });
-  }, [currentStep, completedSteps, routeSegments, routeMeta, matchedList, musicPreferences]);
+  }, [
+    currentStep,
+    completedSteps,
+    routeSegments,
+    routeMeta,
+    matchedList,
+    musicPreferences,
+    sourceType,
+    sessionPlan,
+  ]);
 
   const handleNext = (): void => {
     setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
@@ -101,7 +145,6 @@ export function App(): JSX.Element {
   };
 
   const handleStepClick = (index: number): void => {
-    // Solo permitir navegar a pasos completados (no saltar adelante).
     if (completedSteps.includes(index) && index !== currentStep) {
       setCurrentStep(index);
     }
@@ -110,6 +153,27 @@ export function App(): JSX.Element {
   const handleRouteProcessed = (segments: ClassifiedSegment[], meta: RouteMeta): void => {
     setRouteSegments(segments);
     setRouteMeta(meta);
+  };
+
+  const handleSourceTypeSelect = (next: RouteSourceChoice): void => {
+    if (sourceType !== next) {
+      // Si cambia la rama, limpiamos los datos derivados de la rama anterior
+      setRouteSegments(null);
+      setRouteMeta(null);
+      setMatchedList(null);
+      // Si dejamos la rama indoor, limpiamos el plan
+      if (next !== 'session') {
+        setSessionPlan(null);
+      }
+    }
+    setSourceType(next);
+    // Avance automatico al paso Datos: el usuario no necesita un boton extra
+    setCompletedSteps((prev) => (prev.includes(STEP_TYPE) ? prev : [...prev, STEP_TYPE]));
+    setCurrentStep(STEP_DATA);
+  };
+
+  const handleSessionPlanChange = (plan: EditableSessionPlan | null): void => {
+    setSessionPlan(plan);
   };
 
   const handleMatched = (
@@ -129,6 +193,23 @@ export function App(): JSX.Element {
     setMusicPreferences(preferences);
   };
 
+  // Modo TV pantalla completa: solo accesible si hay sessionPlan.
+  if (tvModeActive && sessionPlan !== null && validation.ok) {
+    return (
+      <SessionTVMode
+        plan={sessionPlan}
+        validatedInputs={validation.data}
+        onClose={() => setTvModeActive(false)}
+      />
+    );
+  }
+
+  // Landing: pantalla de inicio. Al pulsar "Empezar" entramos al wizard
+  // por el paso Tipo (STEP_TYPE = 0).
+  if (view === 'landing') {
+    return <Landing onStart={() => setView('wizard')} />;
+  }
+
   return (
     <div className="min-h-full flex flex-col bg-white">
       <Header />
@@ -144,39 +225,55 @@ export function App(): JSX.Element {
       </div>
 
       <main className="flex-1">
-        {currentStep === 0 && (
+        {currentStep === STEP_TYPE && (
+          <SourceTypeStep onSelect={handleSourceTypeSelect} />
+        )}
+
+        {currentStep === STEP_DATA && sourceType !== null && (
           <UserDataStep
             inputs={inputs}
             dispatch={dispatch}
             validation={validation}
             currentYear={currentYear}
+            onBack={handleBack}
             onNext={handleNext}
+            mode={sourceType === 'session' ? 'session' : 'gpx'}
           />
         )}
-        {currentStep === 1 && validation.ok && (
+        {currentStep === STEP_DATA && sourceType === null && (
+          <NeedsTypeMessage onBack={handleBack} />
+        )}
+
+        {currentStep === STEP_ROUTE && validation.ok && sourceType !== null && (
           <RouteStep
             validatedInputs={validation.data}
+            sourceType={sourceType}
+            initialSessionPlan={sessionPlan ?? undefined}
             onProcessed={handleRouteProcessed}
+            onSessionPlanChange={handleSessionPlanChange}
             onBack={handleBack}
             onNext={handleNext}
           />
         )}
-        {currentStep === 1 && !validation.ok && (
+        {currentStep === STEP_ROUTE && (!validation.ok || sourceType === null) && (
           <NeedsDataMessage onBack={handleBack} />
         )}
-        {currentStep === 2 && routeSegments !== null && routeMeta !== null && (
+
+        {currentStep === STEP_MUSIC && routeSegments !== null && routeMeta !== null && (
           <MusicStep
             segments={routeSegments}
             meta={routeMeta}
             onMatched={handleMatched}
             onBack={handleBack}
             initialPreferences={musicPreferences}
+            crossZoneMode={sourceType === 'session' ? 'discrete' : 'overlap'}
           />
         )}
-        {currentStep === 2 && (routeSegments === null || routeMeta === null) && (
+        {currentStep === STEP_MUSIC && (routeSegments === null || routeMeta === null) && (
           <NeedsRouteMessage onBack={handleBack} />
         )}
-        {currentStep === 3 &&
+
+        {currentStep === STEP_RESULT &&
           validation.ok &&
           routeSegments !== null &&
           routeMeta !== null &&
@@ -193,9 +290,16 @@ export function App(): JSX.Element {
               preferences={musicPreferences}
               onMatchedChange={handleMatchedChange}
               onBack={handleBack}
+              {...(sourceType === 'session'
+                ? {
+                    mode: 'session' as const,
+                    crossZoneMode: 'discrete' as const,
+                    onEnterTVMode: () => setTvModeActive(true),
+                  }
+                : {})}
             />
           )}
-        {currentStep === 3 &&
+        {currentStep === STEP_RESULT &&
           (!validation.ok ||
             routeSegments === null ||
             routeMeta === null ||
@@ -207,16 +311,33 @@ export function App(): JSX.Element {
   );
 }
 
-interface NeedsDataMessageProps {
-  onBack: () => void;
-}
-
-function NeedsDataMessage({ onBack }: NeedsDataMessageProps): JSX.Element {
+function NeedsTypeMessage({ onBack }: { onBack: () => void }): JSX.Element {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10">
-      <Card variant="info" title="Necesitamos tus datos primero" titleIcon="warning">
+      <Card variant="info" title="Elige primero el tipo de entrenamiento" titleIcon="warning">
         <p className="text-gris-700 mb-4">
-          Vuelve al paso anterior para introducir tu peso y FTP o frecuencia cardíaca.
+          Necesitamos saber si vas a entrenar con una ruta GPX o una sesión indoor para
+          adaptarnos a ti.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-turquesa-700 font-semibold hover:underline"
+        >
+          <MaterialIcon name="arrow_back" size="small" />
+          Volver al paso de Tipo
+        </button>
+      </Card>
+    </div>
+  );
+}
+
+function NeedsDataMessage({ onBack }: { onBack: () => void }): JSX.Element {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+      <Card variant="info" title="Revisa tus datos" titleIcon="warning">
+        <p className="text-gris-700 mb-4">
+          Vuelve al paso anterior para introducir los datos que necesitamos.
         </p>
         <button
           type="button"
@@ -234,10 +355,10 @@ function NeedsDataMessage({ onBack }: NeedsDataMessageProps): JSX.Element {
 function NeedsRouteMessage({ onBack }: { onBack: () => void }): JSX.Element {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-10">
-      <Card variant="info" title="Sube tu ruta antes" titleIcon="warning">
+      <Card variant="info" title="Define tu ruta o sesión antes" titleIcon="warning">
         <p className="text-gris-700 mb-4">
-          Para elegir la música necesitamos saber qué zonas tendrá tu ruta. Vuelve a
-          subir tu GPX en el paso anterior.
+          Para elegir la música necesitamos saber qué zonas tendrá tu entrenamiento.
+          Vuelve al paso de Ruta para subir un GPX o construir una sesión indoor.
         </p>
         <button
           type="button"
@@ -287,7 +408,7 @@ function Header(): JSX.Element {
             Vatios con Ritmo
           </h1>
           <p className="text-xs md:text-sm text-gris-500 mt-1">
-            Tu ruta GPX, tu música al ritmo de tu potencia.
+            Tu entrenamiento, tu música al ritmo de tu intensidad.
           </p>
         </div>
       </div>
@@ -331,4 +452,3 @@ function Footer(): JSX.Element {
     </footer>
   );
 }
-

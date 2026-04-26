@@ -24,15 +24,38 @@ export type ValidationResult =
   | { ok: true; data: ValidatedUserInputs }
   | { ok: false; errors: ValidationError[] };
 
+/**
+ * Modo de validacion segun la fuente del entrenamiento.
+ *
+ * - 'gpx': comportamiento original. Peso obligatorio (alimenta la ecuacion
+ *   de potencia GPX), zonas requieren FTP o FC o birthYear. Bici relevante.
+ * - 'session': el usuario construye bloques manualmente y elige la zona de
+ *   cada uno, asi que el peso/bici no son load-bearing y pueden quedar
+ *   vacios. Si no hay FTP/FC/birthYear, las zonas siguen siendo elegibles
+ *   por el usuario y solo perdemos la estimacion de potencia (cosmetica)
+ *   y los BPM esperados por zona en el modo TV. Todo opcional.
+ */
+export type ValidationMode = 'gpx' | 'session';
+
+const SESSION_DEFAULT_WEIGHT_KG = 70;
+
 function inRange(value: number, min: number, max: number): boolean {
   return Number.isFinite(value) && value >= min && value <= max;
 }
 
 /**
- * Valida los inputs del usuario siguiendo las reglas de CLAUDE.md:
- * - weightKg siempre obligatorio.
+ * Valida los inputs del usuario.
+ *
+ * Modo 'gpx' (default, retrocompatible):
+ * - weightKg obligatorio.
  * - Si no hay FTP, requiere FC max O ano de nacimiento.
- * - restingHeartRate es opcional pero necesario para zonas Karvonen.
+ * - restingHeartRate opcional pero necesario para zonas Karvonen.
+ *
+ * Modo 'session' (sesion indoor):
+ * - weightKg opcional (defaultea a 70kg para estimaciones cosmeticas).
+ * - Sin requisito de FTP/FC/birthYear (las zonas las elige el usuario por
+ *   bloque al construir la sesion).
+ * - Bike fields ignorados (no afectan a la pipeline indoor).
  *
  * Funcion pura: misma entrada -> misma salida. currentYear se pasa por
  * parametro para mantenerla testeable sin mocks de Date.
@@ -40,7 +63,11 @@ function inRange(value: number, min: number, max: number): boolean {
 export function validateUserInputs(
   raw: UserInputsRaw,
   currentYear: number,
+  mode: ValidationMode = 'gpx',
 ): ValidationResult {
+  if (mode === 'session') {
+    return validateSession(raw, currentYear);
+  }
   const errors: ValidationError[] = [];
   const limits = VALIDATION_LIMITS;
 
@@ -150,6 +177,116 @@ export function validateUserInputs(
   const hasHeartRateZones = effectiveMaxHr !== null && raw.restingHeartRate !== null;
 
   // Defaults razonables para bici si el usuario no toca los campos
+  const bikeType: BikeType = raw.bikeType ?? DEFAULTS.bikeType;
+  const bikeWeightKg = raw.bikeWeightKg ?? DEFAULTS.bikeWeightByType[bikeType];
+
+  return {
+    ok: true,
+    data: {
+      weightKg,
+      ftpWatts: raw.ftpWatts,
+      effectiveMaxHr,
+      restingHeartRate: raw.restingHeartRate,
+      birthYear: raw.birthYear,
+      bikeWeightKg,
+      bikeType,
+      hasFtp,
+      hasHeartRateZones,
+    },
+  };
+}
+
+/**
+ * Validador para sesiones indoor. Reglas relajadas: peso opcional (default
+ * 70 kg), bici irrelevante, sin requisito de FTP/FC/birthYear. Solo valida
+ * que los campos que el usuario SI ha rellenado esten dentro de rango.
+ *
+ * Devuelve siempre `{ok: true}` salvo cuando algun campo introducido cae
+ * fuera de su rango aceptado.
+ */
+function validateSession(raw: UserInputsRaw, currentYear: number): ValidationResult {
+  const errors: ValidationError[] = [];
+  const limits = VALIDATION_LIMITS;
+
+  // weightKg: opcional, pero si esta debe ser valido
+  if (raw.weightKg !== null && !inRange(raw.weightKg, limits.weightKg.min, limits.weightKg.max)) {
+    errors.push({
+      code: 'WEIGHT_OUT_OF_RANGE',
+      min: limits.weightKg.min,
+      max: limits.weightKg.max,
+    });
+  }
+
+  // FTP: opcional, validar rango si esta
+  if (raw.ftpWatts !== null && !inRange(raw.ftpWatts, limits.ftpWatts.min, limits.ftpWatts.max)) {
+    errors.push({
+      code: 'FTP_OUT_OF_RANGE',
+      min: limits.ftpWatts.min,
+      max: limits.ftpWatts.max,
+    });
+  }
+
+  // birthYear: opcional, validar rango si esta
+  const birthYearMax = currentYear - limits.birthYear.maxOffsetFromCurrent;
+  if (raw.birthYear !== null && !inRange(raw.birthYear, limits.birthYear.min, birthYearMax)) {
+    errors.push({
+      code: 'BIRTH_YEAR_OUT_OF_RANGE',
+      min: limits.birthYear.min,
+      max: birthYearMax,
+    });
+  }
+
+  // maxHeartRate: opcional, validar rango si esta
+  if (
+    raw.maxHeartRate !== null &&
+    !inRange(raw.maxHeartRate, limits.maxHeartRate.min, limits.maxHeartRate.max)
+  ) {
+    errors.push({
+      code: 'MAX_HR_OUT_OF_RANGE',
+      min: limits.maxHeartRate.min,
+      max: limits.maxHeartRate.max,
+    });
+  }
+
+  // restingHeartRate: opcional, validar rango si esta
+  if (
+    raw.restingHeartRate !== null &&
+    !inRange(raw.restingHeartRate, limits.restingHeartRate.min, limits.restingHeartRate.max)
+  ) {
+    errors.push({
+      code: 'RESTING_HR_OUT_OF_RANGE',
+      min: limits.restingHeartRate.min,
+      max: limits.restingHeartRate.max,
+    });
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+
+  // Calcular FC max efectiva
+  let effectiveMaxHr: number | null = null;
+  if (raw.maxHeartRate !== null) {
+    effectiveMaxHr = raw.maxHeartRate;
+  } else if (raw.birthYear !== null) {
+    effectiveMaxHr = calculateMaxHeartRateGulati(currentYear - raw.birthYear);
+  }
+
+  // Validacion cruzada: FC reposo < FC max
+  if (
+    raw.restingHeartRate !== null &&
+    effectiveMaxHr !== null &&
+    raw.restingHeartRate >= effectiveMaxHr
+  ) {
+    return { ok: false, errors: [{ code: 'RESTING_GE_MAX_HR' }] };
+  }
+
+  const hasFtp = raw.ftpWatts !== null;
+  const hasHeartRateZones = effectiveMaxHr !== null && raw.restingHeartRate !== null;
+  const weightKg = raw.weightKg ?? SESSION_DEFAULT_WEIGHT_KG;
+
+  // Bici: defaults razonables aunque el usuario no toque nada (la pipeline
+  // indoor no usa estos campos, pero ValidatedUserInputs los exige por contrato)
   const bikeType: BikeType = raw.bikeType ?? DEFAULTS.bikeType;
   const bikeWeightKg = raw.bikeWeightKg ?? DEFAULTS.bikeWeightByType[bikeType];
 

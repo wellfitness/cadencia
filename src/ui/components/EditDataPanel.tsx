@@ -11,6 +11,8 @@ export interface EditDataPanelProps {
   currentYear: number;
   /** Cerrado por defecto. La pantalla padre puede pasar `defaultOpen` segun necesite. */
   defaultOpen?: boolean;
+  /** 'gpx' (default) o 'session'. Pasa al UserDataForm para condicionar campos. */
+  mode?: 'gpx' | 'session';
 }
 
 /**
@@ -27,6 +29,7 @@ export function EditDataPanel({
   validation,
   currentYear,
   defaultOpen = false,
+  mode = 'gpx',
 }: EditDataPanelProps): JSX.Element {
   return (
     <details
@@ -52,6 +55,7 @@ export function EditDataPanel({
           dispatch={dispatch}
           validation={validation}
           currentYear={currentYear}
+          mode={mode}
         />
       </div>
     </details>

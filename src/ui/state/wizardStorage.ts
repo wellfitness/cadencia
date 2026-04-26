@@ -1,5 +1,5 @@
 import type { MatchPreferences, MatchedSegment } from '@core/matching';
-import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
+import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/segmentation';
 
 /**
  * Persistencia del state del wizard en sessionStorage. Necesaria porque el
@@ -12,6 +12,8 @@ import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
  * fisiologicos y la ruta se borran al cerrar la pestana. Aqui igual.
  */
 
+export type RouteSourceType = 'gpx' | 'session';
+
 export interface WizardState {
   currentStep: number;
   completedSteps: readonly number[];
@@ -19,6 +21,14 @@ export interface WizardState {
   routeMeta: RouteMeta | null;
   matchedList: readonly MatchedSegment[] | null;
   musicPreferences: MatchPreferences;
+  /** Origen de la ruta: GPX subido o sesion construida manualmente. */
+  sourceType?: RouteSourceType;
+  /**
+   * Plan editable de sesion indoor cycling (solo si sourceType === 'session').
+   * Se persiste en su forma editable (con grupos × N visibles) para que el
+   * usuario recupere su estructura tras un redirect OAuth.
+   */
+  sessionPlan?: EditableSessionPlan;
 }
 
 const STORAGE_KEY = 'vatios:wizardState:v1';
@@ -66,6 +76,11 @@ function isWizardState(value: unknown): value is WizardState {
     (v['routeMeta'] === null || typeof v['routeMeta'] === 'object') &&
     (v['matchedList'] === null || Array.isArray(v['matchedList'])) &&
     typeof v['musicPreferences'] === 'object' &&
-    v['musicPreferences'] !== null
+    v['musicPreferences'] !== null &&
+    (v['sourceType'] === undefined ||
+      v['sourceType'] === 'gpx' ||
+      v['sourceType'] === 'session') &&
+    (v['sessionPlan'] === undefined ||
+      (typeof v['sessionPlan'] === 'object' && v['sessionPlan'] !== null))
   );
 }
