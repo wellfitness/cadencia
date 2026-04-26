@@ -5,21 +5,28 @@ import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment } from './types';
 import { ZONE_MUSIC_CRITERIA, applyAllEnergetic } from './zoneCriteria';
 
-/** Cuantos segmentos atras evitamos repetir la misma cancion. */
+/** Cuantos tracks atras evitamos repetir la misma cancion. */
 const NO_REPEAT_WINDOW = 5;
 
 /**
- * Asigna una cancion a cada segmento de la ruta segun los criterios de zona
- * y las preferencias del usuario. Determinista: misma entrada -> misma salida.
+ * Asigna canciones a la ruta segun los criterios de zona y las preferencias
+ * del usuario. Determinista: misma entrada -> misma salida.
  *
- * Algoritmo (ver CLAUDE.md "Algoritmo de matching"):
- *  1. Para cada segmento, derivar criterios efectivos (con allEnergetic).
- *  2. Filtrar candidatos estrictos -> relajados -> best-effort.
- *  3. Calcular score por candidato, ordenar desc.
- *  4. Coger el primer track no usado en los ultimos NO_REPEAT_WINDOW segmentos.
- *  5. Si no hay candidato disponible (catalogo demasiado pequeno), elegir
- *     el de mayor score aunque repita: la ventana es preferencia, no regla
- *     bloqueante.
+ * Cada track ocupa todos los segmentos consecutivos que su duracion natural
+ * cubra (3-4 min de cancion = 3-4 segmentos de 60 s), en lugar de generar
+ * una entrada por cada bloque de 60 s. Asi una ruta de 4 h produce ~70
+ * tracks en vez de 240 (CLAUDE.md "Algoritmo de matching", paso 4:
+ * "permitir solapamiento al siguiente").
+ *
+ * Algoritmo:
+ *  1. En el segmento actual derivar criterios (con allEnergetic).
+ *  2. Filtrar candidatos: estrictos -> relajados -> best-effort.
+ *  3. Score por candidato y orden desc.
+ *  4. Elegir el primer track no usado en los ultimos NO_REPEAT_WINDOW. Si
+ *     todos repiten (catalogo pequeno), coger el de mayor score igualmente.
+ *  5. Emitir UNA entrada anclada al segmento actual y avanzar el cursor
+ *     consumiendo segmentos hasta cubrir la duracion del track elegido.
+ *  6. Si no hay candidato (catalogo vacio en esa zona), avanzar 1 segmento.
  */
 export function matchTracksToSegments(
   segments: readonly ClassifiedSegment[],
@@ -29,13 +36,16 @@ export function matchTracksToSegments(
   const recent: string[] = [];
   const out: MatchedSegment[] = [];
 
-  for (const seg of segments) {
+  let i = 0;
+  while (i < segments.length) {
+    const seg = segments[i]!;
     const baseCriteria = ZONE_MUSIC_CRITERIA[seg.zone];
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
     const { candidates, quality } = findCandidates(tracks, effective);
 
     if (candidates.length === 0) {
       out.push({ ...seg, track: null, matchScore: 0, matchQuality: quality });
+      i++;
       continue;
     }
 
@@ -55,6 +65,16 @@ export function matchTracksToSegments(
       matchScore: choice.score,
       matchQuality: quality,
     });
+
+    // Consumir tantos segmentos como dure el track. Salvaguarda contra
+    // duracion 0 o negativa (datos corruptos): minimo avanzar 1 segmento
+    // para no entrar en bucle infinito.
+    const trackDurationSec = Math.max(1, choice.track.durationMs / 1000);
+    let coveredSec = 0;
+    do {
+      coveredSec += segments[i]!.durationSec;
+      i++;
+    } while (i < segments.length && coveredSec < trackDurationSec);
   }
 
   return out;

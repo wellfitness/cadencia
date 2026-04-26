@@ -41,16 +41,43 @@ function segment(zone: ClassifiedSegment['zone']): ClassifiedSegment {
 }
 
 describe('matchTracksToSegments', () => {
-  it('asigna un track a cada segmento', () => {
+  it('un track largo cubre varios segmentos consecutivos (overlap)', () => {
+    // Track de 200 s, segmentos de 60 s -> 1 track tapa 4 segmentos (240 s).
+    const tracks = [track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 200_000 })];
+    const segments = Array.from({ length: 5 }, () => segment(3)); // 5*60 = 300 s
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    // 1er track cubre seg 1-4 (240 s >= 200 s), repite para seg 5 -> 2 entradas
+    expect(matched).toHaveLength(2);
+  });
+
+  it('tracks cortos: una entrada por segmento si el track cabe en uno', () => {
+    // Tracks de 50 s, segmentos de 60 s -> cada track ocupa solo su segmento.
+    const tracks = Array.from({ length: 5 }, (_, idx) =>
+      track({
+        tempoBpm: 125 + idx,
+        energy: 0.75,
+        valence: 0.6,
+        durationMs: 50_000,
+      }),
+    );
+    const segments = Array.from({ length: 3 }, () => segment(3));
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    expect(matched).toHaveLength(3);
+    expect(matched.every((m) => m.track !== null)).toBe(true);
+  });
+
+  it('cada zona recibe su track correspondiente', () => {
     const tracks = [
-      track({ tempoBpm: 100, energy: 0.5 }), // Z1
-      track({ tempoBpm: 115, energy: 0.6, valence: 0.5 }), // Z2
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }), // Z3
+      track({ tempoBpm: 100, energy: 0.5, durationMs: 50_000 }), // Z1
+      track({ tempoBpm: 115, energy: 0.6, valence: 0.5, durationMs: 50_000 }), // Z2
+      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 50_000 }), // Z3
     ];
     const segments = [segment(1), segment(2), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
     expect(matched).toHaveLength(3);
-    expect(matched.every((m) => m.track !== null)).toBe(true);
+    expect(matched[0]?.zone).toBe(1);
+    expect(matched[1]?.zone).toBe(2);
+    expect(matched[2]?.zone).toBe(3);
   });
 
   it('marca matchQuality strict cuando hay candidato exacto', () => {
@@ -83,17 +110,19 @@ describe('matchTracksToSegments', () => {
     expect(matched[0]?.track).toBeNull();
   });
 
-  it('no repite track en ventana de 5 segmentos si hay alternativas', () => {
+  it('no repite track en ventana de 5 entradas si hay alternativas', () => {
+    // Tracks de 60 s para que cada uno ocupe exactamente 1 segmento -> 5 entradas.
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }),
-      track({ tempoBpm: 124, energy: 0.78, valence: 0.62 }),
-      track({ tempoBpm: 126, energy: 0.72, valence: 0.65 }),
-      track({ tempoBpm: 128, energy: 0.85, valence: 0.7 }),
-      track({ tempoBpm: 122, energy: 0.8, valence: 0.55 }),
-      track({ tempoBpm: 127, energy: 0.79, valence: 0.6 }),
+      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 124, energy: 0.78, valence: 0.62, durationMs: 60_000 }),
+      track({ tempoBpm: 126, energy: 0.72, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 128, energy: 0.85, valence: 0.7, durationMs: 60_000 }),
+      track({ tempoBpm: 122, energy: 0.8, valence: 0.55, durationMs: 60_000 }),
+      track({ tempoBpm: 127, energy: 0.79, valence: 0.6, durationMs: 60_000 }),
     ];
     const segments = Array.from({ length: 5 }, () => segment(3));
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    expect(matched).toHaveLength(5);
     const uris = matched.map((m) => m.track?.uri);
     expect(new Set(uris).size).toBe(5);
   });
@@ -122,10 +151,31 @@ describe('matchTracksToSegments', () => {
     expect(matchTracksToSegments([], tracks, EMPTY_PREFERENCES)).toEqual([]);
   });
 
-  it('catalogo de 1 track repite (ventana cede)', () => {
-    const tracks = [track({ tempoBpm: 125, energy: 0.75, valence: 0.6 })];
+  it('catalogo de 1 track repite cuando la ruta lo necesita', () => {
+    // Track de 60 s + 3 segmentos de 60 s -> el unico track se repite 3 veces.
+    const tracks = [track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 })];
     const segments = Array.from({ length: 3 }, () => segment(3));
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    expect(matched).toHaveLength(3);
     expect(matched.every((m) => m.track?.uri === tracks[0]!.uri)).toBe(true);
+  });
+
+  it('ruta de 4 h con tracks de 3 min produce ~80 entradas, no 240', () => {
+    // Regresion guard del bug original: el matching emitia una entrada por
+    // segmento de 60 s (240 entradas para 4 h) en vez de respetar la
+    // duracion del track. Con tracks de ~3 min debe rondar 80.
+    const tracks = Array.from({ length: 50 }, (_, idx) =>
+      track({
+        tempoBpm: 120 + (idx % 10),
+        energy: 0.75 + (idx % 5) * 0.01,
+        valence: 0.6 + (idx % 5) * 0.01,
+        durationMs: 180_000, // 3 min
+      }),
+    );
+    const segments = Array.from({ length: 240 }, () => segment(3)); // 4 h
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    // 240 segs * 60 s = 14400 s. Tracks de 180 s -> 80 entradas.
+    expect(matched.length).toBeGreaterThanOrEqual(78);
+    expect(matched.length).toBeLessThanOrEqual(82);
   });
 });

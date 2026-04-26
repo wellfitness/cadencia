@@ -58,11 +58,12 @@ describe('replaceTrackInSegment', () => {
   });
 
   it('no rompe los segmentos vecinos', () => {
+    // Tracks de 60 s para que cada uno ocupe 1 segmento -> N entradas.
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6 }),
-      track({ tempoBpm: 127, energy: 0.8, valence: 0.7 }),
+      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 122, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 127, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
     ];
     const segments = [segment(3), segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
@@ -75,15 +76,15 @@ describe('replaceTrackInSegment', () => {
   });
 
   it('evita repetir tracks de vecinos cercanos', () => {
-    // 4 tracks. matched asigna 4 distintos. Al sustituir el segundo, el nuevo
-    // no puede ser ni el original NI los vecinos (pos 0, 2, 3).
-    // Como solo hay 4 tracks, el unico candidato valido seria... ninguno.
-    // En ese caso replaceTrackInSegment usa fallback (cualquiera != actual).
+    // 4 tracks de 60 s, 4 segmentos de 60 s -> 4 entradas distintas.
+    // Al sustituir la entrada 1, el nuevo no puede ser ni el original NI
+    // los vecinos (pos 0, 2, 3). Como solo hay 4 tracks no queda candidato
+    // valido -> replaceTrackInSegment usa fallback (cualquiera != actual).
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6 }),
-      track({ tempoBpm: 127, energy: 0.8, valence: 0.7 }),
+      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 122, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 127, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
     ];
     const segments = [segment(3), segment(3), segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
