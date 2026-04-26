@@ -9,19 +9,22 @@ export interface StepperProps {
   steps: readonly StepperStep[];
   currentStep: number;
   completedSteps: readonly number[];
+  /** Si se provee, los pasos navegables (current y completed) se renderizan como botones clicables. */
+  onStepClick?: (index: number) => void;
   className?: string;
 }
 
 /**
  * Stepper horizontal accesible. Cada paso muestra icono + label.
- * - Paso completado: check turquesa
- * - Paso actual: bordeado y resaltado (aria-current="step")
- * - Pasos futuros: gris
+ * - Paso completado: check turquesa, clickable si onStepClick.
+ * - Paso actual: bordeado y resaltado (aria-current="step").
+ * - Pasos futuros: gris, NO clickable (evita saltar el flow sin completar).
  */
 export function Stepper({
   steps,
   currentStep,
   completedSteps,
+  onStepClick,
   className = '',
 }: StepperProps): JSX.Element {
   return (
@@ -33,6 +36,9 @@ export function Stepper({
         {steps.map((step, idx) => {
           const isCompleted = completedSteps.includes(idx);
           const isCurrent = idx === currentStep;
+          // Es navegable si esta completado o si es el actual (clic en actual no hace nada).
+          // Pasos futuros NO son navegables (rompen el flow del wizard).
+          const isNavigable = isCompleted || isCurrent;
           return (
             <li key={step.label} className="flex items-center gap-2 flex-1">
               <StepIndicator
@@ -40,6 +46,9 @@ export function Stepper({
                 step={step}
                 isCompleted={isCompleted}
                 isCurrent={isCurrent}
+                {...(onStepClick && isNavigable && !isCurrent
+                  ? { onClick: () => onStepClick(idx) }
+                  : {})}
               />
               {idx < steps.length - 1 && (
                 <span
@@ -62,9 +71,17 @@ interface StepIndicatorProps {
   step: StepperStep;
   isCompleted: boolean;
   isCurrent: boolean;
+  /** Si se provee, el paso es un boton clicable. */
+  onClick?: () => void;
 }
 
-function StepIndicator({ index, step, isCompleted, isCurrent }: StepIndicatorProps): JSX.Element {
+function StepIndicator({
+  index,
+  step,
+  isCompleted,
+  isCurrent,
+  onClick,
+}: StepIndicatorProps): JSX.Element {
   const circleBase =
     'flex items-center justify-center rounded-full w-10 h-10 md:w-12 md:h-12 border-2 transition-colors duration-200';
   const circleState = isCompleted
@@ -79,11 +96,8 @@ function StepIndicator({ index, step, isCompleted, isCurrent }: StepIndicatorPro
       ? 'text-gris-700 font-medium'
       : 'text-gris-400 font-medium';
 
-  return (
-    <div
-      className="flex items-center gap-2"
-      {...(isCurrent ? { 'aria-current': 'step' as const } : {})}
-    >
+  const innerContent = (
+    <>
       <span className={`${circleBase} ${circleState}`}>
         {isCompleted ? (
           <MaterialIcon name="check" size="medium" />
@@ -93,6 +107,28 @@ function StepIndicator({ index, step, isCompleted, isCurrent }: StepIndicatorPro
         <span className="sr-only">Paso {index + 1}</span>
       </span>
       <span className={`text-sm md:text-base whitespace-nowrap ${labelState}`}>{step.label}</span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity duration-200 cursor-pointer min-h-[44px]"
+        aria-label={`Volver al paso ${index + 1}: ${step.label}`}
+      >
+        {innerContent}
+      </button>
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center gap-2"
+      {...(isCurrent ? { 'aria-current': 'step' as const } : {})}
+    >
+      {innerContent}
     </div>
   );
 }

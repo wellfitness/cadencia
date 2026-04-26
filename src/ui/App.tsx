@@ -72,6 +72,13 @@ export function App(): JSX.Element {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
+  const handleStepClick = (index: number): void => {
+    // Solo permitir navegar a pasos completados (no saltar adelante).
+    if (completedSteps.includes(index) && index !== currentStep) {
+      setCurrentStep(index);
+    }
+  };
+
   const handleRouteProcessed = (segments: ClassifiedSegment[], meta: RouteMeta): void => {
     setRouteSegments(segments);
     setRouteMeta(meta);
@@ -99,7 +106,12 @@ export function App(): JSX.Element {
       <Header />
       <div className="border-b border-gris-200 bg-gris-50">
         <div className="mx-auto w-full max-w-4xl px-4 py-4">
-          <Stepper steps={STEPS} currentStep={currentStep} completedSteps={completedSteps} />
+          <Stepper
+            steps={STEPS}
+            currentStep={currentStep}
+            completedSteps={completedSteps}
+            onStepClick={handleStepClick}
+          />
         </div>
       </div>
 

@@ -217,7 +217,7 @@ export function ResultStep({
         {matched.length === 0 ? (
           <p className="text-sm text-gris-500 italic">Sin temas que mostrar.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2 md:max-h-[55vh] md:overflow-y-auto md:pr-1">
             {matched.map((m, i) => (
               <li key={`${m.startSec}-${i}`}>
                 <PlaylistTrackRow
