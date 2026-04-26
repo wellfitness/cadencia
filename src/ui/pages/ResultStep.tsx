@@ -272,8 +272,9 @@ export function ResultStep({
             </p>
           )}
           <p className="text-xs text-gris-500">
-            Se creará una lista privada en tu cuenta. Solo te pediremos permiso para crear y
-            modificar listas privadas, nada más.
+            Se creará una lista en tu cuenta de Spotify. Si la quieres privada, márcala
+            como tal desde la propia app de Spotify (Spotify exige permiso de listas
+            públicas para añadir canciones, aunque solo las usemos para tu ruta).
           </p>
           {hasSpotifySession && (
             <div className="pt-3 mt-1 border-t border-gris-100 flex items-center justify-between gap-2">

@@ -32,7 +32,15 @@ export interface CreatedPlaylist {
 }
 
 /**
- * Scope minimo requerido: solo crear y modificar playlists privadas del usuario.
- * No pedimos lectura de su biblioteca ni reproduccion.
+ * Scopes requeridos: crear/modificar playlists. Necesitamos AMBOS (privado y
+ * publico) por una limitacion de la Web API de Spotify en 2025: aunque
+ * pasemos `public: false` al crear la playlist, Spotify la guarda como
+ * publica y luego para anadirle tracks reclama el scope de publico. Sin
+ * `playlist-modify-public` el POST a /playlists/{id}/tracks devuelve 403.
+ *
+ * No pedimos lectura de biblioteca, escucha, ni datos personales.
  */
-export const SPOTIFY_SCOPES = ['playlist-modify-private'] as const;
+export const SPOTIFY_SCOPES = [
+  'playlist-modify-private',
+  'playlist-modify-public',
+] as const;

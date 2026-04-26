@@ -82,14 +82,22 @@ function isSpotifyPlaylist(v: unknown): v is SpotifyPlaylist {
 }
 
 /**
- * Crea una playlist privada en la cuenta del token.
+ * Crea una playlist en la cuenta del token.
  *
- * Usa `POST /v1/me/playlists` (no `/users/{id}/playlists`). Spotify endurecio
- * la politica de la Web API en 2025 y el endpoint con `user_id` explicito
- * devuelve 403 Forbidden silencioso para apps en Development Mode aunque el
- * token tenga el scope correcto y el `user_id` coincida con `/me`. El
- * endpoint `/me/playlists` deduce el dueno del token y no aplica esa
- * restriccion.
+ * Notas de la API de Spotify (Dev Mode hardening 2025):
+ *
+ * 1. Usa `POST /v1/me/playlists` (no `/users/{id}/playlists`). El endpoint
+ *    con `user_id` explicito devuelve 403 silencioso aunque token, scope y
+ *    user_id sean validos. El endpoint `/me/playlists` deduce el dueno del
+ *    token y no aplica esa restriccion.
+ *
+ * 2. `public: false` es ignorado en silencio: la respuesta inmediata dice
+ *    `public:false` pero un GET a la misma playlist devuelve `public:true`,
+ *    y un PUT con `public:false` no la convierte. Por eso el cliente debe
+ *    pedir tambien scope `playlist-modify-public` (sino el POST a
+ *    /playlists/{id}/tracks devuelve 403). Mantenemos `public:false` aqui
+ *    por intencion documental: si Spotify revierte la restriccion en el
+ *    futuro funcionara como queremos sin cambiar codigo.
  */
 export async function createPlaylist(
   accessToken: string,
