@@ -7,11 +7,13 @@ import {
   type UserInputsRaw,
 } from '@core/user';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
+import { EMPTY_PREFERENCES, type MatchPreferences, type MatchedSegment } from '@core/matching';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { UserDataStep } from '@ui/pages/UserDataStep';
 import { RouteStep } from '@ui/pages/RouteStep';
+import { MusicStep } from '@ui/pages/MusicStep';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
 
 const STEPS: readonly StepperStep[] = [
@@ -51,8 +53,13 @@ export function App(): JSX.Element {
 
   // Estado de la ruta procesada (vive en App para que la fase 4 "Resultado"
   // pueda leerlo sin volver atras).
-  const [, setRouteSegments] = useState<readonly ClassifiedSegment[] | null>(null);
-  const [, setRouteMeta] = useState<RouteMeta | null>(null);
+  const [routeSegments, setRouteSegments] = useState<readonly ClassifiedSegment[] | null>(null);
+  const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(null);
+
+  // Estado de la lista de musica generada (preferencias + segmentos casados).
+  // Se setea cuando el usuario pulsa Siguiente en MusicStep.
+  const [, setMatchedList] = useState<readonly MatchedSegment[] | null>(null);
+  const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(EMPTY_PREFERENCES);
 
   const handleNext = (): void => {
     setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
@@ -66,6 +73,15 @@ export function App(): JSX.Element {
   const handleRouteProcessed = (segments: ClassifiedSegment[], meta: RouteMeta): void => {
     setRouteSegments(segments);
     setRouteMeta(meta);
+  };
+
+  const handleMatched = (
+    matched: MatchedSegment[],
+    preferences: MatchPreferences,
+  ): void => {
+    setMatchedList(matched);
+    setMusicPreferences(preferences);
+    handleNext();
   };
 
   return (
@@ -98,7 +114,19 @@ export function App(): JSX.Element {
         {currentStep === 1 && !validation.ok && (
           <NeedsDataMessage onBack={handleBack} />
         )}
-        {currentStep > 1 && (
+        {currentStep === 2 && routeSegments !== null && routeMeta !== null && (
+          <MusicStep
+            segments={routeSegments}
+            meta={routeMeta}
+            onMatched={handleMatched}
+            onBack={handleBack}
+            initialPreferences={musicPreferences}
+          />
+        )}
+        {currentStep === 2 && (routeSegments === null || routeMeta === null) && (
+          <NeedsRouteMessage onBack={handleBack} />
+        )}
+        {currentStep > 2 && (
           <PlaceholderStep
             label={STEPS[currentStep]?.label ?? 'Próximo paso'}
             icon={STEPS[currentStep]?.icon ?? 'construction'}
@@ -129,6 +157,27 @@ function NeedsDataMessage({ onBack }: NeedsDataMessageProps): JSX.Element {
         >
           <MaterialIcon name="arrow_back" size="small" />
           Volver al paso de Datos
+        </button>
+      </Card>
+    </div>
+  );
+}
+
+function NeedsRouteMessage({ onBack }: { onBack: () => void }): JSX.Element {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+      <Card variant="info" title="Sube tu ruta antes" titleIcon="warning">
+        <p className="text-gris-700 mb-4">
+          Para elegir la música necesitamos saber qué zonas tendrá tu ruta. Vuelve a
+          subir tu GPX en el paso anterior.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-turquesa-700 font-semibold hover:underline"
+        >
+          <MaterialIcon name="arrow_back" size="small" />
+          Volver al paso de Ruta
         </button>
       </Card>
     </div>

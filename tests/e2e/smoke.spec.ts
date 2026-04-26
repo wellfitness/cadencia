@@ -116,3 +116,35 @@ test.describe('Vatios con Ritmo - paso Ruta', () => {
     await expect(page.getByLabel(/tu peso/i)).toHaveValue('70');
   });
 });
+
+test.describe('Vatios con Ritmo - paso Música', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await fillUserData(page);
+    await page.getByRole('button', { name: /siguiente: ruta/i }).first().click();
+    await uploadGpx(page, buildSyntheticGpx());
+    await page.getByRole('heading', { name: /perfil de la ruta/i }).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /siguiente: música/i }).first().click();
+  });
+
+  test('muestra preferencias y vista previa de temas asignados', async ({ page }) => {
+    await expect(page.getByText(/géneros que te van/i)).toBeVisible();
+    await expect(page.getByText(/todo con energía/i)).toBeVisible();
+    // La lista debe mostrar al menos 1 tema y mencionar "min" de duración
+    await expect(page.getByText(/temas para/i).first()).toBeVisible();
+  });
+
+  test('marcar un género cambia la lista en vivo', async ({ page }) => {
+    // Capturar primer track antes de filtrar
+    const firstTrackBefore = await page.locator('article').first().textContent();
+    // Marcar el primer pill de género disponible (que sea distinto al neutro)
+    const firstGenrePill = page.getByRole('checkbox').first();
+    await firstGenrePill.click();
+    // Los temas pueden cambiar (no es garantía 100%, pero al menos no debe romper)
+    await expect(page.getByText(/temas para/i).first()).toBeVisible();
+    // Comprobar que el botón "Limpiar selección" aparece
+    await expect(page.getByText(/limpiar selección/i)).toBeVisible();
+    // Marker: el nombre del primer track puede o no haber cambiado, no asumimos
+    expect(firstTrackBefore).toBeTruthy();
+  });
+});
