@@ -275,14 +275,30 @@ function Footer(): JSX.Element {
           <MaterialIcon name="lock" size="small" className="text-gris-400" />
           Sin cuentas, sin cookies, sin servidores. Todo corre en tu dispositivo.
         </p>
-        <a
-          href="https://polyformproject.org/licenses/noncommercial/1.0.0/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
-        >
-          Licencia PolyForm Noncommercial 1.0.0
-        </a>
+        <nav className="flex items-center gap-3">
+          <a
+            href="/privacy.html"
+            className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
+          >
+            Privacidad
+          </a>
+          <span aria-hidden className="text-gris-300">·</span>
+          <a
+            href="/terms.html"
+            className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
+          >
+            Términos
+          </a>
+          <span aria-hidden className="text-gris-300">·</span>
+          <a
+            href="https://polyformproject.org/licenses/noncommercial/1.0.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
+          >
+            Licencia
+          </a>
+        </nav>
       </div>
     </footer>
   );

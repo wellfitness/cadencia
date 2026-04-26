@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#00bec8" />
+    <title>Política de privacidad — Vatios con Ritmo</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=ABeeZee:ital@0;1&family=Righteous&display=swap"
+    />
+    <style>
+      :root {
+        --turquesa-600: #00bec8;
+        --turquesa-700: #088b96;
+        --gris-200: #e5e7eb;
+        --gris-500: #6b7280;
+        --gris-700: #374151;
+        --gris-800: #1f2937;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'ABeeZee', system-ui, sans-serif;
+        color: var(--gris-800);
+        background: #ffffff;
+        line-height: 1.6;
+        font-size: 16px;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+      }
+      h1,
+      h2 {
+        font-family: 'Righteous', system-ui, sans-serif;
+        line-height: 1.2;
+        color: var(--gris-800);
+      }
+      h1 {
+        font-size: 1.9rem;
+        margin: 24px 0 8px;
+      }
+      h2 {
+        font-size: 1.3rem;
+        margin: 32px 0 8px;
+      }
+      a {
+        color: var(--turquesa-700);
+      }
+      .muted {
+        color: var(--gris-500);
+        font-size: 0.875rem;
+      }
+      ul {
+        padding-left: 20px;
+      }
+      .back {
+        display: inline-block;
+        margin-top: 32px;
+        padding: 10px 16px;
+        background: var(--turquesa-600);
+        color: #fff;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+      }
+      .back:hover {
+        background: var(--turquesa-700);
+      }
+      hr {
+        border: none;
+        border-top: 1px solid var(--gris-200);
+        margin: 32px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <a href="/" style="color: var(--turquesa-700); text-decoration: none">← Volver a la app</a>
+      <h1>Política de privacidad</h1>
+      <p class="muted">Última actualización: 26 de abril de 2026</p>
+
+      <h2>1. En una frase</h2>
+      <p>
+        <strong>Vatios con Ritmo no recoge, almacena ni envía a ningún servidor ningún dato
+        personal tuyo.</strong> Toda la lógica corre en tu navegador. La única conexión externa es
+        con Spotify y solo cuando tú pulsas explícitamente "Crear en Spotify".
+      </p>
+
+      <h2>2. Qué datos manejas tú dentro de la app</h2>
+      <ul>
+        <li>
+          <strong>Datos físicos</strong> que introduces: peso, FC máxima, FC en reposo, FTP, año
+          de nacimiento, tipo y peso de bici. Se guardan en <code>sessionStorage</code> de tu
+          navegador (no se transmiten a ningún sitio) y se borran automáticamente cuando cierras
+          la pestaña.
+        </li>
+        <li>
+          <strong>Tu archivo GPX</strong>: se procesa íntegramente en tu navegador para calcular
+          potencia y zonas de intensidad. No se sube a ningún servidor. Cuando cierras la pestaña
+          se descarta de memoria.
+        </li>
+        <li>
+          <strong>Tus preferencias musicales</strong> (géneros marcados, toggle "todo con
+          energía"): solo en memoria de la sesión actual.
+        </li>
+      </ul>
+
+      <h2>3. Conexión con Spotify</h2>
+      <p>
+        Solo cuando pulsas el botón <strong>"Crear en Spotify"</strong>, la app inicia un flujo
+        OAuth 2.0 con PKCE para obtener tu autorización a crear listas privadas en tu cuenta.
+      </p>
+      <ul>
+        <li>
+          <strong>Permiso solicitado</strong>: <code>playlist-modify-private</code>. Solo crear y
+          modificar listas privadas. No leemos tu biblioteca, ni tus reproducciones, ni nada más.
+        </li>
+        <li>
+          <strong>Token de acceso</strong>: lo guarda Spotify en respuesta y solo vive en
+          <code>sessionStorage</code> de tu navegador. Expira con la pestaña. Nunca lo enviamos a
+          un servidor de terceros (incluido el nuestro, porque no tenemos servidor).
+        </li>
+        <li>
+          <strong>Datos enviados a Spotify</strong>: el nombre de la lista que tú escribes, una
+          descripción autogenerada con el resumen de tu ruta (km, desnivel, duración) y los URIs
+          de las canciones. Nada de tu archivo GPX original ni de tus datos físicos viaja a
+          Spotify.
+        </li>
+        <li>
+          Puedes revocar la autorización en cualquier momento desde
+          <a href="https://www.spotify.com/account/apps/" target="_blank" rel="noopener noreferrer"
+            >tu cuenta de Spotify → Apps</a
+          >.
+        </li>
+      </ul>
+
+      <h2>4. Lo que NO hacemos</h2>
+      <ul>
+        <li>No tenemos cuentas, registros ni base de datos de usuarios.</li>
+        <li>No usamos cookies de seguimiento ni de terceros.</li>
+        <li>No usamos analítica (Google Analytics, Plausible, etc.).</li>
+        <li>No mostramos publicidad ni vendemos datos a anunciantes.</li>
+        <li>No hay servidor backend al que tu información pueda llegar.</li>
+      </ul>
+
+      <h2>5. Almacenamiento técnico necesario</h2>
+      <p>
+        Usamos exclusivamente <code>sessionStorage</code> del navegador (no
+        <code>localStorage</code>) para conservar tus datos físicos mientras navegas entre los
+        pasos de la app. Se borra automáticamente al cerrar la pestaña.
+      </p>
+      <p>
+        Como Aplicación Web Progresiva (PWA), el navegador puede cachear el código de la app
+        (HTML, CSS, JavaScript) para que funcione sin conexión. Esto NO incluye datos personales
+        tuyos.
+      </p>
+
+      <h2>6. Menores</h2>
+      <p>
+        La app está pensada para personas mayores de 16 años (edad mínima de Spotify). Si eres
+        menor, no la uses sin consentimiento de tus padres o tutores.
+      </p>
+
+      <h2>7. Cambios en esta política</h2>
+      <p>
+        Si en el futuro se modifica esta política, la nueva versión se publicará aquí con su
+        fecha. Como la app no tiene cuentas, no podemos avisarte por correo: te invitamos a
+        revisarla periódicamente.
+      </p>
+
+      <h2>8. Contacto</h2>
+      <p>
+        Para cualquier consulta sobre privacidad puedes escribir a
+        <a href="mailto:movimientofuncional.net@gmail.com">movimientofuncional.net@gmail.com</a>.
+      </p>
+
+      <h2>9. Jurisdicción</h2>
+      <p>
+        Esta política se rige por la legislación española. Los datos tratados por Spotify están
+        sujetos a su propia
+        <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer"
+          >política de privacidad</a
+        >.
+      </p>
+
+      <hr />
+      <a class="back" href="/">← Volver a la app</a>
+    </div>
+  </body>
+</html>

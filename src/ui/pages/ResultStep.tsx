@@ -14,6 +14,8 @@ import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
 import { getTopGenres, loadNativeTracks } from '@core/tracks';
 import type { UserInputsRaw, ValidatedUserInputs, ValidationResult } from '@core/user';
 import {
+  clearAuthFlow,
+  clearTokens,
   computeCodeChallenge,
   createPlaylistWithTracks,
   exchangeCodeForTokens,
@@ -82,6 +84,7 @@ export function ResultStep({
     buildPlaylistName(routeMeta.name, new Date()),
   );
   const [replacedIndices, setReplacedIndices] = useState<ReadonlySet<number>>(new Set());
+  const [hasSpotifySession, setHasSpotifySession] = useState<boolean>(() => loadTokens() !== null);
 
   // Si los inputs cambian (edit-in-place), recalculamos matching desde cero.
   // El indice de "reemplazados manualmente" se reinicia.
@@ -191,6 +194,14 @@ export function ResultStep({
     }
   };
 
+  const handleSpotifyLogout = (): void => {
+    clearTokens();
+    clearAuthFlow();
+    setHasSpotifySession(false);
+    setError(null);
+    setPhase('idle');
+  };
+
   const totalMinutes = Math.round(routeMeta.totalDurationSec / 60);
   const validUriCount = matched.filter((m) => m.track !== null).length;
   const replacedCount = replacedIndices.size;
@@ -267,6 +278,21 @@ export function ResultStep({
             Se creará una lista privada en tu cuenta. Solo te pediremos permiso para crear y
             modificar listas privadas, nada más.
           </p>
+          {hasSpotifySession && (
+            <div className="pt-3 mt-1 border-t border-gris-100 flex items-center justify-between gap-2">
+              <span className="text-xs text-gris-500 flex items-center gap-1">
+                <MaterialIcon name="check_circle" size="small" className="text-success" />
+                Sesión activa con Spotify
+              </span>
+              <button
+                type="button"
+                onClick={handleSpotifyLogout}
+                className="text-xs text-rosa-600 hover:text-rosa-700 hover:underline font-medium"
+              >
+                Cerrar sesión y volver a autorizar
+              </button>
+            </div>
+          )}
         </div>
       </Card>
 
