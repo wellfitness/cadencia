@@ -16,6 +16,7 @@ import { RouteStep } from '@ui/pages/RouteStep';
 import { MusicStep } from '@ui/pages/MusicStep';
 import { ResultStep } from '@ui/pages/ResultStep';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
+import { loadWizardState, saveWizardState } from '@ui/state/wizardStorage';
 
 const STEPS: readonly StepperStep[] = [
   { label: 'Datos', icon: 'person' },
@@ -25,8 +26,14 @@ const STEPS: readonly StepperStep[] = [
 ] as const;
 
 export function App(): JSX.Element {
-  const [currentStep, setCurrentStep] = useState<number>(0);
-  const [completedSteps, setCompletedSteps] = useState<readonly number[]>([]);
+  // Carga lazy del state del wizard desde sessionStorage. Necesario para
+  // sobrevivir al redirect de Spotify en /callback (full page navigation).
+  const persisted = useState(() => loadWizardState())[0];
+
+  const [currentStep, setCurrentStep] = useState<number>(persisted?.currentStep ?? 0);
+  const [completedSteps, setCompletedSteps] = useState<readonly number[]>(
+    persisted?.completedSteps ?? [],
+  );
 
   // State del usuario lifteado aqui para que pasos posteriores (Ruta, Resultado)
   // puedan leerlo y, en el caso de Resultado, editarlo en linea sin volver atras.
@@ -53,15 +60,36 @@ export function App(): JSX.Element {
   );
 
   // Estado de la ruta procesada (vive en App para que la fase 4 "Resultado"
-  // pueda leerlo sin volver atras).
-  const [routeSegments, setRouteSegments] = useState<readonly ClassifiedSegment[] | null>(null);
-  const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(null);
+  // pueda leerlo sin volver atras). Inicializado desde sessionStorage si el
+  // usuario vuelve del OAuth de Spotify.
+  const [routeSegments, setRouteSegments] = useState<readonly ClassifiedSegment[] | null>(
+    persisted?.routeSegments ?? null,
+  );
+  const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(persisted?.routeMeta ?? null);
 
   // Estado de la lista de musica generada (preferencias + segmentos casados).
   // Se setea cuando el usuario pulsa Siguiente en MusicStep y se actualiza
   // desde ResultStep si el usuario edita inputs/preferencias o sustituye temas.
-  const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(null);
-  const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(EMPTY_PREFERENCES);
+  const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(
+    persisted?.matchedList ?? null,
+  );
+  const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(
+    persisted?.musicPreferences ?? EMPTY_PREFERENCES,
+  );
+
+  // Persistir el wizard state en sessionStorage en cada cambio. Necesario para
+  // que el redirect OAuth de Spotify (que hace full page navigation) no
+  // pierda el progreso.
+  useEffect(() => {
+    saveWizardState({
+      currentStep,
+      completedSteps,
+      routeSegments,
+      routeMeta,
+      matchedList,
+      musicPreferences,
+    });
+  }, [currentStep, completedSteps, routeSegments, routeMeta, matchedList, musicPreferences]);
 
   const handleNext = (): void => {
     setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));

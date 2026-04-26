@@ -57,3 +57,6 @@ tsconfig.tsbuildinfo
 
 # GPX files (rutas personales que no deben caer al repo publico)
 *.gpx
+
+# Design system local (no se publica al repo)
+design-system/
