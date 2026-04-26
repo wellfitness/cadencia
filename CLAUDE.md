@@ -250,11 +250,15 @@ VITE_SPOTIFY_CLIENT_ID=tu-client-id-aqui
 
 Pasos para obtenerlo:
 1. https://developer.spotify.com/dashboard → "Create an App".
-2. Añade Redirect URIs: `http://localhost:5173/callback` (dev), tu dominio en producción, `vatiosconritmo://callback` para APK.
+2. Añade Redirect URIs: `http://127.0.0.1:5173/callback` (dev), `https://sincro.movimientofuncional.app/callback` (prod), `vatiosconritmo://callback` (APK).
 3. Activar "Web API" en las APIs.
 4. Copiar el Client ID al `.env.local` (gitignored).
 
 Ver [.env.example](.env.example) para la plantilla.
+
+**Nota sobre `127.0.0.1` vs `localhost`**: Spotify dejó de aceptar `http://localhost` a finales de 2024. En desarrollo abre la app en `http://127.0.0.1:5173/`, no en `localhost`.
+
+**No usar Client Secret**: PKCE prescinde del secret a propósito. Aunque Spotify lo muestre en el dashboard, no debe meterse nunca en el `.env.local` con prefijo `VITE_*` — acabaría visible en el bundle JS público y permitiría suplantar la app.
 
 ### Limitaciones conocidas (otras plataformas musicales)
 

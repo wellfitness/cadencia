@@ -1,0 +1,37 @@
+# Fallback a index.html para SPA routing
+# La app maneja /callback (Spotify OAuth) en JavaScript. Sin este fallback,
+# Apache devolveria 404 al refrescar en /callback o entrar directamente.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Si la URL es un fichero o directorio real, servirlo directamente
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Cualquier otra cosa: servir index.html (la SPA decide que mostrar)
+  RewriteRule . /index.html [L]
+</IfModule>
+
+# Compresion gzip / brotli para assets de texto (Hostinger soporta ambos)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
+
+# Cache largo para assets con hash en el nombre (Vite genera assets/index-XXXXX.js)
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|woff2?|ttf|svg|png|jpg|jpeg|gif|ico)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  # index.html y manifest no se cachean (hay que recargar para nuevas versiones)
+  <FilesMatch "\.(html|webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# Forzar HTTPS (Hostinger te activa el SSL gratuito automaticamente)
+<IfModule mod_rewrite.c>
+  RewriteCond %{HTTPS} off
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>

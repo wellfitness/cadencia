@@ -50,4 +50,9 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
   },
+  server: {
+    // Escuchar tambien en 127.0.0.1 (no solo localhost). Necesario para PKCE
+    // de Spotify, que exige IP loopback explicita en HTTP de dev.
+    host: '127.0.0.1',
+  },
 });
