@@ -1,4 +1,4 @@
-import { useMemo, useReducer, type ChangeEvent } from 'react';
+import { useMemo, useReducer, useState, type ChangeEvent } from 'react';
 import {
   EMPTY_PREFERENCES,
   matchTracksToSegments,
@@ -7,12 +7,29 @@ import {
   type MatchedSegment,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import { getTopGenres, loadNativeTracks } from '@core/tracks';
+import {
+  dedupeByUri,
+  getTopGenres,
+  loadNativeTracks,
+  parseTrackCsv,
+  type Track,
+} from '@core/tracks';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
+import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TrackCard } from '@ui/components/TrackCard';
+
+type SourceMode = 'predefined' | 'mine' | 'both';
+
+interface UploadedCsv {
+  id: string;
+  name: string;
+  trackCount: number;
+  tracks: readonly Track[];
+  error?: string;
+}
 
 type PreferencesAction =
   | { type: 'TOGGLE_GENRES'; genres: string[] }
@@ -66,16 +83,75 @@ export function MusicStep({
     initialPreferences ?? EMPTY_PREFERENCES,
   );
 
-  // Catalogo + top generos cacheado entre renders (singleton del modulo).
-  const tracks = useMemo(() => loadNativeTracks(), []);
+  // Fuente del catalogo: predefinido (CSVs embebidos), solo lo subido por el
+  // usuario, o ambos combinados. Default 'both' para no romper el flow actual.
+  const [sourceMode, setSourceMode] = useState<SourceMode>('both');
+  const [uploadedCsvs, setUploadedCsvs] = useState<readonly UploadedCsv[]>([]);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Catalogo combinado segun la fuente elegida. Los nativos se cachean a nivel
+  // de modulo en loadNativeTracks(); los user tracks se mergean dedup por URI.
+  const tracks = useMemo(() => {
+    const userTracks = uploadedCsvs.flatMap((c) => [...c.tracks]);
+    if (sourceMode === 'predefined') return loadNativeTracks();
+    if (sourceMode === 'mine') return dedupeByUri(userTracks);
+    return dedupeByUri([...loadNativeTracks(), ...userTracks]);
+  }, [sourceMode, uploadedCsvs]);
+
   const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
 
-  // Matching en vivo: cada cambio de preferencias recalcula. <50ms para 142
-  // tracks y rutas tipicas, no necesita debounce.
+  // Matching en vivo: cada cambio de preferencias o fuente recalcula. <50ms
+  // para catalogos pequenos, no necesita debounce.
   const matched = useMemo(
     () => matchTracksToSegments(segments, tracks, preferences, { crossZoneMode }),
     [segments, tracks, preferences, crossZoneMode],
   );
+
+  const handleCsvUpload = async (file: File): Promise<void> => {
+    setUploadError(null);
+    try {
+      const text = await file.text();
+      const parsed = parseTrackCsv(text, 'user');
+      if (parsed.length === 0) {
+        setUploadedCsvs((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            name: file.name,
+            trackCount: 0,
+            tracks: [],
+            error: 'CSV sin tracks válidos',
+          },
+        ]);
+        return;
+      }
+      setUploadedCsvs((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          name: file.name,
+          trackCount: parsed.length,
+          tracks: parsed,
+        },
+      ]);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Error al leer el CSV';
+      setUploadedCsvs((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          name: file.name,
+          trackCount: 0,
+          tracks: [],
+          error: message,
+        },
+      ]);
+    }
+  };
+
+  const handleRemoveCsv = (id: string): void => {
+    setUploadedCsvs((prev) => prev.filter((c) => c.id !== id));
+  };
 
   const setGenres = (genres: string[]): void => {
     dispatch({ type: 'TOGGLE_GENRES', genres });
@@ -93,8 +169,121 @@ export function MusicStep({
   const remaining = Math.max(0, matched.length - MAX_PREVIEW);
   const relaxedCount = matched.filter((m) => m.matchQuality !== 'strict').length;
 
+  const validUploads = uploadedCsvs.filter((c) => c.error === undefined);
+  const hasUserTracks = validUploads.length > 0;
+  const showDropzone = sourceMode === 'mine' || sourceMode === 'both';
+  const needsUserUpload = sourceMode === 'mine' && !hasUserTracks;
+
   return (
     <div className="mx-auto w-full max-w-2xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      <Card title="De dónde sale tu música" titleIcon="library_music">
+        <fieldset className="space-y-2">
+          <legend className="sr-only">Fuente del catálogo de música</legend>
+          <SourceRadio
+            value="both"
+            current={sourceMode}
+            onChange={setSourceMode}
+            title="Combinar ambas"
+            desc="La biblioteca predefinida más tus CSV. Más variedad y siempre hay tracks disponibles."
+          />
+          <SourceRadio
+            value="mine"
+            current={sourceMode}
+            onChange={setSourceMode}
+            title="Solo mis CSV"
+            desc="Solo canciones que tú subas. Máxima personalización; necesitas subir al menos un CSV."
+          />
+          <SourceRadio
+            value="predefined"
+            current={sourceMode}
+            onChange={setSourceMode}
+            title="Solo predefinida"
+            desc="La biblioteca embebida en la app, sin tus CSV."
+          />
+        </fieldset>
+
+        {showDropzone && (
+          <div className="mt-4 space-y-3">
+            <p className="text-xs text-gris-600 leading-relaxed">
+              ¿No tienes un CSV de tus listas? Genéralo gratis en{' '}
+              <a
+                href="https://exportify.net"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-turquesa-700 font-semibold underline-offset-2 hover:underline"
+              >
+                exportify.net
+              </a>
+              . Es código abierto, autoriza Spotify en tu navegador y descarga
+              cualquier lista como CSV con BPM, energía y géneros (las columnas
+              que necesitamos).
+            </p>
+            <FileDropzone
+              acceptedLabel="CSV"
+              accept=".csv,text/csv"
+              onFile={(f) => void handleCsvUpload(f)}
+              onError={(msg) => setUploadError(msg)}
+            />
+            {uploadError !== null && (
+              <p
+                className="text-sm text-rosa-600 flex items-center gap-1.5"
+                role="alert"
+              >
+                <MaterialIcon name="error_outline" size="small" />
+                {uploadError}
+              </p>
+            )}
+            {uploadedCsvs.length > 0 && (
+              <ul className="space-y-2">
+                {uploadedCsvs.map((c) => (
+                  <li
+                    key={c.id}
+                    className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 ${
+                      c.error !== undefined
+                        ? 'border-rosa-100 bg-rosa-100/30'
+                        : 'border-gris-200 bg-gris-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MaterialIcon
+                        name={c.error !== undefined ? 'error_outline' : 'check_circle'}
+                        size="small"
+                        className={
+                          c.error !== undefined ? 'text-rosa-600' : 'text-turquesa-600'
+                        }
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gris-800 truncate">
+                          {c.name}
+                        </p>
+                        <p className="text-xs text-gris-500">
+                          {c.error ?? `${c.trackCount} tracks cargados`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveCsv(c.id)}
+                      className="text-gris-500 hover:text-rosa-600 transition-colors p-1 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                      aria-label={`Quitar ${c.name}`}
+                    >
+                      <MaterialIcon name="close" size="small" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {needsUserUpload && (
+          <p className="text-sm text-tulipTree-600 mt-3 flex items-center gap-1.5">
+            <MaterialIcon name="info" size="small" className="text-tulipTree-500" />
+            Sube al menos un CSV válido para continuar con esta fuente.
+          </p>
+        )}
+      </Card>
+
       <Card title="Tus preferencias" titleIcon="tune">
         <div className="space-y-4">
           <div>
@@ -166,8 +355,52 @@ export function MusicStep({
         )}
       </Card>
 
-      <FooterActions onBack={onBack} onNext={handleNext} canGoNext={matched.length > 0} />
+      <FooterActions
+        onBack={onBack}
+        onNext={handleNext}
+        canGoNext={matched.length > 0 && tracks.length > 0 && !needsUserUpload}
+      />
     </div>
+  );
+}
+
+interface SourceRadioProps {
+  value: SourceMode;
+  current: SourceMode;
+  onChange: (next: SourceMode) => void;
+  title: string;
+  desc: string;
+}
+
+function SourceRadio({
+  value,
+  current,
+  onChange,
+  title,
+  desc,
+}: SourceRadioProps): JSX.Element {
+  const checked = value === current;
+  return (
+    <label
+      className={`flex items-start gap-3 cursor-pointer rounded-lg border-2 p-3 min-h-[44px] transition-colors ${
+        checked
+          ? 'border-turquesa-600 bg-turquesa-50'
+          : 'border-gris-200 bg-white hover:border-turquesa-300'
+      }`}
+    >
+      <input
+        type="radio"
+        name="source-mode"
+        value={value}
+        checked={checked}
+        onChange={() => onChange(value)}
+        className="mt-1 w-5 h-5 accent-turquesa-600 cursor-pointer"
+      />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-gris-800">{title}</p>
+        <p className="text-xs text-gris-500">{desc}</p>
+      </div>
+    </label>
   );
 }
 

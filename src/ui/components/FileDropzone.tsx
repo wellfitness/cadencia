@@ -43,8 +43,9 @@ export function FileDropzone({
     }
     const file = files[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.gpx')) {
-      onError?.(`El archivo debe tener extensión .${acceptedLabel.toLowerCase()}`);
+    const expectedExt = `.${acceptedLabel.toLowerCase()}`;
+    if (!file.name.toLowerCase().endsWith(expectedExt)) {
+      onError?.(`El archivo debe tener extensión ${expectedExt}`);
       return;
     }
     onFile(file);
@@ -103,7 +104,9 @@ export function FileDropzone({
         />
         <div className="space-y-1">
           <p className="text-base md:text-lg font-semibold text-gris-800">
-            {isDragOver ? 'Suelta tu archivo aquí' : 'Arrastra tu GPX o pulsa para elegir'}
+            {isDragOver
+              ? 'Suelta tu archivo aquí'
+              : `Arrastra tu ${acceptedLabel} o pulsa para elegir`}
           </p>
           <p className="text-sm text-gris-500">
             Solo {acceptedLabel}. Tu archivo no sale de tu dispositivo.
