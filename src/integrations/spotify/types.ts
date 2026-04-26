@@ -21,16 +21,6 @@ export interface SpotifyAuthFlowState {
 }
 
 /**
- * Datos minimos del usuario Spotify, solo para mostrar feedback humano
- * ("Hola, {nombre}") y para el endpoint POST /v1/users/{id}/playlists.
- * NO se persiste mas alla de la sesion.
- */
-export interface SpotifyUser {
-  id: string;
-  displayName: string | null;
-}
-
-/**
  * Resumen de la playlist creada con exito en Spotify, devuelto a la UI
  * para mostrar el enlace al usuario.
  */

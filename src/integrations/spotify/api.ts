@@ -1,4 +1,4 @@
-import type { CreatedPlaylist, SpotifyUser } from './types';
+import type { CreatedPlaylist } from './types';
 
 const API_BASE = 'https://api.spotify.com/v1';
 
@@ -30,41 +30,40 @@ async function fetchSpotify(
   }
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
-    let detail = `${res.status}`;
+    // Leer el cuerpo del error de la forma mas tolerante posible:
+    // primero como texto (siempre funciona), despues intentar parsear JSON.
+    const rawBody = await res.text().catch(() => '');
+    let parsedMessage: string | null = null;
     try {
-      const json: unknown = await res.json();
+      const json: unknown = JSON.parse(rawBody);
       if (isSpotifyErrorResponse(json)) {
-        detail = `${res.status} ${json.error.message}`;
+        parsedMessage = json.error.message;
       }
     } catch {
-      // sin body parseable, dejamos solo el status
+      // Body no era JSON. Dejamos el rawBody como esta.
     }
-    throw new Error(`Spotify API ${detail}`);
+    // Logger en consola para debugging avanzado
+    if (typeof console !== 'undefined') {
+      console.error('[Spotify API error]', {
+        status: res.status,
+        statusText: res.statusText,
+        path,
+        method: init.method ?? 'GET',
+        parsedMessage,
+        rawBody: rawBody.slice(0, 500), // primeros 500 chars
+      });
+    }
+    // Mensaje a la UI: incluimos el cuerpo (truncado) si Spotify no dio JSON,
+    // o el message parseado si si.
+    const detail =
+      parsedMessage !== null
+        ? parsedMessage
+        : rawBody !== ''
+          ? rawBody.slice(0, 200)
+          : res.statusText;
+    throw new Error(`Spotify API ${res.status}: ${detail}`);
   }
   return res;
-}
-
-interface SpotifyMe {
-  id: string;
-  display_name: string | null;
-}
-
-function isSpotifyMe(v: unknown): v is SpotifyMe {
-  if (typeof v !== 'object' || v === null) return false;
-  const o = v as Record<string, unknown>;
-  return typeof o['id'] === 'string';
-}
-
-export async function getCurrentUser(accessToken: string): Promise<SpotifyUser> {
-  const res = await fetchSpotify(accessToken, '/me');
-  const json: unknown = await res.json();
-  if (!isSpotifyMe(json)) {
-    throw new Error('Spotify /me devolvio una respuesta inesperada');
-  }
-  return {
-    id: json.id,
-    displayName: typeof json.display_name === 'string' ? json.display_name : null,
-  };
 }
 
 interface SpotifyPlaylist {
@@ -82,13 +81,22 @@ function isSpotifyPlaylist(v: unknown): v is SpotifyPlaylist {
   return typeof (urls as Record<string, unknown>)['spotify'] === 'string';
 }
 
+/**
+ * Crea una playlist privada en la cuenta del token.
+ *
+ * Usa `POST /v1/me/playlists` (no `/users/{id}/playlists`). Spotify endurecio
+ * la politica de la Web API en 2025 y el endpoint con `user_id` explicito
+ * devuelve 403 Forbidden silencioso para apps en Development Mode aunque el
+ * token tenga el scope correcto y el `user_id` coincida con `/me`. El
+ * endpoint `/me/playlists` deduce el dueno del token y no aplica esa
+ * restriccion.
+ */
 export async function createPlaylist(
   accessToken: string,
-  userId: string,
   name: string,
   description: string,
 ): Promise<{ id: string; externalUrl: string; name: string }> {
-  const res = await fetchSpotify(accessToken, `/users/${encodeURIComponent(userId)}/playlists`, {
+  const res = await fetchSpotify(accessToken, '/me/playlists', {
     method: 'POST',
     body: JSON.stringify({ name, description, public: false }),
   });
@@ -128,17 +136,11 @@ export async function addTracksToPlaylist(
  */
 export async function createPlaylistWithTracks(args: {
   accessToken: string;
-  userId: string;
   name: string;
   description: string;
   uris: readonly string[];
 }): Promise<CreatedPlaylist> {
-  const playlist = await createPlaylist(
-    args.accessToken,
-    args.userId,
-    args.name,
-    args.description,
-  );
+  const playlist = await createPlaylist(args.accessToken, args.name, args.description);
   if (args.uris.length > 0) {
     await addTracksToPlaylist(args.accessToken, playlist.id, args.uris);
   }

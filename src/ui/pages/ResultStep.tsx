@@ -22,7 +22,6 @@ import {
   generateCodeVerifier,
   generateState,
   getAuthorizationUrl,
-  getCurrentUser,
   getRedirectUri,
   getSpotifyClientId,
   loadAuthFlow,
@@ -176,12 +175,10 @@ export function ResultStep({
     }
     setPhase('creating');
     try {
-      const user = await getCurrentUser(tokens.accessToken);
       const uris = extractUris(matched);
       const description = buildPlaylistDescription(routeMeta);
       const playlist = await createPlaylistWithTracks({
         accessToken: tokens.accessToken,
-        userId: user.id,
         name: playlistName.trim() || buildPlaylistName(routeMeta.name, new Date()),
         description,
         uris,

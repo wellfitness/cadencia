@@ -1,44 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  addTracksToPlaylist,
-  createPlaylist,
-  createPlaylistWithTracks,
-  getCurrentUser,
-} from './api';
+import { addTracksToPlaylist, createPlaylist, createPlaylistWithTracks } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('getCurrentUser', () => {
-  it('parsea id + display_name', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ id: 'u123', display_name: 'Pepe' }), { status: 200 }),
-    );
-    const user = await getCurrentUser('AT');
-    expect(user).toEqual({ id: 'u123', displayName: 'Pepe' });
-  });
-
-  it('display_name null se mantiene null', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ id: 'u', display_name: null }), { status: 200 }),
-    );
-    expect((await getCurrentUser('AT')).displayName).toBeNull();
-  });
-
-  it('respuesta 401 tira Error con mensaje de Spotify', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(
-        JSON.stringify({ error: { status: 401, message: 'Invalid access token' } }),
-        { status: 401 },
-      ),
-    );
-    await expect(getCurrentUser('AT')).rejects.toThrow(/Invalid access token/);
-  });
-});
-
 describe('createPlaylist', () => {
-  it('POST a /users/{id}/playlists con body correcto', async () => {
+  it('POST a /me/playlists con body correcto', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -49,7 +17,7 @@ describe('createPlaylist', () => {
         { status: 201 },
       ),
     );
-    const result = await createPlaylist('AT', 'u123', 'Mi lista', 'desc');
+    const result = await createPlaylist('AT', 'Mi lista', 'desc');
     expect(result).toEqual({
       id: 'pl123',
       name: 'Mi lista',
@@ -58,7 +26,8 @@ describe('createPlaylist', () => {
     const call = fetchSpy.mock.calls[0]!;
     const url = call[0] as string;
     const init = call[1] as RequestInit;
-    expect(url).toContain('/v1/users/u123/playlists');
+    expect(url).toContain('/v1/me/playlists');
+    expect(url).not.toContain('/users/');
     expect(init.method).toBe('POST');
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body).toEqual({ name: 'Mi lista', description: 'desc', public: false });
@@ -105,7 +74,6 @@ describe('createPlaylistWithTracks', () => {
       .mockResolvedValueOnce(new Response('', { status: 201 }));
     const result = await createPlaylistWithTracks({
       accessToken: 'AT',
-      userId: 'u',
       name: 'X',
       description: 'd',
       uris: ['spotify:track:a', 'spotify:track:b'],
