@@ -14,6 +14,7 @@ import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { UserDataStep } from '@ui/pages/UserDataStep';
 import { RouteStep } from '@ui/pages/RouteStep';
 import { MusicStep } from '@ui/pages/MusicStep';
+import { ResultStep } from '@ui/pages/ResultStep';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
 
 const STEPS: readonly StepperStep[] = [
@@ -57,8 +58,9 @@ export function App(): JSX.Element {
   const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(null);
 
   // Estado de la lista de musica generada (preferencias + segmentos casados).
-  // Se setea cuando el usuario pulsa Siguiente en MusicStep.
-  const [, setMatchedList] = useState<readonly MatchedSegment[] | null>(null);
+  // Se setea cuando el usuario pulsa Siguiente en MusicStep y se actualiza
+  // desde ResultStep si el usuario edita inputs/preferencias o sustituye temas.
+  const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(null);
   const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(EMPTY_PREFERENCES);
 
   const handleNext = (): void => {
@@ -82,6 +84,14 @@ export function App(): JSX.Element {
     setMatchedList(matched);
     setMusicPreferences(preferences);
     handleNext();
+  };
+
+  const handleMatchedChange = (
+    matched: MatchedSegment[],
+    preferences: MatchPreferences,
+  ): void => {
+    setMatchedList(matched);
+    setMusicPreferences(preferences);
   };
 
   return (
@@ -126,12 +136,30 @@ export function App(): JSX.Element {
         {currentStep === 2 && (routeSegments === null || routeMeta === null) && (
           <NeedsRouteMessage onBack={handleBack} />
         )}
-        {currentStep > 2 && (
-          <PlaceholderStep
-            label={STEPS[currentStep]?.label ?? 'Próximo paso'}
-            icon={STEPS[currentStep]?.icon ?? 'construction'}
-          />
-        )}
+        {currentStep === 3 &&
+          validation.ok &&
+          routeSegments !== null &&
+          routeMeta !== null &&
+          matchedList !== null && (
+            <ResultStep
+              inputs={inputs}
+              dispatch={dispatch}
+              validation={validation}
+              validatedInputs={validation.data}
+              currentYear={currentYear}
+              routeSegments={routeSegments}
+              routeMeta={routeMeta}
+              matched={matchedList}
+              preferences={musicPreferences}
+              onMatchedChange={handleMatchedChange}
+              onBack={handleBack}
+            />
+          )}
+        {currentStep === 3 &&
+          (!validation.ok ||
+            routeSegments === null ||
+            routeMeta === null ||
+            matchedList === null) && <NeedsMusicMessage onBack={handleBack} />}
       </main>
 
       <Footer />
@@ -184,6 +212,26 @@ function NeedsRouteMessage({ onBack }: { onBack: () => void }): JSX.Element {
   );
 }
 
+function NeedsMusicMessage({ onBack }: { onBack: () => void }): JSX.Element {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+      <Card variant="info" title="Genera la lista antes" titleIcon="warning">
+        <p className="text-gris-700 mb-4">
+          Para crear la lista en Spotify primero tienes que pasar por el paso de música.
+        </p>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 text-turquesa-700 font-semibold hover:underline"
+        >
+          <MaterialIcon name="arrow_back" size="small" />
+          Volver al paso de Música
+        </button>
+      </Card>
+    </div>
+  );
+}
+
 function Header(): JSX.Element {
   return (
     <header className="border-b border-gris-200 bg-white">
@@ -228,20 +276,3 @@ function Footer(): JSX.Element {
   );
 }
 
-interface PlaceholderStepProps {
-  label: string;
-  icon: string;
-}
-
-function PlaceholderStep({ label, icon }: PlaceholderStepProps): JSX.Element {
-  return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10">
-      <Card variant="info" title={`Paso "${label}"`} titleIcon={icon}>
-        <p className="text-gris-700">
-          Este paso se construye en una fase posterior. Por ahora solo el formulario de datos del
-          usuario está activo.
-        </p>
-      </Card>
-    </div>
-  );
-}

@@ -240,6 +240,32 @@ GET  /v1/search?q=track:{n}+artist:{a}&type=track     # solo si falta URI
 
 Scope: `playlist-modify-private`.
 
+### Configuración del Client ID
+
+PKCE no necesita Client Secret, pero sí un Client ID. Se configura por `.env.local`:
+
+```
+VITE_SPOTIFY_CLIENT_ID=tu-client-id-aqui
+```
+
+Pasos para obtenerlo:
+1. https://developer.spotify.com/dashboard → "Create an App".
+2. Añade Redirect URIs: `http://localhost:5173/callback` (dev), tu dominio en producción, `vatiosconritmo://callback` para APK.
+3. Activar "Web API" en las APIs.
+4. Copiar el Client ID al `.env.local` (gitignored).
+
+Ver [.env.example](.env.example) para la plantilla.
+
+### Limitaciones conocidas (otras plataformas musicales)
+
+**Solo Spotify** está soportado. Las alternativas comunes no son viables con la arquitectura cliente-only actual:
+
+- **Apple Music**: requiere un Developer Token JWT firmado con clave privada de equipo Apple Developer. Esa clave NO puede vivir en código que se descarga al cliente. Necesitaría un backend que firme tokens, lo que rompe la regla "sin servidores".
+- **Amazon Music**: no expone API pública para crear playlists.
+- **YouTube Music**: no tiene API oficial; las soluciones no oficiales (ytmusicapi y similares) requieren cookies del usuario y violan ToS.
+
+Si en el futuro se quisiera soportar otras plataformas, requeriría cambio arquitectónico (mini-backend que firme tokens o app nativa por plataforma).
+
 ---
 
 ## Diseño UI

@@ -148,3 +148,27 @@ test.describe('Vatios con Ritmo - paso Música', () => {
     expect(firstTrackBefore).toBeTruthy();
   });
 });
+
+test.describe('Vatios con Ritmo - paso Resultado', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await fillUserData(page);
+    await page.getByRole('button', { name: /siguiente: ruta/i }).first().click();
+    await uploadGpx(page, buildSyntheticGpx());
+    await page.getByRole('heading', { name: /perfil de la ruta/i }).waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: /siguiente: música/i }).first().click();
+    await page.getByText(/temas para/i).first().waitFor({ timeout: 5_000 });
+    await page.getByRole('button', { name: /siguiente: resultado/i }).first().click();
+  });
+
+  test('muestra mensaje de Configura tu Client ID si no hay env var', async ({ page }) => {
+    // Sin VITE_SPOTIFY_CLIENT_ID en .env.local, el getSpotifyClientId() devuelve null.
+    await expect(page.getByText(/configura tu client id de spotify/i)).toBeVisible();
+    await expect(page.getByText(/developer\.spotify\.com\/dashboard/i)).toBeVisible();
+  });
+
+  test('muestra el boton de volver atras desde Configura', async ({ page }) => {
+    const backButton = page.getByRole('button', { name: /volver atrás/i });
+    await expect(backButton).toBeVisible();
+  });
+});

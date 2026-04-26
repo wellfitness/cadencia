@@ -5,3 +5,4 @@ export * from './power';
 export * from './segmentation';
 export * from './tracks';
 export * from './matching';
+export * from './playlist';
