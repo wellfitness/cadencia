@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy Vatios con Ritmo a Hostinger via FTP.
+# Deploy Cadencia a Hostinger via FTP.
 # Sube el contenido de dist/ (build de Vite) a public_html del subdominio.
 # Mismo patron que el deploy de KinesisLab: bash + curl, cero deps.
 
@@ -39,7 +39,7 @@ upload_file() {
 }
 
 echo "=========================================="
-echo "  Deploy Vatios con Ritmo a Hostinger"
+echo "  Deploy Cadencia a Hostinger"
 echo "=========================================="
 echo "Host: $FTP_HOST"
 echo "Dir:  $FTP_REMOTE_DIR (relativo al public_html del subdominio)"
@@ -81,4 +81,4 @@ echo "  Deploy completado"
 echo "=========================================="
 echo "Subidos: $COUNTER archivos"
 [ $ERRORS -gt 0 ] && echo "ERRORES: $ERRORS archivos" || echo "Errores: 0"
-echo "URL: https://sincro.movimientofuncional.app"
+echo "URL: https://cadencia.movimientofuncional.app"

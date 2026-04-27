@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt'],
       manifest: {
-        name: 'Vatios con Ritmo',
-        short_name: 'VatiosRitmo',
-        description: 'Playlists de Spotify ordenadas segun el perfil de potencia de tu ruta GPX',
+        name: 'Cadencia',
+        short_name: 'Cadencia',
+        description: 'Música de Spotify sincronizada con tu entrenamiento en bici (outdoor o indoor)',
         theme_color: '#00bec8',
         background_color: '#ffffff',
         display: 'standalone',

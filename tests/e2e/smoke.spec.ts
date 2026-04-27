@@ -36,7 +36,7 @@ async function uploadGpx(page: Page, content: string, filename = 'test.gpx'): Pr
   });
 }
 
-test.describe('Vatios con Ritmo - shell + paso Datos', () => {
+test.describe('Cadencia - shell + paso Datos', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
   });
@@ -48,7 +48,7 @@ test.describe('Vatios con Ritmo - shell + paso Datos', () => {
       if (msg.type() === 'error') errors.push(msg.text());
     });
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Vatios con Ritmo', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Cadencia', level: 1 })).toBeVisible();
     expect(errors).toEqual([]);
   });
 
@@ -81,7 +81,7 @@ test.describe('Vatios con Ritmo - shell + paso Datos', () => {
   });
 });
 
-test.describe('Vatios con Ritmo - paso Ruta', () => {
+test.describe('Cadencia - paso Ruta', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await fillUserData(page);
@@ -117,7 +117,7 @@ test.describe('Vatios con Ritmo - paso Ruta', () => {
   });
 });
 
-test.describe('Vatios con Ritmo - paso Música', () => {
+test.describe('Cadencia - paso Música', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await fillUserData(page);
@@ -149,7 +149,7 @@ test.describe('Vatios con Ritmo - paso Música', () => {
   });
 });
 
-test.describe('Vatios con Ritmo - paso Resultado', () => {
+test.describe('Cadencia - paso Resultado', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await fillUserData(page);

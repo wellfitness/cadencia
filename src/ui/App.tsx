@@ -405,10 +405,10 @@ function Header(): JSX.Element {
         />
         <div>
           <h1 className="font-display text-turquesa-600 text-2xl md:text-3xl leading-none">
-            Vatios con Ritmo
+            Cadencia
           </h1>
           <p className="text-xs md:text-sm text-gris-500 mt-1">
-            Tu entrenamiento, tu música al ritmo de tu intensidad.
+            para ciclistas con ritmo
           </p>
         </div>
       </div>

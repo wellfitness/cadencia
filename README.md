@@ -1,57 +1,57 @@
-# Vatios con Ritmo
+# Cadencia
 
-Webapp + APK Android (via Capacitor) que genera playlists de Spotify ordenadas segun el perfil de **potencia (vatios)** de una ruta GPX, sincronizando el **BPM (ritmo)** musical con la intensidad del esfuerzo.
+> *para ciclistas con ritmo*
 
-> **Source-available, open a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la logica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist). Strava y Komoot se importan como GPX manual.
+Webapp que sincroniza música de Spotify con la intensidad de tus entrenamientos en bici. Outdoor desde un GPX o indoor desde sesiones por bloques.
+
+> **Source-available, open a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la lógica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist).
+
+## Qué puedes hacer
+
+- **Subir un GPX de ruta** (Strava, Komoot, Garmin…) → la app estima la potencia por segmento de tu ruta y te genera una playlist Spotify donde cada canción encaja con la intensidad real de cada tramo.
+- **Construir una sesión indoor cycling** desde cero o partiendo de plantillas científicas (SIT, HIIT, Noruego 4×4, Z2…) → la app genera la playlist sincronizada para esa sesión.
+- **Modo TV** para sesiones indoor: pantalla completa con la sesión y la canción actual, ideal para usar en una tablet sobre el manillar.
 
 ## Stack
 
-Vite + React 18 + TypeScript + Tailwind + Capacitor 6 + Vitest + Playwright + Recharts.
+Vite + React 18 + TypeScript + Tailwind + Vitest + Playwright + Recharts + vite-plugin-pwa.
 
 ## Quick start
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:5173
+pnpm dev          # http://127.0.0.1:5173
 pnpm test         # Vitest unit
 pnpm test:e2e     # Playwright (necesita 'pnpm test:e2e:install' la primera vez)
 pnpm typecheck
 pnpm lint
 ```
 
-## Build
+## Build y deploy
 
 ```bash
-pnpm build        # → dist/  (subir a Hostinger /public_html via SFTP)
+pnpm build              # → dist/  (subir a Hostinger /public_html via SFTP)
+pnpm deploy             # subir dist/ por FTP (requiere .env.local)
+pnpm deploy:full        # build + deploy en una sola tanda
 ```
 
-## Android (Capacitor)
-
-```bash
-pnpm dlx cap add android       # primera vez
-pnpm build && pnpm cap:sync    # cada vez que cambia el frontend
-pnpm cap:android               # abrir Android Studio para firmar APK
-```
+La app se publica como webapp + PWA (instalable desde el navegador con "Añadir a pantalla de inicio") en [cadencia.movimientofuncional.app](https://cadencia.movimientofuncional.app).
 
 ## Estructura
 
-- `src/core/` - Logica pura (sin React, sin DOM): cilculos fisiologicos, parser GPX, motor de matching. 100% unitestable.
-- `src/integrations/` - Cliente OAuth de Spotify (unico servicio externo con autenticacion).
-- `src/ui/` - Componentes React + Tailwind.
-- `src/data/tracks/` - CSVs de Spotify embebidos como librerias por defecto.
+- `src/core/` — Lógica pura (sin React, sin DOM): cálculos fisiológicos (Karvonen, Coggan, Gulati), parser GPX, ecuación de potencia, motor de matching, plantillas de sesión. 100% unitestable.
+- `src/integrations/spotify/` — Cliente OAuth PKCE de Spotify (único servicio externo con autenticación).
+- `src/ui/` — Componentes React + Tailwind. Wizard de 5 pasos: Tipo → Datos → Ruta → Música → Resultado, además de Landing y Modo TV.
+- `src/data/tracks/` — CSVs de Spotify embebidos como librería por defecto.
 
-Para guias de contribucion y reglas del proyecto ver [CLAUDE.md](./CLAUDE.md).
+Para guías de contribución y reglas vinculantes del proyecto ver [CLAUDE.md](./CLAUDE.md).
 
 ## Licencia
 
 [PolyForm Noncommercial License 1.0.0](./LICENSE).
 
-Puedes usar, modificar y redistribuir el codigo libremente para cualquier
-proposito **no comercial** (personal, educativo, investigacion, ONGs).
-El uso comercial esta reservado a la titular del copyright. Si quieres uso
-comercial, abre un issue.
+Puedes usar, modificar y redistribuir el código libremente para cualquier propósito **no comercial** (personal, educativo, investigación, ONGs). El uso comercial está reservado a la titular del copyright. Si quieres uso comercial, abre un issue.
 
 ## Contribuir
 
-Lee [CONTRIBUTING.md](./CONTRIBUTING.md) — todos los commits deben firmarse
-con DCO (`git commit -s`).
+Lee [CONTRIBUTING.md](./CONTRIBUTING.md) — todos los commits deben firmarse con DCO (`git commit -s`).

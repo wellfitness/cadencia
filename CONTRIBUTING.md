@@ -1,4 +1,4 @@
-# Contributing to Vatios con Ritmo
+# Contributing to Cadencia
 
 ¡Gracias por querer colaborar! Antes de abrir un PR lee esto.
 

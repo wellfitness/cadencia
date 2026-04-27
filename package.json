@@ -1,8 +1,8 @@
 {
-  "name": "vatios-con-ritmo",
+  "name": "cadencia",
   "private": true,
   "version": "0.0.1",
-  "description": "Webapp + Android que genera playlists de Spotify ordenadas segun el perfil de potencia (vatios) de una ruta GPX, sincronizando el BPM (ritmo) musical con la intensidad del esfuerzo.",
+  "description": "Webapp que sincroniza musica de Spotify con la intensidad de tus entrenamientos en bici: outdoor desde un GPX (potencia por segmentos) o indoor desde sesiones por bloques. Para ciclistas con ritmo.",
   "type": "module",
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {

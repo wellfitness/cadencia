@@ -1,7 +1,7 @@
 import type { MatchedSegment } from '../matching/types';
 import type { RouteMeta } from '../segmentation/types';
 
-const PRODUCT_NAME = 'Vatios con Ritmo';
+const PRODUCT_NAME = 'Cadencia';
 const FALLBACK_ROUTE_NAME = 'Sin título';
 
 function pad(n: number): string {
@@ -14,7 +14,7 @@ function formatDate(date: Date): string {
 
 /**
  * Nombre por defecto de la playlist en Spotify.
- * Formato: "Vatios con Ritmo - {ruta} - {YYYY-MM-DD}".
+ * Formato: "Cadencia - {ruta} - {YYYY-MM-DD}".
  */
 export function buildPlaylistName(routeName: string, date: Date): string {
   const trimmed = routeName.trim();

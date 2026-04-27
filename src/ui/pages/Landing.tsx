@@ -12,6 +12,7 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
       <TopBar onStart={onStart} />
       <main className="flex-1">
         <Hero onStart={onStart} />
+        <SpotifyPremiumNotice />
         <HowItWorks />
         <WhyItWorks />
         <Privacy />
@@ -35,7 +36,7 @@ function TopBar({ onStart }: { onStart: () => void }): JSX.Element {
             decorative
           />
           <span className="font-display text-turquesa-600 text-xl leading-none">
-            Vatios con Ritmo
+            Cadencia
           </span>
         </div>
         <Button variant="primary" size="sm" onClick={onStart} iconRight="arrow_forward">
@@ -83,6 +84,21 @@ function Hero({ onStart }: { onStart: () => void }): JSX.Element {
         <p className="text-sm text-gris-500 mt-3">
           Gratis. Sin cuenta. Sin servidor.
         </p>
+      </div>
+    </section>
+  );
+}
+
+function SpotifyPremiumNotice(): JSX.Element {
+  return (
+    <section aria-label="Aviso sobre Spotify Premium" className="bg-white">
+      <div className="mx-auto w-full max-w-3xl px-4 pt-6 md:pt-8">
+        <Card variant="info" title="Antes de empezar" titleIcon="info">
+          <p className="text-gris-700">
+            Necesitas Spotify Premium para que la lista se adapte a la ruta o
+            entrenamiento. Con la cuenta gratuita se reproduce en orden aleatorio.
+          </p>
+        </Card>
       </div>
     </section>
   );
@@ -292,7 +308,7 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   },
   {
     q: '¿Funciona sin Spotify Premium?',
-    a: 'Necesitas una cuenta de Spotify (gratuita o Premium) solo para que podamos crear la playlist en tu biblioteca. Sin cuenta de Spotify la app sigue calculándote la potencia y la segmentación, pero no podrás guardar la playlist.',
+    a: 'Para crear la playlist sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción. Sin cuenta de Spotify la app sigue calculándote la potencia y la segmentación, pero no podrás guardar la lista.',
   },
   {
     q: '¿Es gratis?',

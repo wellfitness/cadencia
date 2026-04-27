@@ -6,15 +6,15 @@ import type { RouteMeta } from '../segmentation/types';
 describe('buildPlaylistName', () => {
   const date = new Date('2026-04-26T10:00:00Z');
 
-  it('formato Vatios con Ritmo - {ruta} - YYYY-MM-DD', () => {
+  it('formato "Cadencia - {ruta} - YYYY-MM-DD"', () => {
     expect(buildPlaylistName('Mi ruta', date)).toBe(
-      'Vatios con Ritmo - Mi ruta - 2026-04-26',
+      'Cadencia - Mi ruta - 2026-04-26',
     );
   });
 
   it('ruta vacia usa "Sin título"', () => {
-    expect(buildPlaylistName('', date)).toBe('Vatios con Ritmo - Sin título - 2026-04-26');
-    expect(buildPlaylistName('   ', date)).toBe('Vatios con Ritmo - Sin título - 2026-04-26');
+    expect(buildPlaylistName('', date)).toBe('Cadencia - Sin título - 2026-04-26');
+    expect(buildPlaylistName('   ', date)).toBe('Cadencia - Sin título - 2026-04-26');
   });
 
   it('pad cero en mes y dia', () => {
