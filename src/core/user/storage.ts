@@ -4,8 +4,8 @@ const STORAGE_KEY = 'vatios:userInputs:v1';
 
 /**
  * Wrapper de sessionStorage. Aislado aqui para que el resto del core no toque
- * APIs del DOM y para que la WebView de Capacitor no rompa la app si tiene
- * restricciones de almacenamiento (cada acceso esta protegido con try/catch).
+ * APIs del DOM (cada acceso esta protegido con try/catch para sobrevivir a
+ * restricciones de almacenamiento — modo privado, cuota llena, etc.).
  *
  * Por que sessionStorage (no localStorage):
  * Los datos fisiologicos del usuario solo viven mientras la pestana este

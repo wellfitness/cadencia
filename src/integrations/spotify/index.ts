@@ -14,4 +14,4 @@ export {
 export { getAuthorizationUrl, exchangeCodeForTokens, refreshAccessToken } from './auth';
 export { createPlaylist, addTracksToPlaylist, createPlaylistWithTracks } from './api';
 export { getSpotifyClientId } from './clientId';
-export { getRedirectUri, isCapacitorRuntime } from './redirectUri';
+export { getRedirectUri } from './redirectUri';

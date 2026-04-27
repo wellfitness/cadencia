@@ -35,18 +35,6 @@ lerna-debug.log*
 .env.local
 .env.*.local
 
-# Capacitor / Android
-android/.gradle/
-android/app/build/
-android/build/
-android/local.properties
-android/.idea/
-android/captures/
-android/app/release/
-android/app/debug/
-*.keystore
-!debug.keystore
-
 # Claude / Agent local config (per-user, not project-specific)
 .claude/
 .agent/

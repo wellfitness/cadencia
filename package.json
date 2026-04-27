@@ -17,8 +17,6 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps",
-    "cap:sync": "cap sync android",
-    "cap:android": "cap open android",
     "deploy": "bash scripts/deploy.sh",
     "deploy:full": "pnpm build && bash scripts/deploy.sh",
     "prepare": "husky"
@@ -29,10 +27,6 @@
     "recharts": "^2.13.0"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/browser": "^6.0.4",
-    "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0",
     "@eslint/js": "9.39.1",
     "@playwright/test": "^1.49.1",
     "@testing-library/jest-dom": "^6.6.3",
