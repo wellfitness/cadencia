@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getZoneCriteria } from '@core/matching';
 import {
   calculateKarvonenZones,
   type HeartRateZone,
   type KarvonenZoneRange,
 } from '@core/physiology/karvonen';
-import { expandSessionPlan, type EditableSessionPlan, type SessionBlock } from '@core/segmentation';
+import {
+  expandSessionPlan,
+  type CadenceProfile,
+  type EditableSessionPlan,
+  type SessionBlock,
+} from '@core/segmentation';
 import type { ValidatedUserInputs } from '@core/user/userInputs';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+
+const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
+  flat: 'Llano',
+  climb: 'Escalada',
+  sprint: 'Sprint',
+};
 
 export interface SessionTVModeProps {
   plan: EditableSessionPlan;
@@ -38,6 +50,7 @@ const ZONE_BG_DARK: Record<HeartRateZone, string> = {
   3: 'bg-zone-3',
   4: 'bg-zone-4',
   5: 'bg-zone-5',
+  6: 'bg-zone-6',
 };
 
 const ZONE_TEXT: Record<HeartRateZone, string> = {
@@ -46,6 +59,7 @@ const ZONE_TEXT: Record<HeartRateZone, string> = {
   3: 'text-zone-3',
   4: 'text-zone-4',
   5: 'text-zone-5',
+  6: 'text-zone-6',
 };
 
 const ZONE_PERCENT_FCR: Record<HeartRateZone, string> = {
@@ -54,6 +68,7 @@ const ZONE_PERCENT_FCR: Record<HeartRateZone, string> = {
   3: '70-80% FCR',
   4: '80-90% FCR',
   5: '90-100% FCR',
+  6: '100% FCR',
 };
 
 const WARNING_BEEP_TIMES = new Set([10, 5, 3, 2, 1]);
@@ -359,8 +374,17 @@ export function SessionTVMode({
                     {PHASE_LABELS[currentBlock.phase] ?? currentBlock.phase.toUpperCase()}
                   </h2>
                   <p className="text-base md:text-xl opacity-90">
-                    Zona {currentBlock.zone}
+                    Zona {currentBlock.zone} · {CADENCE_PROFILE_LABELS[currentBlock.cadenceProfile]}
                   </p>
+                  {(() => {
+                    const c = getZoneCriteria(currentBlock.zone, currentBlock.cadenceProfile);
+                    return (
+                      <p className="text-sm md:text-base opacity-80 mt-0.5 flex items-center gap-1.5">
+                        <MaterialIcon name="speed" size="small" />
+                        Cadencia: {c.cadenceMin}-{c.cadenceMax} rpm
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
               {currentZoneFc !== null && (
@@ -431,6 +455,7 @@ function zoneToBorder(zone: HeartRateZone): string {
     3: 'border-zone-3',
     4: 'border-zone-4',
     5: 'border-zone-5',
+    6: 'border-zone-6',
   };
   return map[zone];
 }

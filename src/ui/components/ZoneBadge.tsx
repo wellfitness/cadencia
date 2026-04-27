@@ -9,9 +9,9 @@ export interface ZoneBadgeProps {
 }
 
 /**
- * Badge semantico de zona Z1..Z5. Usa la paleta de zonas del proyecto
- * (azul -> verde -> amarillo -> naranja -> rojo) destinada exclusivamente
- * a visualizacion de datos.
+ * Badge semantico de zona Z1..Z6. Usa la paleta de zonas del proyecto
+ * (azul -> verde -> amarillo -> naranja -> rojo -> carmesi oscuro) destinada
+ * exclusivamente a visualizacion de datos.
  */
 export function ZoneBadge({ zone, label, size = 'md', className = '' }: ZoneBadgeProps): JSX.Element {
   const colorClass = ZONE_BG[zone];
@@ -33,4 +33,5 @@ const ZONE_BG: Record<HeartRateZone, string> = {
   3: 'bg-zone-3',
   4: 'bg-zone-4',
   5: 'bg-zone-5',
+  6: 'bg-zone-6',
 };

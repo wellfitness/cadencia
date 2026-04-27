@@ -18,18 +18,20 @@ import type { ClassifiedSegment, RouteMeta } from './types';
  * pasamos esta potencia por ratioToCogganZone(), recuperamos la misma zona,
  * cerrando el bucle de forma determinista.
  *
- *   Z1 < 55%   → 45%
- *   Z2 55-75%  → 65%
- *   Z3 75-90%  → 82.5%
- *   Z4 90-105% → 97.5%
- *   Z5 ≥ 105%  → 110%
+ *   Z1 < 55%      → 45%
+ *   Z2 55-75%     → 65%
+ *   Z3 75-90%     → 82.5%
+ *   Z4 90-105%    → 97.5%
+ *   Z5 105-120%   → 112.5%
+ *   Z6 ≥ 120%     → 135%
  */
 const ZONE_FTP_MIDPOINT: Record<HeartRateZone, number> = {
   1: 0.45,
   2: 0.65,
   3: 0.825,
   4: 0.975,
-  5: 1.1,
+  5: 1.125,
+  6: 1.35,
 };
 
 /** Mismo estimador W/kg que classifyZone.ts cuando el usuario no aporta FTP. */
@@ -73,6 +75,7 @@ export function classifySessionPlan(
       durationSec: block.durationSec,
       avgPowerWatts,
       zone: block.zone,
+      cadenceProfile: block.cadenceProfile,
       startDistanceMeters: 0,
       endDistanceMeters: 0,
       startElevationMeters: 0,
@@ -106,7 +109,7 @@ export function buildSessionRouteMeta(
   const normalizedPowerWatts =
     totalDurationSec > 0 ? Math.pow(npNumerator / totalDurationSec, 0.25) : 0;
 
-  const zoneDurationsSec: Record<HeartRateZone, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const zoneDurationsSec: Record<HeartRateZone, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   for (const s of segments) zoneDurationsSec[s.zone] += s.durationSec;
 
   return {

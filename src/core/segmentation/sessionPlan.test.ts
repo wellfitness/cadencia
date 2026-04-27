@@ -9,19 +9,19 @@ import {
 
 const warmup: SessionItem = {
   type: 'block',
-  block: { id: 'w', phase: 'warmup', zone: 2, durationSec: 300 },
+  block: { id: 'w', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 300 },
 };
 const cooldown: SessionItem = {
   type: 'block',
-  block: { id: 'c', phase: 'cooldown', zone: 1, durationSec: 300 },
+  block: { id: 'c', phase: 'cooldown', zone: 1, cadenceProfile: 'flat', durationSec: 300 },
 };
 const intervalGroup: SessionItem = {
   type: 'group',
   id: 'g',
   repeat: 4,
   blocks: [
-    { id: 'work', phase: 'work', zone: 4, durationSec: 240 },
-    { id: 'rec', phase: 'recovery', zone: 2, durationSec: 180 },
+    { id: 'work', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 240 },
+    { id: 'rec', phase: 'recovery', zone: 2, cadenceProfile: 'flat', durationSec: 180 },
   ],
 };
 
@@ -58,7 +58,7 @@ describe('expandSessionPlan', () => {
       type: 'group',
       id: 'g1',
       repeat: 1,
-      blocks: [{ id: 'b', phase: 'work', zone: 4, durationSec: 60 }],
+      blocks: [{ id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 60 }],
     };
     const expanded = expandSessionPlan({ name: 'x', items: [single] });
     expect(expanded.blocks).toHaveLength(1);
@@ -70,7 +70,7 @@ describe('expandSessionPlan', () => {
       type: 'group',
       id: 'g',
       repeat: 0,
-      blocks: [{ id: 'b', phase: 'work', zone: 3, durationSec: 60 }],
+      blocks: [{ id: 'b', phase: 'work', zone: 3, cadenceProfile: 'flat', durationSec: 60 }],
     };
     const expanded = expandSessionPlan({ name: 'x', items: [broken] });
     expect(expanded.blocks).toHaveLength(1);
@@ -111,7 +111,12 @@ describe('validateSessionPlan', () => {
   it('bloque con duracion 0 no es valido', () => {
     const result = validateSessionPlan({
       name: 'x',
-      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 4, durationSec: 0 } }],
+      items: [
+        {
+          type: 'block',
+          block: { id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 0 },
+        },
+      ],
     });
     expect(result.ok).toBe(false);
   });
@@ -132,7 +137,7 @@ describe('validateSessionPlan', () => {
           type: 'group',
           id: 'g',
           repeat: 0,
-          blocks: [{ id: 'b', phase: 'work', zone: 4, durationSec: 60 }],
+          blocks: [{ id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 60 }],
         },
       ],
     });
@@ -142,7 +147,12 @@ describe('validateSessionPlan', () => {
   it('plan minimo (un bloque) es valido', () => {
     const result = validateSessionPlan({
       name: 'x',
-      items: [{ type: 'block', block: { id: 'b', phase: 'main', zone: 2, durationSec: 600 } }],
+      items: [
+        {
+          type: 'block',
+          block: { id: 'b', phase: 'main', zone: 2, cadenceProfile: 'flat', durationSec: 600 },
+        },
+      ],
     });
     expect(result.ok).toBe(true);
   });

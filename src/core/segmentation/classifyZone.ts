@@ -12,25 +12,27 @@ import type { ValidatedUserInputs } from '../user/userInputs';
 const ESTIMATED_FTP_WATTS_PER_KG = 2.5;
 
 /**
- * Zonas Coggan en porcentaje de FTP. Z6 (>120%) se colapsa a Z5 porque
- * nuestra paleta visual solo soporta 5 zonas (Z1-Z5).
+ * Zonas Coggan en porcentaje de FTP, modelo de 6 zonas (estandar PDF curso
+ * ciclo indoor + Coggan):
  *
- *   Z1 < 55%
- *   Z2 55-75%
- *   Z3 75-90%
- *   Z4 90-105%
- *   Z5 >= 105% (incluye Z6 historica >120%)
+ *   Z1 < 55%        Recuperacion completa
+ *   Z2 55-75%       Recuperacion activa
+ *   Z3 75-90%       Tempo / MLSS
+ *   Z4 90-105%      Potencia umbral / VT2
+ *   Z5 105-120%     VT2 / PAM (muros)
+ *   Z6 >= 120%      Supramaxima (sprint)
  */
 function ratioToCogganZone(ratio: number): HeartRateZone {
   if (ratio < 0.55) return 1;
   if (ratio < 0.75) return 2;
   if (ratio < 0.9) return 3;
   if (ratio < 1.05) return 4;
-  return 5;
+  if (ratio < 1.2) return 5;
+  return 6;
 }
 
 /**
- * Clasifica un valor de potencia media (W) en una zona Z1-Z5.
+ * Clasifica un valor de potencia media (W) en una zona Z1-Z6.
  *
  * - Si el usuario tiene FTP medida → Coggan estricto.
  * - Si no → estimamos FTP como 2.5 W/kg y aplicamos Coggan sobre esa estimacion.

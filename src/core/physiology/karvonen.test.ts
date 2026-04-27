@@ -2,10 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { calculateKarvonenZones } from './karvonen';
 
 describe('calculateKarvonenZones', () => {
-  it('returns 5 contiguous zones', () => {
+  it('returns 6 contiguous zones', () => {
     const zones = calculateKarvonenZones(190, 60);
-    expect(zones).toHaveLength(5);
-    for (let i = 0; i < zones.length - 1; i++) {
+    expect(zones).toHaveLength(6);
+    // Z1..Z5 son contiguos; Z6 es supramaxima (FC saturada en max).
+    for (let i = 0; i < 4; i++) {
       expect(zones[i]!.maxBpm).toBeCloseTo(zones[i + 1]!.minBpm, 5);
     }
   });
@@ -13,6 +14,12 @@ describe('calculateKarvonenZones', () => {
   it('Z5 upper bound equals max HR', () => {
     const zones = calculateKarvonenZones(190, 60);
     expect(zones[4]!.maxBpm).toBe(190);
+  });
+
+  it('Z6 (supramaxima) tiene minBpm = maxBpm = max HR', () => {
+    const zones = calculateKarvonenZones(190, 60);
+    expect(zones[5]!.minBpm).toBe(190);
+    expect(zones[5]!.maxBpm).toBe(190);
   });
 
   it('Z1 lower bound equals resting + 50% of reserve', () => {

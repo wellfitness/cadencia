@@ -1,6 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HeartRateZone } from '@core/physiology/karvonen';
-import { PHASES, type Phase, type SessionBlock } from '@core/segmentation';
+import { getZoneCriteria } from '@core/matching';
+import {
+  defaultCadenceProfile,
+  getValidProfiles,
+  PHASES,
+  reconcileCadenceProfile,
+  type CadenceProfile,
+  type Phase,
+  type SessionBlock,
+} from '@core/segmentation';
 import { Button } from '../Button';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
@@ -29,9 +38,25 @@ const PHASE_ICONS: Record<Phase, string> = {
   main: 'directions_bike',
 };
 
+const ZONE_LABELS: Record<HeartRateZone, string> = {
+  1: 'Z1 — Recuperación',
+  2: 'Z2 — Aeróbico base',
+  3: 'Z3 — Tempo / MLSS',
+  4: 'Z4 — Umbral',
+  5: 'Z5 — Muros / escalada',
+  6: 'Z6 — Sprint supramáximo',
+};
+
+const PROFILE_LABELS: Record<CadenceProfile, string> = {
+  flat: 'Llano',
+  climb: 'Escalada',
+  sprint: 'Sprint',
+};
+
 /**
- * Editor inline de un unico bloque. Modifica zona, fase, duracion (mm:ss)
- * y descripcion opcional. Devuelve el bloque editado al padre via onSave.
+ * Editor inline de un unico bloque. Modifica zona, fase, cadenceProfile,
+ * duracion (mm:ss) y descripcion opcional. Devuelve el bloque editado al
+ * padre via onSave.
  *
  * El editor mantiene su propio state para que el usuario pueda cancelar
  * sin perder el bloque original.
@@ -39,6 +64,9 @@ const PHASE_ICONS: Record<Phase, string> = {
 export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.Element {
   const [phase, setPhase] = useState<Phase>(block.phase);
   const [zone, setZone] = useState<HeartRateZone>(block.zone);
+  const [cadenceProfile, setCadenceProfile] = useState<CadenceProfile>(
+    reconcileCadenceProfile(block.zone, block.cadenceProfile),
+  );
   const [minutes, setMinutes] = useState(() => Math.floor(block.durationSec / 60));
   const [seconds, setSeconds] = useState(() => block.durationSec % 60);
   const [description, setDescription] = useState<string>(block.description ?? '');
@@ -47,6 +75,20 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
   useEffect(() => {
     firstInputRef.current?.focus();
   }, []);
+
+  const validProfiles = useMemo(() => getValidProfiles(zone), [zone]);
+  const profileLocked = validProfiles.length === 1;
+
+  // Si la zona cambia y el profile actual no es valido, forzamos el default
+  // de la nueva zona. Esto evita estados invalidos (ej. Z5 + flat).
+  useEffect(() => {
+    if (!validProfiles.includes(cadenceProfile)) {
+      setCadenceProfile(defaultCadenceProfile(zone));
+    }
+  }, [zone, validProfiles, cadenceProfile]);
+
+  const criteria = getZoneCriteria(zone, cadenceProfile);
+  const cadenceHint = `${criteria.cadenceMin}-${criteria.cadenceMax} rpm`;
 
   const totalSec = Math.max(1, minutes * 60 + seconds);
   const isValid = totalSec > 0;
@@ -58,6 +100,7 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
       id: block.id,
       phase,
       zone,
+      cadenceProfile,
       durationSec: totalSec,
       ...(trimmedDesc.length > 0 ? { description: trimmedDesc } : {}),
     };
@@ -90,14 +133,36 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
             onChange={(e) => setZone(Number(e.target.value) as HeartRateZone)}
             className="w-full rounded-md border-2 border-gris-300 bg-white px-2 py-2 text-sm focus:border-turquesa-500 focus:outline-none min-h-[40px]"
           >
-            <option value={1}>Z1 — Recuperación</option>
-            <option value={2}>Z2 — Aeróbico base</option>
-            <option value={3}>Z3 — Tempo</option>
-            <option value={4}>Z4 — Umbral</option>
-            <option value={5}>Z5 — Máximo</option>
+            {([1, 2, 3, 4, 5, 6] as const).map((z) => (
+              <option key={z} value={z}>
+                {ZONE_LABELS[z]}
+              </option>
+            ))}
           </select>
         </label>
       </div>
+
+      <label className="block">
+        <span className="text-xs font-semibold text-gris-700 mb-1 block">
+          Tipo de bloque{' '}
+          {profileLocked && (
+            <span className="text-gris-400 font-normal">(fijo para esta zona)</span>
+          )}
+        </span>
+        <select
+          value={cadenceProfile}
+          onChange={(e) => setCadenceProfile(e.target.value as CadenceProfile)}
+          disabled={profileLocked}
+          className="w-full rounded-md border-2 border-gris-300 bg-white px-2 py-2 text-sm focus:border-turquesa-500 focus:outline-none min-h-[40px] disabled:bg-gris-100 disabled:text-gris-600"
+        >
+          {validProfiles.map((p) => (
+            <option key={p} value={p}>
+              {PROFILE_LABELS[p]}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gris-500 mt-1">Cadencia objetivo: {cadenceHint}</p>
+      </label>
 
       <div>
         <span className="text-xs font-semibold text-gris-700 mb-1 block">Duración</span>
@@ -141,6 +206,7 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
           <MaterialIcon name={PHASE_ICONS[phase]} size="small" className="text-gris-500" />
           <span>{PHASE_LABELS[phase]}</span>
           <ZoneBadge zone={zone} size="sm" />
+          <span className="text-gris-500">· {PROFILE_LABELS[cadenceProfile]}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onCancel}>

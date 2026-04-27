@@ -1,4 +1,5 @@
 import type { HeartRateZone } from '../physiology/karvonen';
+import type { CadenceProfile } from './sessionPlan';
 
 /**
  * Bloque de ~60 segundos del recorrido, ya clasificado a una zona de
@@ -12,6 +13,11 @@ export interface ClassifiedSegment {
   durationSec: number;
   avgPowerWatts: number;
   zone: HeartRateZone;
+  /**
+   * Perfil de cadencia. En GPX se infiere por pendiente (>6% → climb, resto
+   * → flat). En sesion indoor se hereda directamente del SessionBlock.
+   */
+  cadenceProfile: CadenceProfile;
   startDistanceMeters: number;
   endDistanceMeters: number;
   startElevationMeters: number;

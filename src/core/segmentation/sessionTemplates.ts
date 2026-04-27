@@ -1,10 +1,21 @@
 import type { HeartRateZone } from '../physiology/karvonen';
-import type { Phase, SessionBlock, SessionItem, SessionTemplate } from './sessionPlan';
+import {
+  defaultCadenceProfile,
+  type CadenceProfile,
+  type Phase,
+  type SessionBlock,
+  type SessionItem,
+  type SessionTemplate,
+} from './sessionPlan';
 
 /**
  * Plantillas predefinidas de sesiones indoor cycling. Estructuras validadas
  * por la literatura (SIT/Bangsbo/Helgerud) adaptadas a la clasificacion en
- * 5 zonas de la app.
+ * 6 zonas de la app:
+ *   - SIT: sprints anaerobicos como Z6+sprint (no Z5).
+ *   - HIIT 10-20-30: el ultimo intervalo (10s) es Z6+sprint.
+ *   - Noruego 4x4: Z4+flat (umbral sostenible).
+ *   - Z2 continuo: Z2+flat.
  *
  * Las plantillas son funciones puras (sin estado) y los IDs son estaticos
  * para que los tests sean deterministas y React reciba keys estables.
@@ -16,8 +27,16 @@ function block(
   zone: HeartRateZone,
   durationSec: number,
   description: string,
+  cadenceProfile?: CadenceProfile,
 ): SessionBlock {
-  return { id, phase, zone, durationSec, description };
+  return {
+    id,
+    phase,
+    zone,
+    cadenceProfile: cadenceProfile ?? defaultCadenceProfile(zone),
+    durationSec,
+    description,
+  };
 }
 
 function group(id: string, repeat: number, blocks: SessionBlock[]): SessionItem {
@@ -36,7 +55,7 @@ const SIT: SessionTemplate = {
   items: [
     single(block('sit-warmup', 'warmup', 2, 5 * 60, 'Calentamiento progresivo')),
     group('sit-sprints', 6, [
-      block('sit-sprint', 'work', 5, 30, 'Sprint a tope'),
+      block('sit-sprint', 'work', 6, 30, 'Sprint a tope'),
       block('sit-recovery', 'recovery', 1, 4 * 60, 'Pedaleo muy suave'),
     ]),
     single(block('sit-cooldown', 'cooldown', 1, 5 * 60, 'Vuelta a la calma')),
@@ -62,7 +81,7 @@ const HIIT_10_20_30: SessionTemplate = {
       ['a', 'b', 'c', 'd', 'e'].flatMap((s) => [
         block(`hiit-easy-${s}`, 'recovery', 2, 30, '30 s suave'),
         block(`hiit-tempo-${s}`, 'work', 3, 20, '20 s tempo'),
-        block(`hiit-sprint-${s}`, 'work', 5, 10, '10 s sprint'),
+        block(`hiit-sprint-${s}`, 'work', 6, 10, '10 s sprint'),
       ]),
     ),
     single(block('hiit-cooldown', 'cooldown', 1, 5 * 60, 'Vuelta a la calma')),

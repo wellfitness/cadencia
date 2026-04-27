@@ -2,7 +2,7 @@ import type { Track } from '../tracks/types';
 import { findCandidates } from './candidates';
 import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment } from './types';
-import { ZONE_MUSIC_CRITERIA, applyAllEnergetic } from './zoneCriteria';
+import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
 
 export interface ReplaceResult {
   /** Lista de matched con la fila reemplazada. Si no hay alternativa, devuelve la lista igual. */
@@ -36,7 +36,7 @@ export function replaceTrackInSegment(
     return { matched: [...matched], replaced: false };
   }
 
-  const baseCriteria = ZONE_MUSIC_CRITERIA[target.zone];
+  const baseCriteria = getZoneCriteria(target.zone, target.cadenceProfile);
   const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
   const { candidates, quality } = findCandidates(tracks, effective);
 

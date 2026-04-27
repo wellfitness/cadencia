@@ -31,7 +31,7 @@ describe('buildPlaylistDescription', () => {
     totalDurationSec: 480,
     averagePowerWatts: 200,
     normalizedPowerWatts: 220,
-    zoneDurationsSec: { 1: 0, 2: 0, 3: 60, 4: 60, 5: 360 },
+    zoneDurationsSec: { 1: 0, 2: 0, 3: 60, 4: 60, 5: 360, 6: 0 },
     hadRealTimestamps: true,
   };
 
@@ -54,6 +54,7 @@ describe('extractUris', () => {
       durationSec: 60,
       avgPowerWatts: 200,
       zone: 3,
+      cadenceProfile: 'flat',
       startDistanceMeters: 0,
       endDistanceMeters: 100,
       startElevationMeters: 100,

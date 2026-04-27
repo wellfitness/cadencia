@@ -28,8 +28,8 @@ describe('classifySessionPlan', () => {
     const plan = expandSessionPlan({
       name: 'test',
       items: [
-        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, durationSec: 300 } },
-        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, durationSec: 240 } },
+        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 300 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 240 } },
       ],
     });
     const segments = classifySessionPlan(plan, userWithFtp);
@@ -42,9 +42,9 @@ describe('classifySessionPlan', () => {
     const plan = expandSessionPlan({
       name: 'x',
       items: [
-        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, durationSec: 100 } },
-        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, durationSec: 200 } },
-        { type: 'block', block: { id: 'c', phase: 'cooldown', zone: 1, durationSec: 60 } },
+        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 100 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 200 } },
+        { type: 'block', block: { id: 'c', phase: 'cooldown', zone: 1, cadenceProfile: 'flat', durationSec: 60 } },
       ],
     });
     const segments = classifySessionPlan(plan, userWithFtp);
@@ -54,12 +54,15 @@ describe('classifySessionPlan', () => {
   });
 
   it('cierra el bucle: la potencia sintetica de cada zona vuelve a clasificarse en la misma zona', () => {
-    // Para cada zona Z1-Z5, generamos un bloque en esa zona y verificamos que
+    // Para cada zona Z1-Z6, generamos un bloque en esa zona y verificamos que
     // classifyZone() recupera la zona original a partir de la potencia sintetica.
-    for (const zone of [1, 2, 3, 4, 5] as const) {
+    const profileFor: Record<1 | 2 | 3 | 4 | 5 | 6, 'flat' | 'climb' | 'sprint'> = {
+      1: 'flat', 2: 'flat', 3: 'flat', 4: 'flat', 5: 'climb', 6: 'sprint',
+    };
+    for (const zone of [1, 2, 3, 4, 5, 6] as const) {
       const plan = expandSessionPlan({
         name: 'x',
-        items: [{ type: 'block', block: { id: 'b', phase: 'work', zone, durationSec: 60 } }],
+        items: [{ type: 'block', block: { id: 'b', phase: 'work', zone, cadenceProfile: profileFor[zone], durationSec: 60 } }],
       });
       const segment = classifySessionPlan(plan, userWithFtp)[0];
       expect(segment).toBeDefined();
@@ -68,10 +71,23 @@ describe('classifySessionPlan', () => {
     }
   });
 
+  it('propaga cadenceProfile del SessionBlock al ClassifiedSegment', () => {
+    const plan = expandSessionPlan({
+      name: 'x',
+      items: [
+        { type: 'block', block: { id: 'a', phase: 'work', zone: 4, cadenceProfile: 'climb', durationSec: 60 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 6, cadenceProfile: 'sprint', durationSec: 30 } },
+      ],
+    });
+    const segments = classifySessionPlan(plan, userWithFtp);
+    expect(segments[0]?.cadenceProfile).toBe('climb');
+    expect(segments[1]?.cadenceProfile).toBe('sprint');
+  });
+
   it('usa FTP estimado (2.5 W/kg) si el usuario no aporta FTP', () => {
     const plan = expandSessionPlan({
       name: 'x',
-      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 2, durationSec: 60 } }],
+      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 2, cadenceProfile: 'flat', durationSec: 60 } }],
     });
     const segments = classifySessionPlan(plan, userWithoutFtp);
     // FTP estimado = 2.5 * 70 = 175 W. Z2 midpoint = 65% → 113.75 W
@@ -82,8 +98,8 @@ describe('classifySessionPlan', () => {
     const plan = expandSessionPlan({
       name: 'x',
       items: [
-        { type: 'block', block: { id: 'a', phase: 'work', zone: 2, durationSec: 0 } },
-        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, durationSec: 60 } },
+        { type: 'block', block: { id: 'a', phase: 'work', zone: 2, cadenceProfile: 'flat', durationSec: 0 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 60 } },
       ],
     });
     const segments = classifySessionPlan(plan, userWithFtp);
@@ -94,7 +110,7 @@ describe('classifySessionPlan', () => {
   it('campos de geografia en 0 (sesion indoor sin coordenadas)', () => {
     const plan = expandSessionPlan({
       name: 'x',
-      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 3, durationSec: 60 } }],
+      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 3, cadenceProfile: 'flat', durationSec: 60 } }],
     });
     const segment = classifySessionPlan(plan, userWithFtp)[0];
     expect(segment?.startDistanceMeters).toBe(0);
@@ -111,8 +127,8 @@ describe('buildSessionRouteMeta', () => {
     const plan: EditableSessionPlan = {
       name: 'mi sesion',
       items: [
-        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, durationSec: 600 } },
-        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, durationSec: 240 } },
+        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 600 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 240 } },
       ],
     };
     const expanded = expandSessionPlan(plan);
@@ -125,7 +141,7 @@ describe('buildSessionRouteMeta', () => {
   it('campos de geografia en 0 y hadRealTimestamps en false', () => {
     const plan = expandSessionPlan({
       name: 'x',
-      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 3, durationSec: 60 } }],
+      items: [{ type: 'block', block: { id: 'b', phase: 'work', zone: 3, cadenceProfile: 'flat', durationSec: 60 } }],
     });
     const segments = classifySessionPlan(plan, userWithFtp);
     const meta = buildSessionRouteMeta(plan, segments);
@@ -139,9 +155,9 @@ describe('buildSessionRouteMeta', () => {
     const plan = expandSessionPlan({
       name: 'x',
       items: [
-        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, durationSec: 100 } },
-        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, durationSec: 200 } },
-        { type: 'block', block: { id: 'c', phase: 'cooldown', zone: 1, durationSec: 50 } },
+        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 100 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 200 } },
+        { type: 'block', block: { id: 'c', phase: 'cooldown', zone: 1, cadenceProfile: 'flat', durationSec: 50 } },
       ],
     });
     const segments = classifySessionPlan(plan, userWithFtp);
@@ -157,8 +173,8 @@ describe('buildSessionRouteMeta', () => {
     const plan = expandSessionPlan({
       name: 'x',
       items: [
-        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 1, durationSec: 600 } },
-        { type: 'block', block: { id: 'b', phase: 'work', zone: 5, durationSec: 60 } },
+        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 1, cadenceProfile: 'flat', durationSec: 600 } },
+        { type: 'block', block: { id: 'b', phase: 'work', zone: 5, cadenceProfile: 'climb', durationSec: 60 } },
       ],
     });
     const segments = classifySessionPlan(plan, userWithFtp);
@@ -176,7 +192,9 @@ describe('SESSION_TEMPLATES integracion', () => {
       for (const s of segments) {
         expect(s.durationSec).toBeGreaterThan(0);
         expect(s.zone).toBeGreaterThanOrEqual(1);
-        expect(s.zone).toBeLessThanOrEqual(5);
+        expect(s.zone).toBeLessThanOrEqual(6);
+        // cadenceProfile siempre se propaga
+        expect(['flat', 'climb', 'sprint']).toContain(s.cadenceProfile);
       }
     }
   });

@@ -207,48 +207,82 @@ bajada       →  35 km/h
 
 ### Segmentación
 
-**Modo GPX**: agrupar puntos en bloques de **60 segundos** estimados. Para cada bloque: potencia media, zona (Z1–Z5), duración.
+**Modo GPX**: agrupar puntos en bloques de **60 segundos** estimados. Para cada bloque: potencia media, zona (Z1–Z6), `cadenceProfile` inferido por pendiente (>6% → `climb`, resto → `flat`), duración.
 
-**Modo sesión indoor**: el usuario define `SessionBlock`s con `{durationSec, zone, label}`. La función `fromSessionBlocks` los convierte a `ClassifiedSegment[]` directamente — sin pasar por física, porque el usuario ya marca la zona objetivo.
+**Modo sesión indoor**: el usuario define `SessionBlock`s con `{durationSec, zone, cadenceProfile, label}`. La función `fromSessionBlocks` los convierte a `ClassifiedSegment[]` directamente — sin pasar por física, porque el usuario ya marca zona y perfil.
 
-Output común a ambos modos: `Array<{ zone: 1|2|3|4|5; durationSec: number }>`.
+Output común a ambos modos: `Array<{ zone: 1|2|3|4|5|6; cadenceProfile: 'flat'|'climb'|'sprint'; durationSec: number }>`.
+
+### Modelo de zonas (Coggan 6 zonas + cadenceProfile)
+
+Se trabaja con **6 zonas** (Z1-Z6 lineales, sin sub-zonas), siguiendo el estándar Coggan adaptado al curso de ciclo indoor. Cada bloque combina **zona** (intensidad cardíaca/potencia/muscular) y **cadenceProfile** (tipo de pedaleo: `flat` llano, `climb` escalada, `sprint` sprint).
+
+**Decisiones de diseño clave:**
+1. **La cadencia objetivo depende del profile, no de la zona.** En cycling real una canción a 80 rpm sirve para Z2, Z3 o Z4 según la resistencia y la energía del track.
+2. **Cadencia es el ÚNICO criterio excluyente.** Energy y valence afectan al score (probabilidad de elección) pero NO descartan tracks. Esto evita que zonas con perfil sonoro estricto se queden sin candidatos por umbrales arbitrarios.
+
+**Cadencia por profile** (rangos rpm — único filtro excluyente, vía 1:1 o 2:1 half-time):
+
+| Profile | Cadencia (rpm) 1:1 | BPM canción 1:1 ∪ 2:1 | Aplicable a |
+|---|---|---|---|
+| `flat` | **70-90** | 70-90 ∪ 140-180 BPM | Z1, Z2, Z3, Z4 (pedaleo continuo sostenible) |
+| `climb` | **60-80** | 60-80 ∪ 120-160 BPM | Z3, Z4, Z5 (escalada, cadencia baja, fuerza) |
+| `sprint` | **90-110** | 90-110 ∪ 180-220 BPM | Z6 (anaeróbico, máxima cadencia) |
+
+**Perfil sonoro IDEAL por zona** (afecta al score, no excluye):
+
+| Zona | Nombre | %FTP | %FCmáx | Profiles válidos | Energy ideal | Valence ideal | Color |
+|---|---|---|---|---|---|---|---|
+| Z1 | Recuperación completa | <55% | <60% | flat | 0.30 | 0.40 | azul `#3b82f6` |
+| Z2 | Recuperación activa | 55-75% | 60-70% | flat | 0.55 | 0.50 | verde `#22c55e` |
+| Z3 | Tempo / MLSS | 75-90% | 70-80% | flat **o** climb | 0.70 | 0.55 | amarillo `#eab308` |
+| Z4 | Potencia umbral / VT2 | 90-105% | 80-90% | flat **o** climb | 0.80 | 0.60 | naranja `#f97316` |
+| Z5 | VT2 / PAM (muros) | 105-120% | 90-100% | climb (fijo) | 0.90 | 0.65 | rojo `#ef4444` |
+| Z6 | Supramáxima (sprint) | >120% | (FC saturada) | sprint (fijo) | 0.95 | 0.70 | carmesí `#7c2d12` |
+
+Tracks con `energy`/`valence` lejos del ideal puntúan más bajo pero siguen siendo elegibles. El motor maximiza el score conjunto.
+
+Si el usuario marca "todo con energía", `energyIdeal` de Z1-Z2 sube a 0.70 (ideal, no umbral).
 
 ### Plantillas de sesión científicas (`src/core/segmentation/sessionTemplates.ts`)
 
-Plantillas predefinidas basadas en literatura de entrenamiento de resistencia. Cada usuario puede partir de una y editarla, o construir desde cero. Ejemplos:
+Plantillas predefinidas basadas en literatura de entrenamiento. Cada usuario puede partir de una y editarla, o construir desde cero:
 
-- **SIT** (Sprint Interval Training): repeticiones cortas máximas (Z5) + recuperaciones largas (Z1).
-- **HIIT** clásico: intervalos Z4 con recuperación Z1.
-- **Noruego 4×4**: Helgerud et al., NTNU. 4 × (4 min Z4 / 3 min Z2). Aplicable indistintamente a ciclismo y running.
-- **Z2 base**: sesión sostenida en zona aeróbica.
-
-### Mapeo zona → metadatos de track
-
-| Zona | BPM objetivo | Energy min | Valence  | Descripción       |
-| ---- | ------------ | ---------- | -------- | ----------------- |
-| Z1   | 90-110       | 0.40       | cualq.   | Recuperación      |
-| Z2   | 110-120      | 0.55       | > 0.40   | Aeróbico base     |
-| Z3   | 120-130      | 0.70       | > 0.50   | Tempo sostenido   |
-| Z4   | 130-145      | 0.80       | > 0.60   | Umbral            |
-| Z5   | 145-175      | 0.90       | > 0.70   | Máximo / sprint   |
-
-Si el usuario marca "todo con energía", `Energy mín = 0.70` también en Z1–Z2.
+- **SIT** (Sprint Interval Training): 6 sprints de 30s en **Z6 + sprint** + recuperaciones largas Z1 + flat.
+- **HIIT 10-20-30** (Bangsbo): el intervalo de 10s es **Z6 + sprint**; los de 20s Z3 + flat; los de 30s Z2 + flat.
+- **Noruego 4×4** (Helgerud et al., NTNU): 4 × (4 min Z4 + flat / 3 min Z2 + flat). VO₂max.
+- **Z2 continuo**: sesión sostenida Z2 + flat.
 
 ### Algoritmo de matching (determinista)
 
 **Regla cero repeticiones (vinculante):** ninguna canción aparece dos veces en la playlist final. Esto vale en ambos modos (`overlap` GPX y `discrete` sesión).
 
-Para cada segmento `[zona, duración]`:
+**Filtro por cadencia con dual-range** (`src/core/matching/candidates.ts`): un track encaja con una `(zona, profile)` si su `tempoBpm` cae en uno de los dos rangos válidos:
 
-1. Filtrar tracks por **zona → BPM + Energy + género preferido**.
-2. Ordenar por `score = 0.5 × match_genero + 0.3 × ajuste_BPM + 0.2 × energy`.
+- **Match 1:1**: `tempoBpm ∈ [cadenceMin, cadenceMax]`. Track de 80 BPM se pedalea a 80 rpm (una pedalada por beat).
+- **Match 2:1 (half-time)**: `tempoBpm ∈ [2·cadenceMin, 2·cadenceMax]`. Track de 145 BPM se pedalea a 72.5 rpm (golpe fuerte cada 2 pedaladas).
+
+Esto compensa el sesgo half-time del algoritmo de tempo de Spotify, que etiqueta muchas canciones rock/pop al doble de su tempo perceptual. Con el filtro dual, "Born to Be Wild" (BPM Spotify ~145) cae correctamente en Z5 + climb (cadencia objetivo 55-75 rpm).
+
+Para cada segmento `(zona, profile, duración)`:
+
+1. **Filtrar candidatos SOLO por cadencia** (1:1 ∪ 2:1). Energy, valence y género NO descartan, son scores.
+2. Ordenar por `score = 0.30 × cadencia + 0.30 × energy + 0.20 × valence + 0.20 × género`. Cada componente es 0..1:
+   - `cadencia` = `max(score 1:1, score 2:1)`, lineal triangular contra el midpoint del rango.
+   - `energy` = `1 - |track.energy - zone.energyIdeal|`.
+   - `valence` = `1 - |track.valence - zone.valenceIdeal|`.
+   - `género` = 1 si match preferencia, 0 si no, 0.5 si lista vacía.
 3. Seleccionar el track con mayor `score` **que no aparezca ya en la playlist**.
-4. **Una entrada por canción**: si una canción es lo bastante larga para cubrir varios segmentos consecutivos de la misma zona, aparece una sola vez en la playlist (no se repite por segmento). Comportamiento controlado por `crossZoneMode: 'overlap' | 'discrete'` (overlap por defecto en modo GPX, discrete en modo sesión).
+4. **Una entrada por canción**: si una canción es lo bastante larga para cubrir varios segmentos consecutivos de la misma zona, aparece una sola vez en la playlist. Comportamiento controlado por `crossZoneMode: 'overlap' | 'discrete'` (overlap por defecto en modo GPX, discrete en modo sesión).
 5. Si el pool se agota antes de cubrir todos los segmentos, emitir un hueco con `track: null` y `matchQuality: 'insufficient'`. La UI debe avisar al usuario para que añada más listas (no se permite generar la playlist con huecos).
 
-**Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): antes de avanzar a `ResultStep`, `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)` y bloquea el avance si alguna zona tiene déficit. Estimación pesimista basada en duración media de track (210 s).
+**Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): antes de avanzar a `ResultStep`, `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)`. La validación bloqueante es **global**: `neededTotal = ceil(totalDur / 210)` vs `availableTotal = nº de tracks únicos en el catálogo`. El desglose por `(zona, profile)` se mantiene como información, no como bloqueo, porque las zonas comparten pool por la cadencia común del profile y un track puede cubrir segmentos de zonas adyacentes en modo overlap.
 
 **Determinista**: misma entrada → misma salida. Si se introduce aleatoriedad para variedad, debe ser con semilla fija configurable.
+
+**Referencias bibliográficas (PubMed):**
+- Dunst et al. 2024, *Frontiers in Physiology*: cadencia óptima por umbral metabólico — LT1 66 rpm, MLSS 82 rpm, VO₂max 84 rpm, sprint sin fatiga 135 rpm. [DOI: 10.3389/fphys.2024.1343601](https://doi.org/10.3389/fphys.2024.1343601)
+- Hebisz & Hebisz 2024, *PLoS One*: HIIT a baja cadencia (50-70 rpm) produce mayor mejora aeróbica que a cadencia libre. [DOI: 10.1371/journal.pone.0311833](https://doi.org/10.1371/journal.pone.0311833)
 
 ---
 

@@ -16,7 +16,8 @@ const ZONE_LABEL: Record<HeartRateZone, string> = {
   2: 'Aeróbico',
   3: 'Tempo',
   4: 'Umbral',
-  5: 'Máximo',
+  5: 'Muros',
+  6: 'Sprint',
 };
 
 const ZONE_BAR_BG: Record<HeartRateZone, string> = {
@@ -25,6 +26,7 @@ const ZONE_BAR_BG: Record<HeartRateZone, string> = {
   3: 'bg-zone-3',
   4: 'bg-zone-4',
   5: 'bg-zone-5',
+  6: 'bg-zone-6',
 };
 
 function formatDistance(meters: number): string {

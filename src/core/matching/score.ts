@@ -1,35 +1,62 @@
 import type { Track } from '../tracks/types';
 import type { ZoneMusicCriteria } from './types';
 
-const W_GENRE = 0.5;
-const W_BPM = 0.3;
-const W_ENERGY = 0.2;
+/**
+ * Pesos del score. Todos suman 1.00. Cadencia y energy son los factores
+ * principales (pedaleo y intensidad sonora). Valence (positividad emocional)
+ * y genero preferido son discriminadores secundarios.
+ */
+const W_CADENCE = 0.3;
+const W_ENERGY = 0.3;
+const W_VALENCE = 0.2;
+const W_GENRE = 0.2;
 
-const NEUTRAL_GENRE_SCORE = 0.5; // sin preferencias o catalogo sin generos = neutro
+const NEUTRAL_GENRE_SCORE = 0.5; // sin preferencias o catalogo sin generos
 
 /**
- * Calcula la puntuacion [0..1] de un track para una zona dada y las preferencias
- * de genero del usuario. Determinista: misma entrada -> misma salida.
+ * Calcula la puntuacion [0..1] de un track para una (zona, profile) dada y
+ * las preferencias de genero del usuario. Determinista.
  *
- * Pesos segun CLAUDE.md "Algoritmo de matching":
- *   score = 0.5 * match_genero + 0.3 * ajuste_BPM + 0.2 * energy
+ * Componentes (todos 0..1):
+ *  - cadenceScore:  proximidad al midpoint del rango de cadencia, tomando
+ *                   el max entre vía 1:1 y vía 2:1 (half-time).
+ *  - energyScore:   1 - |track.energy - zone.energyIdeal|. Distancia al
+ *                   ideal de intensidad sonora. NO descarta tracks lejos.
+ *  - valenceScore:  1 - |track.valence - zone.valenceIdeal|. Distancia al
+ *                   ideal de positividad emocional.
+ *  - genreScore:    1 si el track matchea preferenciaUsuario, 0 si no
+ *                   matchea, 0.5 si lista de preferidos vacia.
  *
- * Componentes:
- *  - match_genero: 1 si algun genero del track esta en preferredGenres,
- *                  NEUTRAL_GENRE_SCORE si la lista de preferidos esta vacia,
- *                  0 si tiene generos pero no matchean.
- *  - ajuste_BPM:   1 cuando el tempo coincide con el midpoint de la zona,
- *                  decrece linealmente hasta 0 en los bordes (bpmMin/bpmMax),
- *                  0 fuera del rango (los filtros previos descartan estos
- *                  tracks en matching estricto, pero best-effort si los puede
- *                  scorar fuera de rango).
- *  - energy:       el propio energy del track (0..1).
+ * El motor escoge en cada slot el track con mayor score que no este ya
+ * usado (regla cero repeticiones).
  */
 export function scoreTrack(
   track: Track,
   criteria: ZoneMusicCriteria,
   preferredGenres: readonly string[],
 ): number {
+  // === CADENCE ===
+  const midpoint11 = (criteria.cadenceMin + criteria.cadenceMax) / 2;
+  const halfRange11 = (criteria.cadenceMax - criteria.cadenceMin) / 2;
+  const midpoint21 = midpoint11 * 2;
+  const halfRange21 = halfRange11 * 2;
+  const score11 =
+    halfRange11 > 0
+      ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpoint11) / halfRange11)
+      : 0;
+  const score21 =
+    halfRange21 > 0
+      ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpoint21) / halfRange21)
+      : 0;
+  const cadenceScore = Math.max(score11, score21);
+
+  // === ENERGY (continua, no excluyente) ===
+  const energyScore = 1 - Math.abs(track.energy - criteria.energyIdeal);
+
+  // === VALENCE (continua, no excluyente) ===
+  const valenceScore = 1 - Math.abs(track.valence - criteria.valenceIdeal);
+
+  // === GENRE ===
   const genreScore =
     preferredGenres.length === 0
       ? NEUTRAL_GENRE_SCORE
@@ -37,12 +64,10 @@ export function scoreTrack(
         ? 1
         : 0;
 
-  const midpoint = (criteria.bpmMin + criteria.bpmMax) / 2;
-  const halfRange = (criteria.bpmMax - criteria.bpmMin) / 2;
-  const distance = Math.abs(track.tempoBpm - midpoint);
-  const bpmScore = halfRange > 0 ? Math.max(0, 1 - distance / halfRange) : 0;
-
-  const energyScore = Math.max(0, Math.min(1, track.energy));
-
-  return W_GENRE * genreScore + W_BPM * bpmScore + W_ENERGY * energyScore;
+  return (
+    W_CADENCE * cadenceScore +
+    W_ENERGY * energyScore +
+    W_VALENCE * valenceScore +
+    W_GENRE * genreScore
+  );
 }

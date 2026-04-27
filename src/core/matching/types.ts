@@ -1,4 +1,5 @@
 import type { HeartRateZone } from '../physiology/karvonen';
+import type { CadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
 
@@ -18,21 +19,34 @@ export const EMPTY_PREFERENCES: MatchPreferences = {
 };
 
 /**
- * Criterios musicales objetivo por zona de potencia. Valores derivados de
- * la tabla de CLAUDE.md "Mapeo zona -> metadatos de track".
+ * Criterios musicales para una combinacion (zona, cadenceProfile).
+ *
+ * **Filtro EXCLUYENTE: cadencia rpm.** Un track encaja si su tempoBpm cae en
+ * [cadenceMin, cadenceMax] (match 1:1, una pedalada por beat) o en
+ * [2·cadenceMin, 2·cadenceMax] (match 2:1 half-time, golpe fuerte cada 2
+ * pedaladas). Si no, no es candidato.
+ *
+ * **Score INCLUYENTE: energy y valence ideales.** Las dimensiones de
+ * intensidad sonora y positividad emocional NO descartan tracks; afectan al
+ * orden de preferencia en scoreTrack: tracks cerca del ideal puntuan mas.
+ * Esto evita falsos descartes y permite que el motor maximice la calidad
+ * dentro del catalogo disponible.
  */
 export interface ZoneMusicCriteria {
   zone: HeartRateZone;
-  bpmMin: number;
-  bpmMax: number;
-  /** Energy minima [0..1] que debe tener el track para esta zona. */
-  energyMin: number;
-  /** Valencia minima [0..1] (positividad). null = no filtrar por valencia. */
-  valenceMin: number | null;
+  cadenceProfile: CadenceProfile;
+  /** Cadencia objetivo minima (rpm). Filtro excluyente vía 1:1 o 2:1. */
+  cadenceMin: number;
+  /** Cadencia objetivo maxima (rpm). Filtro excluyente vía 1:1 o 2:1. */
+  cadenceMax: number;
+  /** Energy [0..1] ideal para esta zona. Score por distancia, no excluye. */
+  energyIdeal: number;
+  /** Valencia [0..1] ideal (positividad emocional). Score por distancia. */
+  valenceIdeal: number;
   description: string;
 }
 
-export type MatchQuality = 'strict' | 'relaxed' | 'best-effort' | 'insufficient';
+export type MatchQuality = 'strict' | 'best-effort' | 'insufficient';
 
 /**
  * Segmento de la ruta ya casado con una cancion concreta. track === null

@@ -3,7 +3,6 @@ import {
   analyzePoolCoverage,
   EMPTY_PREFERENCES,
   matchTracksToSegments,
-  ZONE_MUSIC_CRITERIA,
   type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
@@ -177,7 +176,7 @@ export function MusicStep({
   const totalMinutes = Math.round(meta.totalDurationSec / 60);
   const previewItems = matched.slice(0, MAX_PREVIEW);
   const remaining = Math.max(0, matched.length - MAX_PREVIEW);
-  const relaxedCount = matched.filter((m) => m.matchQuality !== 'strict').length;
+  const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
 
   const validUploads = uploadedCsvs.filter((c) => c.error === undefined);
   const hasUserTracks = validUploads.length > 0;
@@ -342,13 +341,13 @@ export function MusicStep({
             para <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de
             ruta
           </p>
-          {relaxedCount > 0 && (
+          {bestEffortCount > 0 && (
             <span
               className="text-xs text-tulipTree-600 flex items-center gap-1"
-              title={`${relaxedCount} segmento(s) con encaje relajado por catálogo limitado`}
+              title={`${bestEffortCount} segmento(s) sin candidato de cadencia ideal: el motor eligió los más cercanos`}
             >
               <MaterialIcon name="info" size="small" className="text-tulipTree-500" />
-              {relaxedCount} relajado{relaxedCount !== 1 ? 's' : ''}
+              {bestEffortCount} encaje libre
             </span>
           )}
         </div>
@@ -435,7 +434,6 @@ function PoolCoverageWarning({
   sourceMode,
   onSwitchToBoth,
 }: PoolCoverageWarningProps): JSX.Element {
-  const deficits = coverage.byZone.filter((z) => z.deficit > 0);
   return (
     <div
       role="alert"
@@ -452,30 +450,21 @@ function PoolCoverageWarning({
             Tu catálogo no llega para la sesión completa
           </h2>
           <p className="text-sm text-gris-700 mt-1">
-            Para que ninguna canción se repita necesitas más temas en{' '}
-            {deficits.length === 1 ? 'la siguiente zona' : 'las siguientes zonas'}.
+            La sesión necesita{' '}
+            <strong className="tabular-nums">{coverage.neededTotal}</strong>{' '}
+            canciones únicas para no repetir ninguna y tu catálogo solo tiene{' '}
+            <strong className="tabular-nums">{coverage.availableTotal}</strong>.
+            Faltan{' '}
+            <strong className="text-rosa-600 tabular-nums">
+              {coverage.deficitTotal}
+            </strong>
+            .
           </p>
         </div>
       </div>
-      <ul className="space-y-2 pl-1">
-        {deficits.map((z) => (
-          <li key={z.zone} className="flex items-baseline gap-2 text-sm text-gris-800">
-            <span className="font-semibold tabular-nums">Z{z.zone}</span>
-            <span className="text-gris-600">
-              ({ZONE_MUSIC_CRITERIA[z.zone].description}):
-            </span>
-            <span className="tabular-nums">
-              tienes {z.available}, necesitas {z.needed}
-            </span>
-            <span className="text-rosa-600 font-semibold tabular-nums">
-              — faltan {z.deficit}
-            </span>
-          </li>
-        ))}
-      </ul>
       <div className="pt-1">
         <p className="text-sm text-gris-700">
-          Sube otro CSV con más canciones de esas zonas
+          Sube otro CSV con más canciones
           {sourceMode !== 'both' && (
             <>
               {' '}o{' '}

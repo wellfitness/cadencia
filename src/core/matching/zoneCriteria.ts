@@ -1,24 +1,90 @@
 import type { HeartRateZone } from '../physiology/karvonen';
+import {
+  defaultCadenceProfile,
+  reconcileCadenceProfile,
+  type CadenceProfile,
+} from '../segmentation/sessionPlan';
 import type { ZoneMusicCriteria } from './types';
 
 /**
- * Criterios musicales por zona, segun la tabla "Mapeo zona -> metadatos de
- * track" de CLAUDE.md. Valores literales para que se vean en un vistazo.
+ * Cadencia objetivo por TIPO DE PEDALEO (cadenceProfile). Es el UNICO
+ * criterio EXCLUYENTE: un track encaja con una zona/profile si su tempoBpm
+ * cae en cadenceMin..cadenceMax (1:1) o en 2*cadenceMin..2*cadenceMax (2:1
+ * half-time). Si no, no es candidato.
+ *
+ * El resto de dimensiones (energy, valence, genero) son INCLUYENTES: afectan
+ * al score (probabilidad de elegir el track) pero no descartan.
+ *
+ * Rangos definidos por el curso de ciclo indoor del usuario:
+ *   - flat:   70-90 rpm (1:1) o 140-180 BPM (2:1)
+ *   - climb:  60-80 rpm (1:1) o 120-160 BPM (2:1)
+ *   - sprint: 90-110 rpm (1:1) o 180-220 BPM (2:1)
+ *
+ * Refs PubMed:
+ *   - Dunst et al. 2024 (10.3389/fphys.2024.1343601): cadencia optima por
+ *     umbral metabolico (LT1 66, MLSS 82, VO2max 84 rpm).
+ *   - Hebisz & Hebisz 2024 (10.1371/journal.pone.0311833): HIIT a baja
+ *     cadencia 50-70 rpm produce mayor mejora aerobica.
  */
-export const ZONE_MUSIC_CRITERIA: Record<HeartRateZone, ZoneMusicCriteria> = {
-  1: { zone: 1, bpmMin: 90, bpmMax: 110, energyMin: 0.4, valenceMin: null, description: 'Recuperación' },
-  2: { zone: 2, bpmMin: 110, bpmMax: 120, energyMin: 0.55, valenceMin: 0.4, description: 'Aeróbico' },
-  3: { zone: 3, bpmMin: 120, bpmMax: 130, energyMin: 0.7, valenceMin: 0.5, description: 'Tempo' },
-  4: { zone: 4, bpmMin: 130, bpmMax: 145, energyMin: 0.8, valenceMin: 0.6, description: 'Umbral' },
-  5: { zone: 5, bpmMin: 145, bpmMax: 175, energyMin: 0.9, valenceMin: 0.7, description: 'Máximo' },
+const CADENCE_BY_PROFILE: Record<CadenceProfile, { min: number; max: number }> = {
+  flat: { min: 70, max: 90 },
+  climb: { min: 60, max: 80 },
+  sprint: { min: 90, max: 110 },
 };
+
+/**
+ * Perfil sonoro IDEAL por zona. Energy y valence son INCLUYENTES — el motor
+ * acepta cualquier valor, pero los tracks cercanos al ideal puntuan mas alto
+ * en scoreTrack. Esto permite que el catalogo entero sea candidato y se
+ * rankee por proximidad, evitando descartar canciones validas por umbrales.
+ *
+ * Energy: intensidad sonora (0-1). Z1 recovery prefiere bajo, Z6 sprint alto.
+ * Valence: positividad emocional (0-1). Z1 cualquiera, Z6 alegre/eufórica.
+ */
+const PROFILE_IDEAL_BY_ZONE: Record<
+  HeartRateZone,
+  { energyIdeal: number; valenceIdeal: number; description: string }
+> = {
+  1: { energyIdeal: 0.3, valenceIdeal: 0.4, description: 'Z1 — Recuperación completa' },
+  2: { energyIdeal: 0.55, valenceIdeal: 0.5, description: 'Z2 — Recuperación activa' },
+  3: { energyIdeal: 0.7, valenceIdeal: 0.55, description: 'Z3 — Tempo / MLSS' },
+  4: { energyIdeal: 0.8, valenceIdeal: 0.6, description: 'Z4 — Umbral / VT2' },
+  5: { energyIdeal: 0.9, valenceIdeal: 0.65, description: 'Z5 — Muros / escalada intensa' },
+  6: { energyIdeal: 0.95, valenceIdeal: 0.7, description: 'Z6 — Sprint supramáximo' },
+};
+
+/**
+ * Compone los criterios musicales para una combinacion (zona, profile).
+ * Cadencia viene del profile (excluyente), energy/valence ideales vienen de
+ * la zona (inclusivos, afectan al score solo).
+ *
+ * Si el profile recibido no es valido para la zona (ej. Z1 + climb), cae al
+ * default de esa zona via reconcileCadenceProfile.
+ */
+export function getZoneCriteria(
+  zone: HeartRateZone,
+  profile: CadenceProfile,
+): ZoneMusicCriteria {
+  const reconciledProfile = reconcileCadenceProfile(zone, profile);
+  const cadence = CADENCE_BY_PROFILE[reconciledProfile];
+  const ideal = PROFILE_IDEAL_BY_ZONE[zone];
+  return {
+    zone,
+    cadenceProfile: reconciledProfile,
+    cadenceMin: cadence.min,
+    cadenceMax: cadence.max,
+    energyIdeal: ideal.energyIdeal,
+    valenceIdeal: ideal.valenceIdeal,
+    description: ideal.description,
+  };
+}
 
 const ALL_ENERGETIC_FLOOR = 0.7;
 
 /**
- * Aplica el toggle "todo con energia": en Z1-Z2 sube la Energy minima al
- * piso global 0.70 (sin tocar zonas mas altas que ya estan por encima).
- * Funcion pura.
+ * Toggle "todo con energia": sube el energy IDEAL de Z1-Z2 al piso 0.70 para
+ * que el score prefiera tracks energéticos en zonas suaves. NO excluye
+ * tracks bajos — el filtro sigue siendo solo cadencia. Funcion pura.
  */
 export function applyAllEnergetic(
   criteria: ZoneMusicCriteria,
@@ -27,6 +93,20 @@ export function applyAllEnergetic(
   if (!allEnergetic) return criteria;
   return {
     ...criteria,
-    energyMin: Math.max(criteria.energyMin, ALL_ENERGETIC_FLOOR),
+    energyIdeal: Math.max(criteria.energyIdeal, ALL_ENERGETIC_FLOOR),
   };
 }
+
+/**
+ * Compatibilidad: sitios del codigo que aun referencian
+ * `ZONE_MUSIC_CRITERIA[zone]`. Devolvemos los criterios del profile default
+ * de cada zona.
+ */
+export const ZONE_MUSIC_CRITERIA: Record<HeartRateZone, ZoneMusicCriteria> = {
+  1: getZoneCriteria(1, defaultCadenceProfile(1)),
+  2: getZoneCriteria(2, defaultCadenceProfile(2)),
+  3: getZoneCriteria(3, defaultCadenceProfile(3)),
+  4: getZoneCriteria(4, defaultCadenceProfile(4)),
+  5: getZoneCriteria(5, defaultCadenceProfile(5)),
+  6: getZoneCriteria(6, defaultCadenceProfile(6)),
+};

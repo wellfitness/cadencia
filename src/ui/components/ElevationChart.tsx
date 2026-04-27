@@ -31,6 +31,7 @@ const ZONE_FILL: Record<HeartRateZone, string> = {
   3: '#eab308',
   4: '#f97316',
   5: '#ef4444',
+  6: '#7c2d12',
 };
 
 const ZONE_LABEL: Record<HeartRateZone, string> = {
@@ -38,7 +39,8 @@ const ZONE_LABEL: Record<HeartRateZone, string> = {
   2: 'Aeróbico',
   3: 'Tempo',
   4: 'Umbral',
-  5: 'Máximo',
+  5: 'Muros',
+  6: 'Sprint',
 };
 
 /**

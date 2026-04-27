@@ -21,11 +21,62 @@ export const PHASES: readonly Phase[] = [
   'main',
 ] as const;
 
+/**
+ * Perfil de cadencia del bloque. Determina, junto con la zona, el rango de
+ * cadencia objetivo (rpm) y por tanto los tracks elegibles.
+ *
+ * - flat: pedalada continua sostenible.
+ * - climb: cadencia baja, alta resistencia. Muros y escaladas.
+ * - sprint: cadencia alta, pico neuromuscular. Anaerobico.
+ */
+export type CadenceProfile = 'flat' | 'climb' | 'sprint';
+
+export const CADENCE_PROFILES: readonly CadenceProfile[] = ['flat', 'climb', 'sprint'] as const;
+
+/**
+ * Profiles disponibles por zona. Z1-Z2 solo flat (recuperacion). Z3-Z4
+ * permiten flat o climb (tempo sostenido vs escalada moderada). Z5 es muro
+ * (climb fijo). Z6 es sprint puro.
+ */
+const VALID_PROFILES_BY_ZONE: Record<HeartRateZone, readonly CadenceProfile[]> = {
+  1: ['flat'],
+  2: ['flat'],
+  3: ['flat', 'climb'],
+  4: ['flat', 'climb'],
+  5: ['climb'],
+  6: ['sprint'],
+};
+
+export function getValidProfiles(zone: HeartRateZone): readonly CadenceProfile[] {
+  return VALID_PROFILES_BY_ZONE[zone];
+}
+
+/** Profile por defecto cuando no se especifica explicitamente. */
+export function defaultCadenceProfile(zone: HeartRateZone): CadenceProfile {
+  return VALID_PROFILES_BY_ZONE[zone][0]!;
+}
+
+/**
+ * Si el profile recibido es valido para la zona lo devuelve; si no, vuelve
+ * al default. Util al cargar planes guardados antes de la migracion (cuando
+ * el campo cadenceProfile no existia o esta desincronizado con la zona).
+ */
+export function reconcileCadenceProfile(
+  zone: HeartRateZone,
+  profile: CadenceProfile | undefined,
+): CadenceProfile {
+  if (profile === undefined) return defaultCadenceProfile(zone);
+  const valid = VALID_PROFILES_BY_ZONE[zone];
+  return valid.includes(profile) ? profile : defaultCadenceProfile(zone);
+}
+
 export interface SessionBlock {
   /** Identificador estable usado como React key. Unico dentro del plan editable. */
   id: string;
   phase: Phase;
   zone: HeartRateZone;
+  /** Cadencia objetivo del bloque (rpm). Determina los tracks elegibles via 1:1 o half-time. */
+  cadenceProfile: CadenceProfile;
   durationSec: number;
   /** Texto opcional que se muestra en el modo TV durante la fase. */
   description?: string;

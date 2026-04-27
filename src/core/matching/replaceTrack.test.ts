@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { replaceTrackInSegment } from './replaceTrack';
 import { matchTracksToSegments } from './match';
+import { defaultCadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
 import { EMPTY_PREFERENCES } from './types';
@@ -14,7 +15,7 @@ function track(overrides: Partial<Track> = {}): Track {
     album: 'Album',
     artists: ['Artist'],
     genres: [],
-    tempoBpm: 125,
+    tempoBpm: 87,
     energy: 0.75,
     valence: 0.7,
     danceability: 0.7,
@@ -32,6 +33,7 @@ function segment(zone: ClassifiedSegment['zone']): ClassifiedSegment {
     durationSec: 60,
     avgPowerWatts: 200,
     zone,
+    cadenceProfile: defaultCadenceProfile(zone),
     startDistanceMeters: segId * 500,
     endDistanceMeters: (segId + 1) * 500,
     startElevationMeters: 100,
@@ -46,9 +48,9 @@ describe('replaceTrackInSegment', () => {
     // Tracks de 200s, 1 segmento de 60s -> overlap usa solo 1 track. Hay 2
     // mas libres en pool, asi que el reemplazo encuentra alternativa.
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6 }),
+      track({ tempoBpm: 87, energy: 0.75, valence: 0.6 }),
+      track({ tempoBpm: 91, energy: 0.78, valence: 0.65 }),
+      track({ tempoBpm: 84, energy: 0.72, valence: 0.6 }),
     ];
     const segments = [segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
@@ -62,10 +64,10 @@ describe('replaceTrackInSegment', () => {
   it('no rompe los segmentos vecinos', () => {
     // Tracks de 60 s para que cada uno ocupe 1 segmento -> N entradas.
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 127, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
+      track({ tempoBpm: 87, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 91, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 84, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 90, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
     ];
     const segments = [segment(3), segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
@@ -81,11 +83,12 @@ describe('replaceTrackInSegment', () => {
     // 5 tracks de 60s, 4 segmentos -> 4 tracks asignados (uno libre).
     // Reemplazar el segmento 1 debe coger ese 5o, no repetir ninguno.
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 127, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
-      track({ tempoBpm: 126, energy: 0.77, valence: 0.65, durationMs: 60_000 }),
+      // 5 tracks en cadencia Z3 flat (70-90 1:1), todos validos.
+      track({ tempoBpm: 75, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 78, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 82, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
+      track({ tempoBpm: 88, energy: 0.77, valence: 0.65, durationMs: 60_000 }),
     ];
     const segments = [segment(3), segment(3), segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
@@ -105,10 +108,10 @@ describe('replaceTrackInSegment', () => {
     // 4 tracks, 4 segmentos -> los 4 ocupados en la playlist. No queda
     // candidato libre, replaced=false. La UI debe avisar al usuario.
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 127, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
+      track({ tempoBpm: 87, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 91, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 84, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 90, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
     ];
     const segments = [segment(3), segment(3), segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
@@ -119,7 +122,7 @@ describe('replaceTrackInSegment', () => {
   });
 
   it('catalogo de 1 track (mismo que ya tiene): no replaced', () => {
-    const tracks = [track({ tempoBpm: 125, energy: 0.75, valence: 0.6 })];
+    const tracks = [track({ tempoBpm: 87, energy: 0.75, valence: 0.6 })];
     const segments = [segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
     const result = replaceTrackInSegment(matched, 0, tracks, EMPTY_PREFERENCES);
@@ -128,9 +131,9 @@ describe('replaceTrackInSegment', () => {
 
   it('determinista: misma entrada -> mismo resultado', () => {
     const tracks = [
-      track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }),
-      track({ tempoBpm: 128, energy: 0.78, valence: 0.65 }),
-      track({ tempoBpm: 122, energy: 0.72, valence: 0.6 }),
+      track({ tempoBpm: 87, energy: 0.75, valence: 0.6 }),
+      track({ tempoBpm: 91, energy: 0.78, valence: 0.65 }),
+      track({ tempoBpm: 84, energy: 0.72, valence: 0.6 }),
     ];
     const matched = matchTracksToSegments([segment(3)], tracks, EMPTY_PREFERENCES);
     const a = replaceTrackInSegment(matched, 0, tracks, EMPTY_PREFERENCES);
@@ -139,7 +142,7 @@ describe('replaceTrackInSegment', () => {
   });
 
   it('indice fuera de rango: no rompe', () => {
-    const tracks = [track({ tempoBpm: 125, energy: 0.75, valence: 0.6 })];
+    const tracks = [track({ tempoBpm: 87, energy: 0.75, valence: 0.6 })];
     const matched = matchTracksToSegments([segment(3)], tracks, EMPTY_PREFERENCES);
     const result = replaceTrackInSegment(matched, 99, tracks, EMPTY_PREFERENCES);
     expect(result.replaced).toBe(false);

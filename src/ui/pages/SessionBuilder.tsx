@@ -79,6 +79,7 @@ function reducer(state: BuilderState, action: BuilderAction): BuilderState {
         id,
         phase: 'work',
         zone: 3,
+        cadenceProfile: 'flat',
         durationSec: 60,
       };
       const newItem: SessionItem = { type: 'block', block: newBlock };

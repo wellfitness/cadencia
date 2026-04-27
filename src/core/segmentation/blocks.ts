@@ -5,9 +5,22 @@ import { estimatePowerWatts } from '../power/equation';
 import { buildPowerConstants, type PowerConstants } from '../power/types';
 import type { ValidatedUserInputs } from '../user/userInputs';
 import { classifyZone } from './classifyZone';
+import type { CadenceProfile } from './sessionPlan';
 import type { ClassifiedSegment, RouteMeta } from './types';
 
 const TARGET_BLOCK_DURATION_SEC = 60;
+
+/**
+ * Umbral de pendiente (%) por encima del cual el bloque se considera escalada
+ * a efectos de cadencia objetivo (climb). Por debajo se asume llano (flat).
+ * El valor 6% es conservador: cubre repechos sostenidos pero no falsos
+ * positivos en colinas suaves.
+ */
+const CLIMB_SLOPE_THRESHOLD_PCT = 6;
+
+export function inferCadenceProfileFromSlopePct(slopePct: number): CadenceProfile {
+  return slopePct > CLIMB_SLOPE_THRESHOLD_PCT ? 'climb' : 'flat';
+}
 
 export interface SegmentationResult {
   segments: ClassifiedSegment[];
@@ -59,12 +72,15 @@ export function segmentInto60SecondBlocks(
 
     const avgPower = blockDuration > 0 ? blockEnergyJoules / blockDuration : 0;
     const zone = classifyZone(avgPower, validated);
+    const slopePct = blockDistance > 0 ? ((endPoint.ele - startPoint.ele) / blockDistance) * 100 : 0;
+    const cadenceProfile = inferCadenceProfileFromSlopePct(slopePct);
 
     blocks.push({
       startSec: blockStartTimeSec,
       durationSec: blockDuration,
       avgPowerWatts: avgPower,
       zone,
+      cadenceProfile,
       startDistanceMeters: totalDistance - blockDistance,
       endDistanceMeters: totalDistance,
       startElevationMeters: startPoint.ele,
@@ -122,7 +138,7 @@ export function segmentInto60SecondBlocks(
   );
   const np = totalDuration > 0 ? Math.pow(npNumerator / totalDuration, 0.25) : 0;
 
-  const zoneDurations: Record<HeartRateZone, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const zoneDurations: Record<HeartRateZone, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   for (const b of blocks) zoneDurations[b.zone] += b.durationSec;
 
   const meta: RouteMeta = {

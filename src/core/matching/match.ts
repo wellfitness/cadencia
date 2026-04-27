@@ -3,7 +3,7 @@ import type { Track } from '../tracks/types';
 import { findCandidates } from './candidates';
 import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment } from './types';
-import { ZONE_MUSIC_CRITERIA, applyAllEnergetic } from './zoneCriteria';
+import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
 
 /**
  * Modo de asignacion de tracks frente a la estructura de zonas:
@@ -58,7 +58,7 @@ function matchOverlap(
   let i = 0;
   while (i < segments.length) {
     const seg = segments[i]!;
-    const baseCriteria = ZONE_MUSIC_CRITERIA[seg.zone];
+    const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile);
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
     const { candidates, quality } = findCandidates(tracks, effective);
 
@@ -120,7 +120,7 @@ function matchDiscrete(
   const out: MatchedSegment[] = [];
 
   for (const seg of segments) {
-    const baseCriteria = ZONE_MUSIC_CRITERIA[seg.zone];
+    const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile);
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
     const { candidates, quality } = findCandidates(tracks, effective);
 

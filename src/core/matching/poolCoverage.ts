@@ -1,87 +1,125 @@
 import type { HeartRateZone } from '../physiology/karvonen';
+import type { CadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
 import { findCandidates } from './candidates';
 import type { MatchPreferences } from './types';
-import { ZONE_MUSIC_CRITERIA, applyAllEnergetic } from './zoneCriteria';
+import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
 
 /**
  * Duracion media estimada de un track (3:30). Se usa para estimar cuantos
- * tracks UNICOS necesita cada zona para cubrir su tiempo total. Pesimista:
- * en modo overlap un track puede cubrir 2-3 segmentos consecutivos, asi que
- * el calculo "tiempo total / 210 s" sobrestima ligeramente la necesidad
- * real. Es preferible un falso positivo (sugerir mas listas cuando no hace
- * falta) a un falso negativo (no avisar y tener huecos en la playlist).
+ * tracks UNICOS necesita la sesion para cubrir su duracion total sin
+ * repetir, y de forma desglosada por (zona, profile) para diagnostico.
  */
 const AVG_TRACK_DURATION_SEC = 210;
 
 export interface ZoneCoverage {
   zone: HeartRateZone;
-  /** Tracks unicos necesarios para cubrir esta zona sin repetir. */
+  cadenceProfile: CadenceProfile;
+  /** Tracks unicos necesarios para cubrir este (zona, profile) sin repetir. */
   needed: number;
-  /** Tracks unicos disponibles en el pool que cumplen criterios de esta zona. */
+  /** Tracks unicos disponibles en el pool que cumplen los criterios. */
   available: number;
-  /** max(0, needed - available). 0 = pool suficiente. */
+  /** max(0, needed - available). 0 = cobertura suficiente para esta combo. */
   deficit: number;
 }
 
 export interface PoolCoverage {
-  /** True si todas las zonas tienen pool suficiente para cero repeticiones. */
+  /**
+   * Cobertura global. ok=true cuando hay tracks unicos suficientes en el
+   * catalogo para cubrir la sesion entera (independientemente de zona/profile).
+   * Esto refleja la realidad del motor: en modo overlap un track puede cruzar
+   * zonas, asi que el pool relevante es el TOTAL, no la suma por zona.
+   */
   ok: boolean;
-  /** Una entrada por cada zona presente en los segmentos. */
+  /** Tracks unicos necesarios para cubrir la duracion total de la sesion. */
+  neededTotal: number;
+  /** Tracks unicos en el pool (dedupados por URI). */
+  availableTotal: number;
+  /** Diferencia global. 0 = pool suficiente. */
+  deficitTotal: number;
+  /**
+   * Desglose por (zona, profile) presentes en los segmentos. **Informativo,
+   * no bloqueante**: una combo con deficit=N solo significa que el motor
+   * puede tirar de tracks de zonas adyacentes (cadencias solapadas) o pasar
+   * a relax/best-effort. La UI lo muestra como pista, no como error.
+   */
   byZone: ZoneCoverage[];
-  /** Suma de deficits. 0 = ok. */
-  totalDeficit: number;
 }
 
 /**
  * Pre-check de cobertura: dada una lista de segmentos y un pool de tracks,
- * estima si hay tracks unicos suficientes para asignar uno por segmento sin
- * repetir, separado por zona.
+ * estima si hay tracks unicos suficientes para asignar uno por slot sin
+ * repetir.
  *
- * Funcion pura, determinista. Pensada para llamarse en MusicStep antes de
- * permitir avanzar al ResultStep: si ok=false la UI muestra el deficit por
- * zona y bloquea hasta que el usuario anada mas listas.
+ * Decision de diseno: la validacion bloqueante es GLOBAL (pool total ≥
+ * necesidad total). El desglose por (zona, profile) es informativo porque
+ * las zonas comparten cadencia (por profile) y un track puede cubrir
+ * segmentos de zonas adyacentes en modo overlap.
+ *
+ * Funcion pura, determinista.
  */
 export function analyzePoolCoverage(
   segments: readonly ClassifiedSegment[],
   tracks: readonly Track[],
   preferences: MatchPreferences,
 ): PoolCoverage {
-  // Tiempo total por zona (segundos).
-  const durationByZone = new Map<HeartRateZone, number>();
+  // Total: tracks unicos necesarios para cubrir la sesion entera.
+  const totalDurationSec = segments.reduce((acc, s) => acc + s.durationSec, 0);
+  const neededTotal = totalDurationSec === 0
+    ? 0
+    : Math.max(1, Math.ceil(totalDurationSec / AVG_TRACK_DURATION_SEC));
+  const availableTotal = new Set(tracks.map((t) => t.uri)).size;
+  const deficitTotal = Math.max(0, neededTotal - availableTotal);
+
+  // Desglose por (zona, profile): solo informativo. Mismo cálculo que antes
+  // pero la conclusion ok=true/false viene del global, no de aqui.
+  const durationByCombo = new Map<
+    string,
+    { zone: HeartRateZone; profile: CadenceProfile; durationSec: number }
+  >();
   for (const seg of segments) {
-    const prev = durationByZone.get(seg.zone) ?? 0;
-    durationByZone.set(seg.zone, prev + seg.durationSec);
+    const key = `${seg.zone}-${seg.cadenceProfile}`;
+    const prev = durationByCombo.get(key);
+    if (prev) {
+      prev.durationSec += seg.durationSec;
+    } else {
+      durationByCombo.set(key, {
+        zone: seg.zone,
+        profile: seg.cadenceProfile,
+        durationSec: seg.durationSec,
+      });
+    }
   }
 
+  const profileOrder: Record<CadenceProfile, number> = { flat: 0, climb: 1, sprint: 2 };
+  const sortedCombos = [...durationByCombo.values()].sort((a, b) => {
+    if (a.zone !== b.zone) return a.zone - b.zone;
+    return profileOrder[a.profile] - profileOrder[b.profile];
+  });
+
   const byZone: ZoneCoverage[] = [];
-  let totalDeficit = 0;
-
-  // Iteramos zonas en orden 1..5 para salida estable (determinismo).
-  for (const zone of [1, 2, 3, 4, 5] as const) {
-    const totalDurationSec = durationByZone.get(zone) ?? 0;
-    if (totalDurationSec === 0) continue;
-
-    const baseCriteria = ZONE_MUSIC_CRITERIA[zone];
+  for (const combo of sortedCombos) {
+    if (combo.durationSec === 0) continue;
+    const baseCriteria = getZoneCriteria(combo.zone, combo.profile);
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
-    // Reusamos el mismo pipeline que el motor de matching para que la cuenta
-    // refleje exactamente lo que el motor vera (incluyendo relax/best-effort).
     const { candidates } = findCandidates(tracks, effective);
-    // Dedup por URI por seguridad (los CSVs nativos ya vienen dedupados,
-    // pero un usuario podria subir CSVs con URIs repetidas).
     const available = new Set(candidates.map((t) => t.uri)).size;
-
-    const needed = Math.max(1, Math.ceil(totalDurationSec / AVG_TRACK_DURATION_SEC));
-    const deficit = Math.max(0, needed - available);
-    totalDeficit += deficit;
-
-    byZone.push({ zone, needed, available, deficit });
+    const needed = Math.max(1, Math.ceil(combo.durationSec / AVG_TRACK_DURATION_SEC));
+    byZone.push({
+      zone: combo.zone,
+      cadenceProfile: combo.profile,
+      needed,
+      available,
+      deficit: Math.max(0, needed - available),
+    });
   }
 
   return {
-    ok: totalDeficit === 0,
+    ok: deficitTotal === 0,
+    neededTotal,
+    availableTotal,
+    deficitTotal,
     byZone,
-    totalDeficit,
   };
 }

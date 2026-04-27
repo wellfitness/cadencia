@@ -15,6 +15,7 @@ const ZONE_BG: Record<HeartRateZone, string> = {
   3: 'bg-zone-3',
   4: 'bg-zone-4',
   5: 'bg-zone-5',
+  6: 'bg-zone-6',
 };
 
 const PHASE_LABELS: Record<string, string> = {

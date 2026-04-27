@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SessionBlock, SessionItem } from '@core/segmentation';
+import type { CadenceProfile, SessionBlock, SessionItem } from '@core/segmentation';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
 import { BlockEditor } from './BlockEditor';
@@ -26,6 +26,12 @@ const PHASE_LABELS: Record<string, string> = {
   rest: 'Descanso',
   cooldown: 'Vuelta a la calma',
   main: 'Principal',
+};
+
+const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
+  flat: 'Llano',
+  climb: 'Escalada',
+  sprint: 'Sprint',
 };
 
 /**
@@ -264,7 +270,11 @@ function BlockRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <ZoneBadge zone={block.zone} size="sm" />
-          <span className="text-sm font-semibold text-gris-800">
+          <span className="text-xs text-gris-500">·</span>
+          <span className="text-xs font-semibold text-gris-700">
+            {CADENCE_PROFILE_LABELS[block.cadenceProfile]}
+          </span>
+          <span className="text-sm font-semibold text-gris-800 ml-1">
             {formatDuration(block.durationSec)}
           </span>
           <span className="text-xs text-gris-500">{PHASE_LABELS[block.phase] ?? block.phase}</span>
