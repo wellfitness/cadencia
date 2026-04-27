@@ -48,30 +48,29 @@ echo ""
 cd dist
 
 # ──────────────────────────────────────────────
-# 1. Archivos raiz (HTML, manifest, sw, htaccess, etc.)
+# 1. Archivos raiz (HTML, manifest, sw, htaccess, imagenes copiadas
+#    de public/, etc.) - todo lo que esta directamente en dist/ sin
+#    entrar en subcarpetas. Asi no hay que mantener una lista manual
+#    cada vez que se anade un asset estatico nuevo.
 # ──────────────────────────────────────────────
-echo "[1/3] Archivos raiz..."
-for f in index.html privacy.html terms.html manifest.webmanifest sw.js .htaccess robots.txt registerSW.js workbox-*.js favicon.svg; do
+echo "[1/2] Archivos raiz..."
+shopt -s dotglob nullglob
+for f in *; do
   [ -f "$f" ] && upload_file "$f" "$f"
 done
+shopt -u dotglob nullglob
 
 # ──────────────────────────────────────────────
 # 2. assets/ (CSS, JS, sourcemaps con hash)
+#    Los sourcemaps de sw.js / workbox-*.js viven en el root y ya
+#    se subieron en el paso 1.
 # ──────────────────────────────────────────────
-echo "[2/3] Assets (JS + CSS hasheados)..."
+echo "[2/2] Assets (JS + CSS hasheados)..."
 if [ -d "assets" ]; then
   for f in assets/*; do
     [ -f "$f" ] && upload_file "$f" "$f"
   done
 fi
-
-# ──────────────────────────────────────────────
-# 3. Sourcemaps (opcional, para depurar errores en prod)
-# ──────────────────────────────────────────────
-echo "[3/3] Sourcemaps..."
-for f in sw.js.map workbox-*.js.map; do
-  [ -f "$f" ] && upload_file "$f" "$f"
-done
 
 cd ..
 
