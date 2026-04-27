@@ -52,3 +52,10 @@ design-system/
 # Deploy script local (especifico del setup de Hostinger del mantenedor;
 # cada colaborador tiene su propio entorno de despliegue)
 scripts/deploy.sh
+
+# Fuentes locales para scripts de generacion de assets
+# (se descargan al ejecutar generate-assets.py por primera vez)
+scripts/fonts/
+
+# Backups locales (logo original antes de optimizar, etc.)
+scripts/.backup/

@@ -5,6 +5,7 @@ import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { SiteFooter } from '@ui/components/SiteFooter';
 import { BetaAccessModal } from '@ui/components/BetaAccessModal';
+import { usePwaInstall } from '@ui/state/usePwaInstall';
 
 export interface LandingProps {
   onStart: () => void;
@@ -40,6 +41,8 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
 }
 
 function Hero({ onTry }: { onTry: () => void }): JSX.Element {
+  const { canInstall, installing, install } = usePwaInstall();
+
   return (
     <section
       aria-labelledby="hero-title"
@@ -94,9 +97,26 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
         </ul>
 
         {/* CTA unico: abre el modal con los requisitos antes de entrar al wizard */}
-        <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
-          Probar aplicación
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
+            Probar aplicación
+          </Button>
+          {/* Boton de instalacion PWA: solo visible si Chrome ha cedido el prompt
+              (Chromium-based, criterios PWA cumplidos, no instalada todavia). */}
+          {canInstall ? (
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => {
+                void install();
+              }}
+              loading={installing}
+              iconLeft="install_mobile"
+            >
+              Instalar app
+            </Button>
+          ) : null}
+        </div>
         <p className="text-sm text-gris-500 mt-3">
           Gratis. Sin cuenta. Sin servidor.
         </p>
@@ -330,8 +350,29 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
 ] as const;
 
 function Faq(): JSX.Element {
+  // Structured data: FAQPage. Google puede mostrarlas como rich-snippets
+  // en los resultados de busqueda. Fuente unica de verdad: FAQ_ITEMS.
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQ_ITEMS.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.a,
+      },
+    })),
+  };
+
   return (
     <section aria-labelledby="faq-title" className="bg-gris-50">
+      <script
+        type="application/ld+json"
+        // Inline JSON-LD: dangerouslySetInnerHTML evita escape de comillas que
+        // rompe el parsing del crawler.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <div className="mx-auto w-full max-w-3xl px-4 py-12 md:py-16">
         <h2
           id="faq-title"
