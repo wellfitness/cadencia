@@ -236,13 +236,17 @@ Si el usuario marca "todo con energía", `Energy mín = 0.70` también en Z1–Z
 
 ### Algoritmo de matching (determinista)
 
+**Regla cero repeticiones (vinculante):** ninguna canción aparece dos veces en la playlist final. Esto vale en ambos modos (`overlap` GPX y `discrete` sesión).
+
 Para cada segmento `[zona, duración]`:
 
 1. Filtrar tracks por **zona → BPM + Energy + género preferido**.
 2. Ordenar por `score = 0.5 × match_genero + 0.3 × ajuste_BPM + 0.2 × energy`.
-3. Seleccionar el track con mayor `score` **no usado en los últimos 5 tracks**.
+3. Seleccionar el track con mayor `score` **que no aparezca ya en la playlist**.
 4. **Una entrada por canción**: si una canción es lo bastante larga para cubrir varios segmentos consecutivos de la misma zona, aparece una sola vez en la playlist (no se repite por segmento). Comportamiento controlado por `crossZoneMode: 'overlap' | 'discrete'` (overlap por defecto en modo GPX, discrete en modo sesión).
-5. Encolar.
+5. Si el pool se agota antes de cubrir todos los segmentos, emitir un hueco con `track: null` y `matchQuality: 'insufficient'`. La UI debe avisar al usuario para que añada más listas (no se permite generar la playlist con huecos).
+
+**Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): antes de avanzar a `ResultStep`, `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)` y bloquea el avance si alguna zona tiene déficit. Estimación pesimista basada en duración media de track (210 s).
 
 **Determinista**: misma entrada → misma salida. Si se introduce aleatoriedad para variedad, debe ser con semilla fija configurable.
 

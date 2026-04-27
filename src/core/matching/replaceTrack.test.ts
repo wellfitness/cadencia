@@ -42,13 +42,15 @@ function segment(zone: ClassifiedSegment['zone']): ClassifiedSegment {
 }
 
 describe('replaceTrackInSegment', () => {
-  it('cambia el track actual por otro distinto', () => {
+  it('cambia el track actual por otro distinto cuando hay candidato libre', () => {
+    // Tracks de 200s, 1 segmento de 60s -> overlap usa solo 1 track. Hay 2
+    // mas libres en pool, asi que el reemplazo encuentra alternativa.
     const tracks = [
       track({ tempoBpm: 125, energy: 0.75, valence: 0.6 }),
       track({ tempoBpm: 128, energy: 0.78, valence: 0.65 }),
       track({ tempoBpm: 122, energy: 0.72, valence: 0.6 }),
     ];
-    const segments = [segment(3), segment(3), segment(3)];
+    const segments = [segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
     const originalUri = matched[0]!.track!.uri;
 
@@ -75,11 +77,33 @@ describe('replaceTrackInSegment', () => {
     expect(result.matched[2]!.track!.uri).toBe(originalThird);
   });
 
-  it('evita repetir tracks de vecinos cercanos', () => {
-    // 4 tracks de 60 s, 4 segmentos de 60 s -> 4 entradas distintas.
-    // Al sustituir la entrada 1, el nuevo no puede ser ni el original NI
-    // los vecinos (pos 0, 2, 3). Como solo hay 4 tracks no queda candidato
-    // valido -> replaceTrackInSegment usa fallback (cualquiera != actual).
+  it('elige un track no presente en la playlist completa', () => {
+    // 5 tracks de 60s, 4 segmentos -> 4 tracks asignados (uno libre).
+    // Reemplazar el segmento 1 debe coger ese 5o, no repetir ninguno.
+    const tracks = [
+      track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 122, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 127, energy: 0.8, valence: 0.7, durationMs: 60_000 }),
+      track({ tempoBpm: 126, energy: 0.77, valence: 0.65, durationMs: 60_000 }),
+    ];
+    const segments = [segment(3), segment(3), segment(3), segment(3)];
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    const usedBefore = new Set(matched.map((m) => m.track!.uri));
+    expect(usedBefore.size).toBe(4);
+    const result = replaceTrackInSegment(matched, 1, tracks, EMPTY_PREFERENCES);
+    expect(result.replaced).toBe(true);
+    const newUri = result.matched[1]!.track!.uri;
+    // Nuevo URI no debe estar entre los OTROS tracks de la playlist
+    const otherUris = result.matched
+      .filter((_, i) => i !== 1)
+      .map((m) => m.track!.uri);
+    expect(otherUris).not.toContain(newUri);
+  });
+
+  it('pool agotado: todos los tracks ya usados -> replaced=false', () => {
+    // 4 tracks, 4 segmentos -> los 4 ocupados en la playlist. No queda
+    // candidato libre, replaced=false. La UI debe avisar al usuario.
     const tracks = [
       track({ tempoBpm: 125, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
       track({ tempoBpm: 128, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
@@ -90,7 +114,8 @@ describe('replaceTrackInSegment', () => {
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
     const originalSecond = matched[1]!.track!.uri;
     const result = replaceTrackInSegment(matched, 1, tracks, EMPTY_PREFERENCES);
-    expect(result.matched[1]!.track!.uri).not.toBe(originalSecond);
+    expect(result.replaced).toBe(false);
+    expect(result.matched[1]!.track!.uri).toBe(originalSecond);
   });
 
   it('catalogo de 1 track (mismo que ya tiene): no replaced', () => {

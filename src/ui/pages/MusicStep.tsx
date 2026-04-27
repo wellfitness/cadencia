@@ -1,10 +1,13 @@
 import { useMemo, useReducer, useState, type ChangeEvent } from 'react';
 import {
+  analyzePoolCoverage,
   EMPTY_PREFERENCES,
   matchTracksToSegments,
+  ZONE_MUSIC_CRITERIA,
   type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
+  type PoolCoverage,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
 import {
@@ -99,6 +102,13 @@ export function MusicStep({
   }, [sourceMode, uploadedCsvs]);
 
   const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
+
+  // Pre-check de cobertura: cuantos tracks unicos hace falta por zona
+  // para cumplir la regla "cero repeticiones" sin huecos.
+  const coverage = useMemo(
+    () => analyzePoolCoverage(segments, tracks, preferences),
+    [segments, tracks, preferences],
+  );
 
   // Matching en vivo: cada cambio de preferencias o fuente recalcula. <50ms
   // para catalogos pequenos, no necesita debounce.
@@ -317,6 +327,14 @@ export function MusicStep({
         </div>
       </Card>
 
+      {!coverage.ok && (
+        <PoolCoverageWarning
+          coverage={coverage}
+          sourceMode={sourceMode}
+          onSwitchToBoth={() => setSourceMode('both')}
+        />
+      )}
+
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex items-baseline justify-between gap-2 mb-3">
           <p className="text-sm text-gris-600">
@@ -358,7 +376,9 @@ export function MusicStep({
       <FooterActions
         onBack={onBack}
         onNext={handleNext}
-        canGoNext={matched.length > 0 && tracks.length > 0 && !needsUserUpload}
+        canGoNext={
+          matched.length > 0 && tracks.length > 0 && !needsUserUpload && coverage.ok
+        }
       />
     </div>
   );
@@ -401,6 +421,77 @@ function SourceRadio({
         <p className="text-xs text-gris-500">{desc}</p>
       </div>
     </label>
+  );
+}
+
+interface PoolCoverageWarningProps {
+  coverage: PoolCoverage;
+  sourceMode: SourceMode;
+  onSwitchToBoth: () => void;
+}
+
+function PoolCoverageWarning({
+  coverage,
+  sourceMode,
+  onSwitchToBoth,
+}: PoolCoverageWarningProps): JSX.Element {
+  const deficits = coverage.byZone.filter((z) => z.deficit > 0);
+  return (
+    <div
+      role="alert"
+      className="rounded-2xl border-2 border-tulipTree-500 bg-tulipTree-50 p-4 md:p-5 space-y-3"
+    >
+      <div className="flex items-start gap-3">
+        <MaterialIcon
+          name="warning"
+          size="medium"
+          className="text-tulipTree-600 flex-shrink-0 mt-0.5"
+        />
+        <div className="min-w-0">
+          <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
+            Tu catálogo no llega para la sesión completa
+          </h2>
+          <p className="text-sm text-gris-700 mt-1">
+            Para que ninguna canción se repita necesitas más temas en{' '}
+            {deficits.length === 1 ? 'la siguiente zona' : 'las siguientes zonas'}.
+          </p>
+        </div>
+      </div>
+      <ul className="space-y-2 pl-1">
+        {deficits.map((z) => (
+          <li key={z.zone} className="flex items-baseline gap-2 text-sm text-gris-800">
+            <span className="font-semibold tabular-nums">Z{z.zone}</span>
+            <span className="text-gris-600">
+              ({ZONE_MUSIC_CRITERIA[z.zone].description}):
+            </span>
+            <span className="tabular-nums">
+              tienes {z.available}, necesitas {z.needed}
+            </span>
+            <span className="text-rosa-600 font-semibold tabular-nums">
+              — faltan {z.deficit}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="pt-1">
+        <p className="text-sm text-gris-700">
+          Sube otro CSV con más canciones de esas zonas
+          {sourceMode !== 'both' && (
+            <>
+              {' '}o{' '}
+              <button
+                type="button"
+                onClick={onSwitchToBoth}
+                className="text-turquesa-700 font-semibold underline-offset-2 hover:underline"
+              >
+                combina con la biblioteca predefinida
+              </button>
+            </>
+          )}
+          .
+        </p>
+      </div>
+    </div>
   );
 }
 

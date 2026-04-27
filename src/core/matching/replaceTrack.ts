@@ -4,8 +4,6 @@ import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment } from './types';
 import { ZONE_MUSIC_CRITERIA, applyAllEnergetic } from './zoneCriteria';
 
-const NEIGHBOR_WINDOW = 5;
-
 export interface ReplaceResult {
   /** Lista de matched con la fila reemplazada. Si no hay alternativa, devuelve la lista igual. */
   matched: MatchedSegment[];
@@ -15,16 +13,17 @@ export interface ReplaceResult {
 
 /**
  * Sustituye el track del segmento en la posicion `index` por el siguiente
- * mejor candidato del ranking, evitando:
- *  - Repetir el track actual.
- *  - Repetir tracks de los NEIGHBOR_WINDOW segmentos vecinos (para mantener
- *    la sensacion de variedad que aplicamos en el matching original).
+ * mejor candidato del ranking, evitando repetir CUALQUIER track ya presente
+ * en la playlist (regla cero repeticiones global, alineada con el motor de
+ * matching).
  *
  * Funcion pura: misma entrada -> misma salida. Devuelve un nuevo array.
  *
  * Casos:
- *  - Si no hay alternativa, devuelve la lista intacta y replaced=false.
+ *  - Si no hay alternativa unica disponible, devuelve replaced=false. La UI
+ *    debe avisar al usuario que suba mas listas.
  *  - Si la zona del segmento no tiene tracks en el catalogo, idem.
+ *  - Indice fuera de rango: no rompe, devuelve replaced=false.
  */
 export function replaceTrackInSegment(
   matched: readonly MatchedSegment[],
@@ -45,13 +44,12 @@ export function replaceTrackInSegment(
     return { matched: [...matched], replaced: false };
   }
 
-  // URIs prohibidas: la actual + los vecinos (anteriores y posteriores)
+  // URIs prohibidas: TODAS las que ya estan en la playlist (no solo vecinos).
+  // El segmento que estamos reemplazando se incluye explicitamente para que
+  // el ranking nunca devuelva el mismo track (aunque el index del array ya
+  // lo cubrira al estar en la lista).
   const forbidden = new Set<string>();
-  if (target.track !== null) forbidden.add(target.track.uri);
-  const from = Math.max(0, index - NEIGHBOR_WINDOW);
-  const to = Math.min(matched.length, index + NEIGHBOR_WINDOW + 1);
-  for (let i = from; i < to; i++) {
-    if (i === index) continue;
+  for (let i = 0; i < matched.length; i++) {
     const t = matched[i]?.track;
     if (t) forbidden.add(t.uri);
   }
@@ -62,20 +60,7 @@ export function replaceTrackInSegment(
 
   const next = ranked.find((c) => !forbidden.has(c.track.uri));
   if (!next) {
-    // Fallback: si todos los candidatos estan en forbidden (catalogo muy pequeno),
-    // intentamos con el primero que NO sea el track actual exactamente.
-    const fallback = ranked.find((c) => c.track.uri !== target.track?.uri);
-    if (!fallback) {
-      return { matched: [...matched], replaced: false };
-    }
-    return {
-      matched: matched.map((m, i) =>
-        i === index
-          ? { ...m, track: fallback.track, matchScore: fallback.score, matchQuality: quality }
-          : m,
-      ),
-      replaced: true,
-    };
+    return { matched: [...matched], replaced: false };
   }
 
   return {

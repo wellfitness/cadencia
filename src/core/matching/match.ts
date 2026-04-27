@@ -5,9 +5,6 @@ import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment } from './types';
 import { ZONE_MUSIC_CRITERIA, applyAllEnergetic } from './zoneCriteria';
 
-/** Cuantos tracks atras evitamos repetir la misma cancion. */
-const NO_REPEAT_WINDOW = 5;
-
 /**
  * Modo de asignacion de tracks frente a la estructura de zonas:
  * - 'overlap' (default, GPX): un track cubre los siguientes segmentos
@@ -28,13 +25,10 @@ export interface MatchOptions {
  * Asigna canciones a la ruta segun los criterios de zona y las preferencias
  * del usuario. Determinista: misma entrada -> misma salida.
  *
- * Para GPX (default 'overlap'): cada track ocupa todos los segmentos
- * consecutivos que su duracion cubra (3-4 min de cancion = 3-4 segmentos
- * de 60 s). Asi una ruta de 4 h produce ~70 tracks en vez de 240 (CLAUDE.md
- * "Algoritmo de matching", paso 4: "permitir solapamiento al siguiente").
- *
- * Para sesion indoor ('discrete'): cada bloque es atomico, recibe N tracks
- * todos de su zona, y el siguiente bloque empieza limpio.
+ * Regla cero repeticiones: ningun track aparece dos veces en la playlist.
+ * Si el pool no llega para cubrir todos los segmentos, se emiten huecos con
+ * track=null y matchQuality='insufficient'. La UI debe pre-comprobar la
+ * cobertura con analyzePoolCoverage() antes de invocar este motor.
  */
 export function matchTracksToSegments(
   segments: readonly ClassifiedSegment[],
@@ -50,7 +44,7 @@ export function matchTracksToSegments(
 }
 
 /**
- * Algoritmo original (GPX): cursor que avanza segmentos consumiendo lo que
+ * Algoritmo overlap (GPX): cursor que avanza segmentos consumiendo lo que
  * dura el track elegido en el segmento de partida.
  */
 function matchOverlap(
@@ -58,7 +52,7 @@ function matchOverlap(
   tracks: readonly Track[],
   preferences: MatchPreferences,
 ): MatchedSegment[] {
-  const recent: string[] = [];
+  const used = new Set<string>();
   const out: MatchedSegment[] = [];
 
   let i = 0;
@@ -78,20 +72,26 @@ function matchOverlap(
       .map((t) => ({ track: t, score: scoreTrack(t, effective, preferences.preferredGenres) }))
       .sort((a, b) => b.score - a.score);
 
-    const fresh = scored.find((c) => !recent.includes(c.track.uri));
-    const choice = fresh ?? scored[0]!;
+    const fresh = scored.find((c) => !used.has(c.track.uri));
 
-    recent.push(choice.track.uri);
-    if (recent.length > NO_REPEAT_WINDOW) recent.shift();
+    if (!fresh) {
+      // Pool agotado: emitimos hueco para este segmento y avanzamos un slot
+      // (60 s). No repetimos: la regla es cero duplicados en la playlist.
+      out.push({ ...seg, track: null, matchScore: 0, matchQuality: 'insufficient' });
+      i++;
+      continue;
+    }
+
+    used.add(fresh.track.uri);
 
     out.push({
       ...seg,
-      track: choice.track,
-      matchScore: choice.score,
+      track: fresh.track,
+      matchScore: fresh.score,
       matchQuality: quality,
     });
 
-    const trackDurationSec = Math.max(1, choice.track.durationMs / 1000);
+    const trackDurationSec = Math.max(1, fresh.track.durationMs / 1000);
     let coveredSec = 0;
     do {
       coveredSec += segments[i]!.durationSec;
@@ -107,16 +107,16 @@ function matchOverlap(
  * atomico. Para cubrir su duracion se emiten tantos tracks como hagan falta,
  * todos de SU zona. El siguiente segmento arranca con su propio track.
  *
- * Window dinamico de no-repeticion POR ZONA: max(1, min(5, pool - 1)).
- * Mantener una cola separada por zona evita el olvido cruzado: si paso por
- * un bloque Z2 con pool de 4, no quiero que eso reduzca mi memoria de Z4.
+ * Regla cero repeticiones: el Set 'used' es global a la playlist (no por
+ * zona), asi que un mismo track no puede aparecer en dos bloques distintos
+ * aunque sean de la misma zona.
  */
 function matchDiscrete(
   segments: readonly ClassifiedSegment[],
   tracks: readonly Track[],
   preferences: MatchPreferences,
 ): MatchedSegment[] {
-  const recentByZone = new Map<ClassifiedSegment['zone'], string[]>();
+  const used = new Set<string>();
   const out: MatchedSegment[] = [];
 
   for (const seg of segments) {
@@ -133,20 +133,29 @@ function matchDiscrete(
       .map((t) => ({ track: t, score: scoreTrack(t, effective, preferences.preferredGenres) }))
       .sort((a, b) => b.score - a.score);
 
-    // Window dinamico: que cada track suene antes de repetirse, con un techo
-    // de NO_REPEAT_WINDOW para no agotar memoria en bloques largos.
-    const windowSize = Math.max(1, Math.min(NO_REPEAT_WINDOW, scored.length - 1));
-    const recent = recentByZone.get(seg.zone) ?? [];
-
     let coveredSec = 0;
     while (coveredSec < seg.durationSec) {
-      const fresh = scored.find((c) => !recent.includes(c.track.uri));
-      const choice = fresh ?? scored[0]!;
+      const fresh = scored.find((c) => !used.has(c.track.uri));
 
-      recent.push(choice.track.uri);
-      while (recent.length > windowSize) recent.shift();
+      if (!fresh) {
+        // Pool agotado para esta zona dentro del bloque: emitimos un hueco
+        // con la duracion restante y cerramos el bloque. La UI pre-check
+        // deberia haber evitado llegar aqui.
+        const remainingSec = seg.durationSec - coveredSec;
+        out.push({
+          ...seg,
+          startSec: seg.startSec + coveredSec,
+          durationSec: remainingSec,
+          track: null,
+          matchScore: 0,
+          matchQuality: 'insufficient',
+        });
+        break;
+      }
 
-      const trackDurationSec = Math.max(1, choice.track.durationMs / 1000);
+      used.add(fresh.track.uri);
+
+      const trackDurationSec = Math.max(1, fresh.track.durationMs / 1000);
       const remainingSec = seg.durationSec - coveredSec;
       const slotSec = Math.min(trackDurationSec, remainingSec);
 
@@ -154,8 +163,8 @@ function matchDiscrete(
         ...seg,
         startSec: seg.startSec + coveredSec,
         durationSec: slotSec,
-        track: choice.track,
-        matchScore: choice.score,
+        track: fresh.track,
+        matchScore: fresh.score,
         matchQuality: quality,
       });
 
@@ -164,8 +173,6 @@ function matchDiscrete(
       // siguiente bloque empezara con su propio track.
       coveredSec += trackDurationSec;
     }
-
-    recentByZone.set(seg.zone, recent);
   }
 
   return out;

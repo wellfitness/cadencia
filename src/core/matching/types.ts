@@ -32,12 +32,14 @@ export interface ZoneMusicCriteria {
   description: string;
 }
 
-export type MatchQuality = 'strict' | 'relaxed' | 'best-effort';
+export type MatchQuality = 'strict' | 'relaxed' | 'best-effort' | 'insufficient';
 
 /**
- * Segmento de la ruta ya casado con una cancion concreta. Si track === null
- * el catalogo esta vacio (caso degenerado, no deberia pasar con los CSVs
- * nativos).
+ * Segmento de la ruta ya casado con una cancion concreta. track === null
+ * cuando el catalogo no puede cubrir este segmento sin repetir un track ya
+ * usado en la playlist (regla "cero repeticiones"): puede ser por catalogo
+ * vacio para la zona o por agotamiento del pool en sesiones largas. La UI
+ * debe avisar al usuario antes de generar (ver poolCoverage.ts).
  */
 export interface MatchedSegment extends ClassifiedSegment {
   track: Track | null;

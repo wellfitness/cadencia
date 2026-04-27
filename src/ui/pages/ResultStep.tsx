@@ -214,6 +214,9 @@ export function ResultStep({
   const totalMinutes = Math.round(routeMeta.totalDurationSec / 60);
   const validUriCount = matched.filter((m) => m.track !== null).length;
   const replacedCount = replacedIndices.size;
+  const insufficientCount = matched.filter(
+    (m) => m.track === null && m.matchQuality === 'insufficient',
+  ).length;
 
   if (phase === 'done' && created !== null) {
     return <DonePanel playlist={created} />;
@@ -221,6 +224,29 @@ export function ResultStep({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      {insufficientCount > 0 && (
+        <div
+          role="alert"
+          className="rounded-2xl border-2 border-rosa-600 bg-rosa-100/40 p-4 md:p-5 flex items-start gap-3"
+        >
+          <MaterialIcon
+            name="error_outline"
+            size="medium"
+            className="text-rosa-600 flex-shrink-0 mt-0.5"
+          />
+          <div className="min-w-0">
+            <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
+              {insufficientCount === 1
+                ? '1 segmento se ha quedado sin canción'
+                : `${insufficientCount} segmentos se han quedado sin canción`}
+            </h2>
+            <p className="text-sm text-gris-700 mt-1">
+              Tu catálogo no tiene canciones suficientes para evitar repetir. Vuelve a
+              «Música» y sube más listas de las zonas marcadas para completar tu sesión.
+            </p>
+          </div>
+        </div>
+      )}
       {onEnterTVMode !== undefined && (
         <Card variant="tip" title="Modo sesión" titleIcon="cast">
           <p className="text-sm text-gris-700 mb-3">
@@ -322,7 +348,9 @@ export function ResultStep({
         onBack={onBack}
         onCreate={() => void handleCreatePlaylist()}
         creating={phase === 'authorizing' || phase === 'exchanging' || phase === 'creating'}
-        canCreate={validUriCount > 0 && playlistName.trim() !== ''}
+        canCreate={
+          validUriCount > 0 && playlistName.trim() !== '' && insufficientCount === 0
+        }
       />
     </div>
   );

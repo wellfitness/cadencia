@@ -13,6 +13,7 @@ const QUALITY_LABEL: Record<MatchedSegment['matchQuality'], string | null> = {
   strict: null,
   relaxed: 'Encaje aproximado: tu catálogo no tenía un tema exacto',
   'best-effort': 'Encaje libre: muy lejos del rango ideal de la zona',
+  insufficient: 'Sin canción libre: necesitas más temas en esta zona',
 };
 
 /**
