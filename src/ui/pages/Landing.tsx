@@ -58,11 +58,12 @@ function Hero({ onStart }: { onStart: () => void }): JSX.Element {
           id="hero-title"
           className="font-display text-turquesa-700 text-4xl md:text-6xl leading-tight mb-4"
         >
-          Tu ruta. Tu potencia. Tu música.
+          Tu plan. Tu intensidad. Tu música.
         </h1>
         <p className="text-lg md:text-xl text-gris-700 max-w-2xl mx-auto mb-6">
-          Sube un GPX y obtén una playlist de Spotify donde cada canción
-          encaja con la intensidad real de cada tramo de tu ruta.
+          Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
+          La app te genera una playlist de Spotify donde cada canción encaja
+          con la intensidad real de cada tramo o bloque.
         </p>
         <ul className="flex flex-wrap justify-center gap-3 md:gap-6 mb-8 text-gris-700">
           <li className="flex items-center gap-2">
@@ -124,8 +125,8 @@ function HowItWorks(): JSX.Element {
           <StepCard
             num={2}
             icon="route"
-            title="Tu ruta"
-            desc="Sube un archivo GPX exportado desde Strava, Komoot o cualquier app de ciclismo. Estimamos los vatios que generarás en cada tramo."
+            title="Tu plan"
+            desc="Sube un GPX exportado desde Strava o Komoot, o construye una sesión indoor por bloques desde plantillas científicas (SIT, HIIT, Noruego 4×4). Calculamos la intensidad de cada tramo o bloque."
           />
           <StepCard
             num={3}
@@ -194,19 +195,19 @@ function WhyItWorks(): JSX.Element {
             icon="trending_up"
             title="Rendimiento"
             stat="+0,31 SMD"
-            desc="Mejora medible del rendimiento físico y reducción del esfuerzo percibido (-0,22 SMD) sin alterar tu frecuencia cardíaca."
+            desc="Mejora medible del rendimiento físico sin alterar tu frecuencia cardíaca: no es un truco perceptivo, es eficiencia real."
             citation="Terry et al. 2020"
             doi="10.1037/bul0000216"
             n={3599}
           />
           <EvidenceCard
-            icon="bolt"
-            title="Disfrute"
-            stat="+18%"
-            desc="Triatletas élite aumentaron su tiempo hasta agotamiento sincronizando su pedaleo con la música respecto a entrenar sin música."
-            citation="Terry et al. 2011"
-            doi="10.1016/j.jsams.2011.06.003"
-            n={11}
+            icon="psychology"
+            title="Esfuerzo percibido"
+            stat="−0,22 SMD"
+            desc="La misma intensidad te parece menos exigente con música. Empujas más rato antes de necesitar bajar el ritmo."
+            citation="Terry et al. 2020"
+            doi="10.1037/bul0000216"
+            n={3599}
           />
         </div>
         <p className="text-center text-xs text-gris-500 mt-6">
@@ -307,6 +308,10 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
     a: 'No. Si no tienes potenciómetro, basta con tu peso y tu frecuencia cardíaca máxima (medida o estimada por edad mediante la fórmula de Gulati). Calculamos las zonas con la fórmula de Karvonen.',
   },
   {
+    q: '¿Sirve para entrenamiento indoor (rodillo o bici estática)?',
+    a: 'Sí. Además de procesar GPX outdoor, Cadencia tiene un constructor de sesiones indoor: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas (SIT, HIIT, Noruego 4×4) y la app te genera la playlist sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar.',
+  },
+  {
     q: '¿Funciona sin Spotify Premium?',
     a: 'Para crear la playlist sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción. Sin cuenta de Spotify la app sigue calculándote la potencia y la segmentación, pero no podrás guardar la lista.',
   },
@@ -363,7 +368,7 @@ function FinalCta({ onStart }: { onStart: () => void }): JSX.Element {
           id="final-cta-title"
           className="font-display text-turquesa-700 text-3xl md:text-4xl mb-4"
         >
-          ¿Listo para tu próxima ruta?
+          ¿Listo para pedalear con ritmo?
         </h2>
         <p className="text-gris-700 mb-6 text-lg">
           Tarda menos de un minuto en generarte la playlist.
