@@ -10,6 +10,7 @@ import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/se
 import { EMPTY_PREFERENCES, type MatchPreferences, type MatchedSegment } from '@core/matching';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
+import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import type { RouteSourceChoice } from '@ui/components/SourceSelector';
 import { Landing } from '@ui/pages/Landing';
@@ -397,20 +398,7 @@ function Header(): JSX.Element {
   return (
     <header className="border-b border-gris-200 bg-white">
       <div className="mx-auto w-full max-w-4xl px-4 py-4 flex items-center gap-3">
-        <MaterialIcon
-          name="directions_bike"
-          size="large"
-          className="text-turquesa-600"
-          decorative
-        />
-        <div>
-          <h1 className="font-display text-turquesa-600 text-2xl md:text-3xl leading-none">
-            Cadencia
-          </h1>
-          <p className="text-xs md:text-sm text-gris-500 mt-1">
-            para ciclistas con ritmo
-          </p>
-        </div>
+        <Logo variant="full" size="md" />
       </div>
     </header>
   );

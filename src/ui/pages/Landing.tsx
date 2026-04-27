@@ -1,70 +1,83 @@
+import { useState } from 'react';
 import { Card } from '@ui/components/Card';
 import { Button } from '@ui/components/Button';
+import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { SiteFooter } from '@ui/components/SiteFooter';
+import { BetaAccessModal } from '@ui/components/BetaAccessModal';
 
 export interface LandingProps {
   onStart: () => void;
 }
 
 export function Landing({ onStart }: LandingProps): JSX.Element {
+  const [modalOpen, setModalOpen] = useState(false);
+  const openModal = (): void => setModalOpen(true);
+  const closeModal = (): void => setModalOpen(false);
+  const continueToWizard = (): void => {
+    setModalOpen(false);
+    onStart();
+  };
+
   return (
     <div className="min-h-full flex flex-col bg-white">
-      <TopBar onStart={onStart} />
       <main className="flex-1">
-        <Hero onStart={onStart} />
-        <SpotifyPremiumNotice />
+        <Hero onTry={openModal} />
         <HowItWorks />
         <WhyItWorks />
         <Privacy />
         <Faq />
-        <FinalCta onStart={onStart} />
+        <FinalCta onTry={openModal} />
       </main>
-      <Footer />
+      <SiteFooter />
+      <BetaAccessModal
+        open={modalOpen}
+        onClose={closeModal}
+        onContinue={continueToWizard}
+      />
     </div>
   );
 }
 
-function TopBar({ onStart }: { onStart: () => void }): JSX.Element {
-  return (
-    <header className="sticky top-0 z-10 border-b border-gris-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto w-full max-w-5xl px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <MaterialIcon
-            name="directions_bike"
-            size="medium"
-            className="text-turquesa-600"
-            decorative
-          />
-          <span className="font-display text-turquesa-600 text-xl leading-none">
-            Cadencia
-          </span>
-        </div>
-        <Button variant="primary" size="sm" onClick={onStart} iconRight="arrow_forward">
-          Empezar
-        </Button>
-      </div>
-    </header>
-  );
-}
-
-function Hero({ onStart }: { onStart: () => void }): JSX.Element {
+function Hero({ onTry }: { onTry: () => void }): JSX.Element {
   return (
     <section
       aria-labelledby="hero-title"
-      className="bg-gradient-to-b from-turquesa-50 to-white"
+      className="bg-white"
     >
-      <div className="mx-auto w-full max-w-5xl px-4 py-12 md:py-20 text-center">
+      <div className="mx-auto w-full max-w-4xl px-4 py-10 md:py-16 text-center">
+        {/* Logo + wordmark horizontal centrado */}
+        <div className="flex justify-center mb-6">
+          <Logo variant="full" size="xl" orientation="horizontal" />
+        </div>
+
+        {/* Divisor estilo carretera: linea central discontinua larga */}
+        <div
+          aria-hidden="true"
+          className="mx-auto mb-8 h-1 max-w-md"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(to right, #9ca3af 0 28px, transparent 28px 44px)',
+          }}
+        />
+
+        {/* H1 con remate cromatico en la ultima frase */}
         <h1
           id="hero-title"
-          className="font-display text-turquesa-700 text-4xl md:text-6xl leading-tight mb-4"
+          className="font-display text-4xl md:text-6xl leading-tight mb-6"
         >
-          Tu plan. Tu intensidad. Tu música.
+          <span className="block text-gris-800">Tu plan. Tu intensidad.</span>
+          <span className="block text-turquesa-600">Tu música.</span>
         </h1>
+
+        {/* Subtitulo */}
         <p className="text-lg md:text-xl text-gris-700 max-w-2xl mx-auto mb-6">
           Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
           La app te genera una playlist de Spotify donde cada canción encaja
           con la intensidad real de cada tramo o bloque.
         </p>
+
+        {/* Pills de beneficio */}
         <ul className="flex flex-wrap justify-center gap-3 md:gap-6 mb-8 text-gris-700">
           <li className="flex items-center gap-2">
             <MaterialIcon name="favorite" className="text-turquesa-600" />
@@ -79,27 +92,14 @@ function Hero({ onStart }: { onStart: () => void }): JSX.Element {
             <span className="font-semibold">Más rendimiento</span>
           </li>
         </ul>
-        <Button variant="primary" size="lg" onClick={onStart} iconRight="arrow_forward">
-          Empezar ahora
+
+        {/* CTA unico: abre el modal con los requisitos antes de entrar al wizard */}
+        <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
+          Probar aplicación
         </Button>
         <p className="text-sm text-gris-500 mt-3">
           Gratis. Sin cuenta. Sin servidor.
         </p>
-      </div>
-    </section>
-  );
-}
-
-function SpotifyPremiumNotice(): JSX.Element {
-  return (
-    <section aria-label="Aviso sobre Spotify Premium" className="bg-white">
-      <div className="mx-auto w-full max-w-3xl px-4 pt-6 md:pt-8">
-        <Card variant="info" title="Antes de empezar" titleIcon="info">
-          <p className="text-gris-700">
-            Necesitas Spotify Premium para que la lista se adapte a la ruta o
-            entrenamiento. Con la cuenta gratuita se reproduce en orden aleatorio.
-          </p>
-        </Card>
       </div>
     </section>
   );
@@ -316,6 +316,10 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
     a: 'Para crear la playlist sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción. Sin cuenta de Spotify la app sigue calculándote la potencia y la segmentación, pero no podrás guardar la lista.',
   },
   {
+    q: '¿Cómo escucho la playlist en ruta sin saltarme la ley?',
+    a: 'En España (Reglamento General de Circulación, art. 18.2) está prohibido conducir cualquier vehículo, bici incluida, con auriculares conectados a un reproductor de sonido. La sanción son 200 € y 3 puntos del carné de coche. La prohibición abarca también los auriculares de conducción ósea, porque la norma no distingue por tipo. Opciones legales: altavoz Bluetooth montado en el manillar o en el cuadro, o un altavoz portátil en la mochila o en el bolsillo del maillot. Para sesiones indoor (rodillo, bici estática, Modo TV) no hay restricción: ahí los auriculares son perfectos.',
+  },
+  {
     q: '¿Es gratis?',
     a: 'Sí. Es código abierto bajo licencia PolyForm Noncommercial. Puedes usarla libremente para tu uso personal o sin fines comerciales.',
   },
@@ -357,7 +361,7 @@ function Faq(): JSX.Element {
   );
 }
 
-function FinalCta({ onStart }: { onStart: () => void }): JSX.Element {
+function FinalCta({ onTry }: { onTry: () => void }): JSX.Element {
   return (
     <section
       aria-labelledby="final-cta-title"
@@ -373,51 +377,11 @@ function FinalCta({ onStart }: { onStart: () => void }): JSX.Element {
         <p className="text-gris-700 mb-6 text-lg">
           Tarda menos de un minuto en generarte la playlist.
         </p>
-        <Button variant="primary" size="lg" onClick={onStart} iconRight="arrow_forward">
-          Empezar ahora
+        <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
+          Probar aplicación
         </Button>
       </div>
     </section>
   );
 }
 
-function Footer(): JSX.Element {
-  return (
-    <footer className="border-t border-gris-200 bg-gris-50">
-      <div className="mx-auto w-full max-w-5xl px-4 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs md:text-sm text-gris-500">
-        <p className="flex items-center gap-1.5">
-          <MaterialIcon name="lock" size="small" className="text-gris-400" />
-          Sin cuentas, sin cookies, sin servidores. Todo corre en tu dispositivo.
-        </p>
-        <nav className="flex items-center gap-3">
-          <a
-            href="/privacy.html"
-            className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
-          >
-            Privacidad
-          </a>
-          <span aria-hidden className="text-gris-300">
-            ·
-          </span>
-          <a
-            href="/terms.html"
-            className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
-          >
-            Términos
-          </a>
-          <span aria-hidden className="text-gris-300">
-            ·
-          </span>
-          <a
-            href="https://polyformproject.org/licenses/noncommercial/1.0.0/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
-          >
-            Licencia
-          </a>
-        </nav>
-      </div>
-    </footer>
-  );
-}
