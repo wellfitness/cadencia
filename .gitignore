@@ -48,3 +48,7 @@ tsconfig.tsbuildinfo
 
 # Design system local (no se publica al repo)
 design-system/
+
+# Deploy script local (especifico del setup de Hostinger del mantenedor;
+# cada colaborador tiene su propio entorno de despliegue)
+scripts/deploy.sh
