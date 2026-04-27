@@ -160,19 +160,20 @@ describe('matchTracksToSegments', () => {
     expect(matchTracksToSegments([], tracks, EMPTY_PREFERENCES)).toEqual([]);
   });
 
-  it('catalogo de 1 track + ruta de 3 segmentos: 1 con track + 2 con null insufficient', () => {
-    // Cero repeticiones: el unico track ocupa el primer segmento, los otros
-    // dos quedan como huecos con matchQuality 'insufficient'. La UI
-    // (MusicStep + ResultStep) avisa al usuario para que suba mas listas.
-    const tracks = [track({ tempoBpm: 87, energy: 0.75, valence: 0.6, durationMs: 60_000 })];
+  it('catalogo de 1 track + ruta de 3 segmentos: 1 strict + 2 repeated (sin huecos)', () => {
+    // Politica de repeticion permitida: el unico track ocupa los 3 segmentos.
+    // El primero es strict, los siguientes se marcan 'repeated' para que la
+    // UI sugiera al usuario subir mas listas.
+    const tracks = [track({ tempoBpm: 80, energy: 0.75, valence: 0.6, durationMs: 60_000 })];
     const segments = Array.from({ length: 3 }, () => segment(3));
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
     expect(matched).toHaveLength(3);
     expect(matched[0]?.track?.uri).toBe(tracks[0]!.uri);
-    expect(matched[1]?.track).toBeNull();
-    expect(matched[1]?.matchQuality).toBe('insufficient');
-    expect(matched[2]?.track).toBeNull();
-    expect(matched[2]?.matchQuality).toBe('insufficient');
+    expect(matched[0]?.matchQuality).toBe('strict');
+    expect(matched[1]?.track?.uri).toBe(tracks[0]!.uri);
+    expect(matched[1]?.matchQuality).toBe('repeated');
+    expect(matched[2]?.track?.uri).toBe(tracks[0]!.uri);
+    expect(matched[2]?.matchQuality).toBe('repeated');
   });
 
   it('ruta de 4 h con pool suficiente: ~80 entradas unicas, sin repetir', () => {
@@ -262,12 +263,11 @@ describe('matchTracksToSegments', () => {
       expect(matched.every((m) => m.track !== null)).toBe(true);
     });
 
-    it('bloque largo con pool insuficiente: tracks unicos + hueco insufficient final', () => {
-      // 60 min Z2 / 3 min = 20 necesarios. Pool de 6 -> 6 tracks unicos +
-      // 1 hueco null con duracion restante (60-18=42 min).
+    it('bloque largo con pool insuficiente: 6 unicos + repeticiones hasta cubrir', () => {
+      // 60 min Z2 / 3 min = 20 tracks necesarios. Pool de 6 -> 6 tracks
+      // unicos + el resto repetidos (politica: nunca dejar huecos).
       const tracks = Array.from({ length: 6 }, (_, idx) =>
         track({
-          // Z2 flat (cadencia 75-90), 6 tracks distintos en 1:1.
           tempoBpm: 75 + idx * 2,
           energy: 0.65 + idx * 0.01,
           valence: 0.5,
@@ -278,13 +278,12 @@ describe('matchTracksToSegments', () => {
       const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES, {
         crossZoneMode: 'discrete',
       });
-      const withTrack = matched.filter((m) => m.track !== null);
-      const withoutTrack = matched.filter((m) => m.track === null);
-      expect(withTrack).toHaveLength(6);
-      const uris = withTrack.map((m) => m.track!.uri);
-      expect(new Set(uris).size).toBe(6); // todos unicos
-      expect(withoutTrack).toHaveLength(1);
-      expect(withoutTrack[0]?.matchQuality).toBe('insufficient');
+      // Todos los segments deben tener track (sin huecos null).
+      expect(matched.every((m) => m.track !== null)).toBe(true);
+      const uniqueUris = new Set(matched.map((m) => m.track!.uri));
+      expect(uniqueUris.size).toBe(6); // 6 tracks distintos en el pool
+      const repeatedCount = matched.filter((m) => m.matchQuality === 'repeated').length;
+      expect(repeatedCount).toBeGreaterThan(0); // algunos marcados 'repeated'
     });
 
     it('Noruego 4x4: cero repeticiones globales en toda la playlist', () => {
@@ -331,11 +330,10 @@ describe('matchTracksToSegments', () => {
       expect(new Set(allUris).size).toBe(allUris.length);
     });
 
-    it('SIT con catalogo Z5 insuficiente: 3 tracks unicos + 3 nulls insufficient', () => {
-      // 6 sprints Z5 con solo 3 tracks Z5 en pool: cero repeticiones obliga
-      // a emitir 3 tracks distintos + 3 huecos. La UI deberia haber
-      // bloqueado este caso via analyzePoolCoverage en MusicStep.
-      // Z5 climb (cadencia 55-75), 3 tracks unicos en 1:1.
+    it('SIT con pool Z5 insuficiente: 3 tracks unicos + 3 repeticiones marcadas', () => {
+      // 6 sprints Z5 con solo 3 tracks Z5 en pool: politica de repeticion
+      // permitida → 3 tracks distintos + 3 repetidos (todos con track no-null).
+      // Z5 climb cadencia 60-80.
       const z5Pool = Array.from({ length: 3 }, (_, idx) =>
         track({
           tempoBpm: 60 + idx * 5,
@@ -345,8 +343,7 @@ describe('matchTracksToSegments', () => {
         }),
       );
       const z1Pool = [
-        // Z1 flat (cadencia 70-90). BPM 85 cae en Z1 1:1 pero NO en Z5
-        // climb (60-80 1:1, 120-160 2:1) → no es candidato para Z5.
+        // BPM 85 NO cae en Z5 climb (60-80 1:1, 120-160 2:1) → no candidato.
         track({ tempoBpm: 85, energy: 0.4, valence: 0.5, durationMs: 240_000 }),
       ];
       const segments = Array.from({ length: 6 }, () => sessionSeg(5, 30));
@@ -357,13 +354,14 @@ describe('matchTracksToSegments', () => {
         { crossZoneMode: 'discrete' },
       );
       expect(matched).toHaveLength(6);
-      const withTrack = matched.filter((m) => m.track !== null);
-      const withoutTrack = matched.filter((m) => m.track === null);
-      expect(withTrack).toHaveLength(3);
-      const uris = withTrack.map((m) => m.track!.uri);
-      expect(new Set(uris).size).toBe(3); // los 3 son distintos
-      expect(withoutTrack).toHaveLength(3);
-      expect(withoutTrack.every((m) => m.matchQuality === 'insufficient')).toBe(true);
+      // Todos con track no-null.
+      expect(matched.every((m) => m.track !== null)).toBe(true);
+      // Solo 3 URIs distintos en el pool Z5.
+      const uniqueUris = new Set(matched.map((m) => m.track!.uri));
+      expect(uniqueUris.size).toBe(3);
+      // 3 marcados como 'repeated'.
+      const repeatedCount = matched.filter((m) => m.matchQuality === 'repeated').length;
+      expect(repeatedCount).toBe(3);
     });
 
     it('catalogo totalmente vacio -> matched con track null', () => {

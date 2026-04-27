@@ -52,14 +52,17 @@ describe('scoreTrack', () => {
     expect(diff).toBeCloseTo(0.2, 2);
   });
 
-  it('cadencia en el borde (90 rpm 1:1) tiene cadenceScore=0', () => {
+  it('cadencia en el borde (90 rpm 1:1) y energy/valence lejos: score bajo', () => {
     // Track en el borde 1:1 y muy lejos del 2:1 midpoint (160).
     const t = track({ tempoBpm: 90, energy: 0, valence: 0 });
-    // cadencia=0, energy = 1-0.7 = 0.3, valence = 1-0.55 = 0.45, genre=0.5
-    // Pero score 2:1: |90-160|/10 = 7 → 0
-    // = 0.30*0 + 0.30*0.3 + 0.20*0.45 + 0.20*0.5 = 0 + 0.09 + 0.09 + 0.10 = 0.28
+    // cadencia=0
+    // energy: dist=0.7 → cuadratico (1-0.7)² = 0.09
+    // valence: dist=0.55 → cuadratico (1-0.55)² ≈ 0.2025
+    // genre=0.5
+    // = 0.30*0 + 0.30*0.09 + 0.20*0.2025 + 0.20*0.5
+    // = 0 + 0.027 + 0.0405 + 0.10 = 0.1675
     const score = scoreTrack(t, z3, []);
-    expect(score).toBeCloseTo(0.28, 2);
+    expect(score).toBeCloseTo(0.17, 2);
   });
 
   it('energy lejos del ideal reduce score pero no descarta', () => {

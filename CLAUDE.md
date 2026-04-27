@@ -269,14 +269,16 @@ Para cada segmento `(zona, profile, duración)`:
 1. **Filtrar candidatos SOLO por cadencia** (1:1 ∪ 2:1). Energy, valence y género NO descartan, son scores.
 2. Ordenar por `score = 0.30 × cadencia + 0.30 × energy + 0.20 × valence + 0.20 × género`. Cada componente es 0..1:
    - `cadencia` = `max(score 1:1, score 2:1)`, lineal triangular contra el midpoint del rango.
-   - `energy` = `1 - |track.energy - zone.energyIdeal|`.
-   - `valence` = `1 - |track.valence - zone.valenceIdeal|`.
+   - `energy` = `(1 - |track.energy - zone.energyIdeal|)²` — **cuadrática**: penaliza más fuerte los outliers, importante en zonas con ideal extremo (Z1 ideal 0.30, Z6 ideal 0.95).
+   - `valence` = `(1 - |track.valence - zone.valenceIdeal|)²` — cuadrática igual que energy.
    - `género` = 1 si match preferencia, 0 si no, 0.5 si lista vacía.
-3. Seleccionar el track con mayor `score` **que no aparezca ya en la playlist**.
+3. Seleccionar el track con mayor `score`. Política de repetición:
+   - **Preferir track no usado** en la playlist (cero repeticiones cuando el pool llega).
+   - **Si el pool de la zona se agota**, repetir el mejor track ya usado y marcarlo con `matchQuality: 'repeated'`. La UI lo señala y sugiere subir más listas, pero NO bloquea ni deja huecos.
+   - Solo emite `track: null` con `matchQuality: 'insufficient'` cuando literalmente no hay ningún candidato (catálogo vacío para esa cadencia).
 4. **Una entrada por canción**: si una canción es lo bastante larga para cubrir varios segmentos consecutivos de la misma zona, aparece una sola vez en la playlist. Comportamiento controlado por `crossZoneMode: 'overlap' | 'discrete'` (overlap por defecto en modo GPX, discrete en modo sesión).
-5. Si el pool se agota antes de cubrir todos los segmentos, emitir un hueco con `track: null` y `matchQuality: 'insufficient'`. La UI debe avisar al usuario para que añada más listas (no se permite generar la playlist con huecos).
 
-**Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): antes de avanzar a `ResultStep`, `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)`. La validación bloqueante es **global**: `neededTotal = ceil(totalDur / 210)` vs `availableTotal = nº de tracks únicos en el catálogo`. El desglose por `(zona, profile)` se mantiene como información, no como bloqueo, porque las zonas comparten pool por la cadencia común del profile y un track puede cubrir segmentos de zonas adyacentes en modo overlap.
+**Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)`. **NO bloquea el avance** — es informativo. Si `neededTotal > availableTotal`, la UI muestra un panel sugiriendo subir más listas para evitar repeticiones, pero el usuario puede seguir adelante (la playlist se genera con repeticiones marcadas).
 
 **Determinista**: misma entrada → misma salida. Si se introduce aleatoriedad para variedad, debe ser con semilla fija configurable.
 

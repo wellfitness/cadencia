@@ -214,6 +214,7 @@ export function ResultStep({
   const totalMinutes = Math.round(routeMeta.totalDurationSec / 60);
   const validUriCount = matched.filter((m) => m.track !== null).length;
   const replacedCount = replacedIndices.size;
+  const repeatedCount = matched.filter((m) => m.matchQuality === 'repeated').length;
   const insufficientCount = matched.filter(
     (m) => m.track === null && m.matchQuality === 'insufficient',
   ).length;
@@ -224,6 +225,29 @@ export function ResultStep({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      {repeatedCount > 0 && (
+        <div
+          role="status"
+          className="rounded-2xl border-2 border-tulipTree-300 bg-tulipTree-50 p-4 md:p-5 flex items-start gap-3"
+        >
+          <MaterialIcon
+            name="lightbulb"
+            size="medium"
+            className="text-tulipTree-600 flex-shrink-0 mt-0.5"
+          />
+          <div className="min-w-0">
+            <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
+              {repeatedCount === 1
+                ? '1 canción se repite en la playlist'
+                : `${repeatedCount} canciones se repiten en la playlist`}
+            </h2>
+            <p className="text-sm text-gris-700 mt-1">
+              No había candidatos únicos suficientes en tu catálogo. Subiendo
+              más listas tendrás mejor variedad sin repeticiones.
+            </p>
+          </div>
+        </div>
+      )}
       {insufficientCount > 0 && (
         <div
           role="alert"
@@ -237,12 +261,12 @@ export function ResultStep({
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
               {insufficientCount === 1
-                ? '1 segmento se ha quedado sin canción'
-                : `${insufficientCount} segmentos se han quedado sin canción`}
+                ? '1 zona sin canciones disponibles en el catálogo'
+                : `${insufficientCount} zonas sin canciones disponibles`}
             </h2>
             <p className="text-sm text-gris-700 mt-1">
-              Tu catálogo no tiene canciones suficientes para evitar repetir. Vuelve a
-              «Música» y sube más listas de las zonas marcadas para completar tu sesión.
+              Tu catálogo no tiene tracks con la cadencia adecuada. Vuelve a
+              «Música» y sube más listas para cubrir esas zonas.
             </p>
           </div>
         </div>

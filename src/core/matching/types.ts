@@ -46,7 +46,7 @@ export interface ZoneMusicCriteria {
   description: string;
 }
 
-export type MatchQuality = 'strict' | 'best-effort' | 'insufficient';
+export type MatchQuality = 'strict' | 'best-effort' | 'repeated' | 'insufficient';
 
 /**
  * Segmento de la ruta ya casado con una cancion concreta. track === null

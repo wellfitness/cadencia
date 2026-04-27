@@ -17,6 +17,7 @@ export interface PlaylistTrackRowProps {
 const QUALITY_LABEL: Record<MatchedSegment['matchQuality'], string | null> = {
   strict: null,
   'best-effort': 'Encaje libre',
+  repeated: 'Repetida',
   insufficient: 'Sin canción libre',
 };
 

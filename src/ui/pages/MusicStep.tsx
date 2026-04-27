@@ -375,9 +375,7 @@ export function MusicStep({
       <FooterActions
         onBack={onBack}
         onNext={handleNext}
-        canGoNext={
-          matched.length > 0 && tracks.length > 0 && !needsUserUpload && coverage.ok
-        }
+        canGoNext={matched.length > 0 && tracks.length > 0 && !needsUserUpload}
       />
     </div>
   );
@@ -436,49 +434,40 @@ function PoolCoverageWarning({
 }: PoolCoverageWarningProps): JSX.Element {
   return (
     <div
-      role="alert"
-      className="rounded-2xl border-2 border-tulipTree-500 bg-tulipTree-50 p-4 md:p-5 space-y-3"
+      role="status"
+      className="rounded-2xl border-2 border-tulipTree-300 bg-tulipTree-50 p-4 md:p-5 space-y-2"
     >
       <div className="flex items-start gap-3">
         <MaterialIcon
-          name="warning"
+          name="lightbulb"
           size="medium"
           className="text-tulipTree-600 flex-shrink-0 mt-0.5"
         />
         <div className="min-w-0">
           <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
-            Tu catálogo no llega para la sesión completa
+            Algunas canciones se van a repetir
           </h2>
           <p className="text-sm text-gris-700 mt-1">
-            La sesión necesita{' '}
+            Para una sesión sin repetir nada necesitarías{' '}
             <strong className="tabular-nums">{coverage.neededTotal}</strong>{' '}
-            canciones únicas para no repetir ninguna y tu catálogo solo tiene{' '}
+            canciones únicas, y tu catálogo tiene{' '}
             <strong className="tabular-nums">{coverage.availableTotal}</strong>.
-            Faltan{' '}
-            <strong className="text-rosa-600 tabular-nums">
-              {coverage.deficitTotal}
-            </strong>
-            .
+            La playlist se generará igualmente; subiendo más listas
+            {sourceMode !== 'both' && (
+              <>
+                {' '}o{' '}
+                <button
+                  type="button"
+                  onClick={onSwitchToBoth}
+                  className="text-turquesa-700 font-semibold underline-offset-2 hover:underline"
+                >
+                  combinando con la biblioteca predefinida
+                </button>
+              </>
+            )}{' '}
+            tendrás más variedad y mejor encaje por zona.
           </p>
         </div>
-      </div>
-      <div className="pt-1">
-        <p className="text-sm text-gris-700">
-          Sube otro CSV con más canciones
-          {sourceMode !== 'both' && (
-            <>
-              {' '}o{' '}
-              <button
-                type="button"
-                onClick={onSwitchToBoth}
-                className="text-turquesa-700 font-semibold underline-offset-2 hover:underline"
-              >
-                combina con la biblioteca predefinida
-              </button>
-            </>
-          )}
-          .
-        </p>
       </div>
     </div>
   );

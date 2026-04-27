@@ -12,6 +12,7 @@ export interface TrackCardProps {
 const QUALITY_LABEL: Record<MatchedSegment['matchQuality'], string | null> = {
   strict: null,
   'best-effort': 'Encaje libre: muy lejos del rango ideal de la zona',
+  repeated: 'Repetida: el catálogo no tenía suficientes canciones únicas',
   insufficient: 'Sin canción libre: necesitas más temas en esta zona',
 };
 

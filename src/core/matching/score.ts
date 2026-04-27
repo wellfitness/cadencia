@@ -50,11 +50,18 @@ export function scoreTrack(
       : 0;
   const cadenceScore = Math.max(score11, score21);
 
-  // === ENERGY (continua, no excluyente) ===
-  const energyScore = 1 - Math.abs(track.energy - criteria.energyIdeal);
+  // === ENERGY (continua, no excluyente, penalizacion CUADRATICA) ===
+  // (1 - dist)² castiga mas fuerte los outliers. Track con energy 0.95 vs
+  // ideal Z1 0.30 (dist 0.65): linear 0.35 → cuadratico 0.12. Tracks cerca
+  // del ideal (dist <0.2) quedan casi intactos. Esto evita que en zonas
+  // con ideal extremo (Z1 ideal 0.30, Z6 ideal 0.95) los tracks lejanos
+  // suban al top cuando no hay opciones cercanas.
+  const energyDist = Math.abs(track.energy - criteria.energyIdeal);
+  const energyScore = Math.pow(Math.max(0, 1 - energyDist), 2);
 
-  // === VALENCE (continua, no excluyente) ===
-  const valenceScore = 1 - Math.abs(track.valence - criteria.valenceIdeal);
+  // === VALENCE (continua, no excluyente, penalizacion CUADRATICA) ===
+  const valenceDist = Math.abs(track.valence - criteria.valenceIdeal);
+  const valenceScore = Math.pow(Math.max(0, 1 - valenceDist), 2);
 
   // === GENRE ===
   const genreScore =

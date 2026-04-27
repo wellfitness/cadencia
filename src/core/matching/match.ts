@@ -8,12 +8,8 @@ import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
 /**
  * Modo de asignacion de tracks frente a la estructura de zonas:
  * - 'overlap' (default, GPX): un track cubre los siguientes segmentos
- *   consecutivos hasta agotar su duracion, AUNQUE cambien de zona. Adecuado
- *   para rutas continuas donde los segmentos vecinos suelen compartir zona.
- * - 'discrete' (sesion indoor): cada segmento es una unidad atomica. Para
- *   un segmento de duracion D se emiten N tracks de SU zona hasta cubrir D.
- *   El siguiente segmento arranca con su propio track. Evita que un track
- *   de zona alta suene durante un bloque de recuperacion.
+ *   consecutivos hasta agotar su duracion, AUNQUE cambien de zona.
+ * - 'discrete' (sesion indoor): cada segmento es una unidad atomica.
  */
 export type CrossZoneMode = 'overlap' | 'discrete';
 
@@ -25,10 +21,14 @@ export interface MatchOptions {
  * Asigna canciones a la ruta segun los criterios de zona y las preferencias
  * del usuario. Determinista: misma entrada -> misma salida.
  *
- * Regla cero repeticiones: ningun track aparece dos veces en la playlist.
- * Si el pool no llega para cubrir todos los segmentos, se emiten huecos con
- * track=null y matchQuality='insufficient'. La UI debe pre-comprobar la
- * cobertura con analyzePoolCoverage() antes de invocar este motor.
+ * Politica de repetición: el motor PREFIERE no repetir, pero si el pool se
+ * agota antes de cubrir todos los segmentos, **repite el mejor track ya
+ * usado** en lugar de dejar huecos. La playlist nunca queda incompleta.
+ * El track repetido lleva matchQuality='repeated' para que la UI lo señale
+ * y el usuario sepa que subiendo más listas mejorará la variedad.
+ *
+ * Solo emite track=null cuando literalmente no hay candidatos para una
+ * zona (catalogo vacio para esa cadencia).
  */
 export function matchTracksToSegments(
   segments: readonly ClassifiedSegment[],
@@ -63,7 +63,7 @@ function matchOverlap(
     const { candidates, quality } = findCandidates(tracks, effective);
 
     if (candidates.length === 0) {
-      out.push({ ...seg, track: null, matchScore: 0, matchQuality: quality });
+      out.push({ ...seg, track: null, matchScore: 0, matchQuality: 'insufficient' });
       i++;
       continue;
     }
@@ -73,25 +73,20 @@ function matchOverlap(
       .sort((a, b) => b.score - a.score);
 
     const fresh = scored.find((c) => !used.has(c.track.uri));
+    // Si no hay fresh, repetimos el mejor (scored[0]) marcandolo como 'repeated'.
+    const choice = fresh ?? scored[0]!;
+    const isRepeat = !fresh;
 
-    if (!fresh) {
-      // Pool agotado: emitimos hueco para este segmento y avanzamos un slot
-      // (60 s). No repetimos: la regla es cero duplicados en la playlist.
-      out.push({ ...seg, track: null, matchScore: 0, matchQuality: 'insufficient' });
-      i++;
-      continue;
-    }
-
-    used.add(fresh.track.uri);
+    used.add(choice.track.uri);
 
     out.push({
       ...seg,
-      track: fresh.track,
-      matchScore: fresh.score,
-      matchQuality: quality,
+      track: choice.track,
+      matchScore: choice.score,
+      matchQuality: isRepeat ? 'repeated' : quality,
     });
 
-    const trackDurationSec = Math.max(1, fresh.track.durationMs / 1000);
+    const trackDurationSec = Math.max(1, choice.track.durationMs / 1000);
     let coveredSec = 0;
     do {
       coveredSec += segments[i]!.durationSec;
@@ -103,13 +98,12 @@ function matchOverlap(
 }
 
 /**
- * Algoritmo discrete (sesion indoor): cada segmento se trata como un bloque
- * atomico. Para cubrir su duracion se emiten tantos tracks como hagan falta,
- * todos de SU zona. El siguiente segmento arranca con su propio track.
+ * Algoritmo discrete (sesion indoor): cada segmento es atomico. Cubre su
+ * duracion con tantos tracks como haga falta, todos de SU zona/profile.
  *
- * Regla cero repeticiones: el Set 'used' es global a la playlist (no por
- * zona), asi que un mismo track no puede aparecer en dos bloques distintos
- * aunque sean de la misma zona.
+ * Politica de repetición igual que overlap: prefiere fresh, pero si el pool
+ * se agota dentro de un bloque largo, repite el mejor en lugar de dejar
+ * hueco.
  */
 function matchDiscrete(
   segments: readonly ClassifiedSegment[],
@@ -125,7 +119,7 @@ function matchDiscrete(
     const { candidates, quality } = findCandidates(tracks, effective);
 
     if (candidates.length === 0) {
-      out.push({ ...seg, track: null, matchScore: 0, matchQuality: quality });
+      out.push({ ...seg, track: null, matchScore: 0, matchQuality: 'insufficient' });
       continue;
     }
 
@@ -136,26 +130,12 @@ function matchDiscrete(
     let coveredSec = 0;
     while (coveredSec < seg.durationSec) {
       const fresh = scored.find((c) => !used.has(c.track.uri));
+      const choice = fresh ?? scored[0]!;
+      const isRepeat = !fresh;
 
-      if (!fresh) {
-        // Pool agotado para esta zona dentro del bloque: emitimos un hueco
-        // con la duracion restante y cerramos el bloque. La UI pre-check
-        // deberia haber evitado llegar aqui.
-        const remainingSec = seg.durationSec - coveredSec;
-        out.push({
-          ...seg,
-          startSec: seg.startSec + coveredSec,
-          durationSec: remainingSec,
-          track: null,
-          matchScore: 0,
-          matchQuality: 'insufficient',
-        });
-        break;
-      }
+      used.add(choice.track.uri);
 
-      used.add(fresh.track.uri);
-
-      const trackDurationSec = Math.max(1, fresh.track.durationMs / 1000);
+      const trackDurationSec = Math.max(1, choice.track.durationMs / 1000);
       const remainingSec = seg.durationSec - coveredSec;
       const slotSec = Math.min(trackDurationSec, remainingSec);
 
@@ -163,14 +143,11 @@ function matchDiscrete(
         ...seg,
         startSec: seg.startSec + coveredSec,
         durationSec: slotSec,
-        track: fresh.track,
-        matchScore: fresh.score,
-        matchQuality: quality,
+        track: choice.track,
+        matchScore: choice.score,
+        matchQuality: isRepeat ? 'repeated' : quality,
       });
 
-      // Avanzamos por la duracion REAL del track (no acotada). Si el track
-      // dura mas que el bloque, igualmente cerramos el bloque aqui — el
-      // siguiente bloque empezara con su propio track.
       coveredSec += trackDurationSec;
     }
   }
