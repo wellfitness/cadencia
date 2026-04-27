@@ -272,10 +272,13 @@ Para cada segmento `(zona, profile, duración)`:
    - `energy` = `(1 - |track.energy - zone.energyIdeal|)²` — **cuadrática**: penaliza más fuerte los outliers, importante en zonas con ideal extremo (Z1 ideal 0.30, Z6 ideal 0.95).
    - `valence` = `(1 - |track.valence - zone.valenceIdeal|)²` — cuadrática igual que energy.
    - `género` = 1 si match preferencia, 0 si no, 0.5 si lista vacía.
-3. Seleccionar el track con mayor `score`. Política de repetición:
-   - **Preferir track no usado** en la playlist (cero repeticiones cuando el pool llega).
-   - **Si el pool de la zona se agota**, repetir el mejor track ya usado y marcarlo con `matchQuality: 'repeated'`. La UI lo señala y sugiere subir más listas, pero NO bloquea ni deja huecos.
-   - Solo emite `track: null` con `matchQuality: 'insufficient'` cuando literalmente no hay ningún candidato (catálogo vacío para esa cadencia).
+3. Seleccionar el track con mayor `score`. Política de selección con prioridad:
+   - **`strict`**: candidato fresh con cadencia OK (idealmente).
+   - **`best-effort` cross-zone**: si todos los strict de la zona están usados, busca CUALQUIER track no usado del catálogo entero (cadencia puede no encajar) y elige el mejor según el ideal de la zona. Prioriza variedad sobre coincidencia exacta de cadencia.
+   - **`repeated`**: solo cuando TODO el catálogo ha sido usado en la playlist. Repite el mejor track del ranking de cadencia. Es el último recurso.
+   - **`insufficient`** (`track: null`): solo cuando el catálogo está literalmente vacío. La UI muestra banner rojo.
+
+   Esto garantiza que NUNCA se repita una canción mientras quede una alternativa fresca, aunque su cadencia no sea ideal. La UI marca los `best-effort` y `repeated` para que el usuario sepa que mejorará subiendo más listas.
 4. **Una entrada por canción**: si una canción es lo bastante larga para cubrir varios segmentos consecutivos de la misma zona, aparece una sola vez en la playlist. Comportamiento controlado por `crossZoneMode: 'overlap' | 'discrete'` (overlap por defecto en modo GPX, discrete en modo sesión).
 
 **Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)`. **NO bloquea el avance** — es informativo. Si `neededTotal > availableTotal`, la UI muestra un panel sugiriendo subir más listas para evitar repeticiones, pero el usuario puede seguir adelante (la playlist se genera con repeticiones marcadas).

@@ -330,10 +330,10 @@ describe('matchTracksToSegments', () => {
       expect(new Set(allUris).size).toBe(allUris.length);
     });
 
-    it('SIT con pool Z5 insuficiente: 3 tracks unicos + 3 repeticiones marcadas', () => {
-      // 6 sprints Z5 con solo 3 tracks Z5 en pool: politica de repeticion
-      // permitida → 3 tracks distintos + 3 repetidos (todos con track no-null).
-      // Z5 climb cadencia 60-80.
+    it('SIT con pool Z5 limitado: agota strict, cae a best-effort, luego repeated', () => {
+      // 6 sprints Z5. Pool: 3 tracks Z5 strict + 1 Z1 (cadencia no encaja Z5).
+      // Politica: agota strict primero, luego usa Z1 como best-effort
+      // (mejor que repetir), y solo repite cuando TODO esta usado.
       const z5Pool = Array.from({ length: 3 }, (_, idx) =>
         track({
           tempoBpm: 60 + idx * 5,
@@ -343,7 +343,6 @@ describe('matchTracksToSegments', () => {
         }),
       );
       const z1Pool = [
-        // BPM 85 NO cae en Z5 climb (60-80 1:1, 120-160 2:1) → no candidato.
         track({ tempoBpm: 85, energy: 0.4, valence: 0.5, durationMs: 240_000 }),
       ];
       const segments = Array.from({ length: 6 }, () => sessionSeg(5, 30));
@@ -354,14 +353,17 @@ describe('matchTracksToSegments', () => {
         { crossZoneMode: 'discrete' },
       );
       expect(matched).toHaveLength(6);
-      // Todos con track no-null.
       expect(matched.every((m) => m.track !== null)).toBe(true);
-      // Solo 3 URIs distintos en el pool Z5.
+      // 4 URIs distintos en total: 3 z5 + 1 z1 (best-effort cross-zone).
       const uniqueUris = new Set(matched.map((m) => m.track!.uri));
-      expect(uniqueUris.size).toBe(3);
-      // 3 marcados como 'repeated'.
+      expect(uniqueUris.size).toBe(4);
+      // El motor prioriza no repetir: 3 strict + 1 best-effort + 2 repeated.
+      const strictCount = matched.filter((m) => m.matchQuality === 'strict').length;
+      const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
       const repeatedCount = matched.filter((m) => m.matchQuality === 'repeated').length;
-      expect(repeatedCount).toBe(3);
+      expect(strictCount).toBe(3);
+      expect(bestEffortCount).toBe(1);
+      expect(repeatedCount).toBe(2);
     });
 
     it('catalogo totalmente vacio -> matched con track null', () => {
