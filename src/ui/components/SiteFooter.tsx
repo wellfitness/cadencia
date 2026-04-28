@@ -196,7 +196,7 @@ export function SiteFooter(): JSX.Element {
               icon="star"
               title="Proyecto Génesis"
               desc="Tu punto de partida personalizado"
-              badge={{ text: 'Premium', tone: 'dorado' }}
+              badge={{ text: 'Curso de pago', tone: 'dorado' }}
               iconColorClass="text-tulipTree-400"
               borderColorClass="border-l-tulipTree-500"
             />
@@ -208,13 +208,13 @@ export function SiteFooter(): JSX.Element {
           <h4 className="text-white text-base font-semibold mb-2">Legal</h4>
           <a
             href="/terms.html"
-            className="block text-sm text-gris-400 py-2.5 hover:text-turquesa-400 transition-colors"
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
           >
             Términos de uso
           </a>
           <a
             href="/privacy.html"
-            className="block text-sm text-gris-400 py-2.5 hover:text-turquesa-400 transition-colors"
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
           >
             Política de privacidad
           </a>
@@ -222,7 +222,7 @@ export function SiteFooter(): JSX.Element {
             href="https://t.me/movimientofuncional"
             target="_blank"
             rel="noopener noreferrer"
-            className="block text-sm text-gris-400 py-2.5 hover:text-turquesa-400 transition-colors"
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
           >
             Contacto
           </a>
@@ -232,7 +232,7 @@ export function SiteFooter(): JSX.Element {
             href="https://github.com/wellfitness/cadencia"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-gris-400 py-2.5 hover:text-turquesa-400 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
           >
             <MaterialIcon name="code" size="small" decorative />
             GitHub
@@ -241,7 +241,7 @@ export function SiteFooter(): JSX.Element {
             href="https://github.com/wellfitness/cadencia/blob/main/LICENSE"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-gris-400 py-2.5 hover:text-turquesa-400 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
           >
             <MaterialIcon name="gavel" size="small" decorative />
             Licencia PolyForm Noncommercial

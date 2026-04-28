@@ -1,9 +1,20 @@
 import {
   calculateTotalDurationSec,
+  expandSessionPlan,
   SESSION_TEMPLATES,
   type SessionTemplate,
 } from '@core/segmentation';
+import type { HeartRateZone } from '@core/physiology/karvonen';
 import { MaterialIcon } from '../MaterialIcon';
+
+const ZONE_BG_BAR: Record<HeartRateZone, string> = {
+  1: 'bg-zone-1',
+  2: 'bg-zone-2',
+  3: 'bg-zone-3',
+  4: 'bg-zone-4',
+  5: 'bg-zone-5',
+  6: 'bg-zone-6',
+};
 
 export interface TemplateGalleryProps {
   /** ID de la plantilla actualmente cargada (para resaltarla). */
@@ -64,9 +75,15 @@ interface TemplateCardProps {
 }
 
 function TemplateCard({ template, active, onSelect }: TemplateCardProps): JSX.Element {
-  const totalSec = calculateTotalDurationSec({ name: template.name, items: [...template.items] });
+  const plan = { name: template.name, items: [...template.items] };
+  const totalSec = calculateTotalDurationSec(plan);
   const totalMin = Math.round(totalSec / 60);
   const icon = TEMPLATE_ICONS[template.id] ?? 'fitness_center';
+
+  // Mini-barra de intensidad: 8 segmentos coloreados segun la zona
+  // proporcional al tiempo en esa zona en el plan expandido. Da una idea
+  // rapida del perfil de la sesion sin tener que cargarla.
+  const intensityBars = buildIntensityBars(template, 8);
 
   return (
     <button
@@ -94,9 +111,48 @@ function TemplateCard({ template, active, onSelect }: TemplateCardProps): JSX.El
       <p className="text-[11px] md:text-xs text-gris-600 leading-snug mb-1.5 line-clamp-3">
         {template.description}
       </p>
+      <div
+        className="flex gap-0.5 mb-1.5"
+        aria-hidden
+        title="Intensidad relativa por zona"
+      >
+        {intensityBars.map((zone, i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-sm ${ZONE_BG_BAR[zone]}`}
+          />
+        ))}
+      </div>
       <p className="text-[11px] md:text-xs text-gris-500 tabular-nums">
         ≈ {totalMin} min
       </p>
     </button>
   );
+}
+
+/**
+ * Construye una representacion en N segmentos de la composicion de zonas de
+ * una plantilla. Cada segmento toma la zona del bloque que cae en su tramo
+ * temporal, dando una vista visual del progreso de intensidad.
+ */
+function buildIntensityBars(template: SessionTemplate, n: number): HeartRateZone[] {
+  const expanded = expandSessionPlan({ name: template.name, items: [...template.items] });
+  const totalSec = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
+  if (totalSec === 0) return [];
+  const segLen = totalSec / n;
+  const result: HeartRateZone[] = [];
+  for (let i = 0; i < n; i++) {
+    const tMid = segLen * (i + 0.5);
+    let cursor = 0;
+    let zone: HeartRateZone = 1;
+    for (const b of expanded.blocks) {
+      if (tMid < cursor + b.durationSec) {
+        zone = b.zone;
+        break;
+      }
+      cursor += b.durationSec;
+    }
+    result.push(zone);
+  }
+  return result;
 }

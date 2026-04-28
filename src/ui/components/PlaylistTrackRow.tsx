@@ -200,6 +200,11 @@ function AlternativesPicker({
     onSelect(uri);
   };
 
+  // El dropdown opera en modo "fallback" cuando no hay tracks con cadencia
+  // ideal libres y se ofrecen otros del catalogo. Detectado por la ausencia
+  // total de items strict — si los hubiera, el motor los devolveria solos.
+  const isFallback = alternatives.length > 0 && alternatives.every((a) => !a.passesCadence);
+
   const popover =
     open && position
       ? createPortal(
@@ -228,31 +233,45 @@ function AlternativesPicker({
                 </p>
               </div>
             ) : (
-              <ul className="py-1">
-                {alternatives.map((alt) => (
-                  <li key={alt.track.uri}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={false}
-                      onClick={() => handleSelect(alt.track.uri)}
-                      className="w-full text-left px-3 py-2 min-h-[44px] flex items-center gap-3 hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gris-800 truncate">
-                          {alt.track.name}
-                        </p>
-                        <p className="text-xs text-gris-500 truncate">
-                          {alt.track.artists.join(', ')}
-                        </p>
-                      </div>
-                      <span className="text-xs text-gris-500 tabular-nums shrink-0">
-                        {Math.round(alt.track.tempoBpm)} bpm
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                {isFallback && (
+                  <div className="px-3 py-2 border-b border-gris-100 bg-tulipTree-50/60 flex items-center gap-1.5">
+                    <MaterialIcon
+                      name="info"
+                      size="small"
+                      className="text-tulipTree-500 shrink-0"
+                    />
+                    <p className="text-xs text-tulipTree-700">
+                      Sin opciones ideales libres
+                    </p>
+                  </div>
+                )}
+                <ul className="py-1">
+                  {alternatives.map((alt) => (
+                    <li key={alt.track.uri}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={false}
+                        onClick={() => handleSelect(alt.track.uri)}
+                        className="w-full text-left px-3 py-2 min-h-[44px] flex items-center gap-3 hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gris-800 truncate">
+                            {alt.track.name}
+                          </p>
+                          <p className="text-xs text-gris-500 truncate">
+                            {alt.track.artists.join(', ')}
+                          </p>
+                        </div>
+                        <span className="text-xs text-gris-500 tabular-nums shrink-0">
+                          {Math.round(alt.track.tempoBpm)} bpm
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </div>,
           document.body,

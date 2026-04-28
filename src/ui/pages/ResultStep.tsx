@@ -41,6 +41,7 @@ import { Card } from '@ui/components/Card';
 import { Input } from '@ui/components/Input';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
+import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 
@@ -254,7 +255,7 @@ export function ResultStep({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+    <WizardStep maxWidth="max-w-3xl">
       <WizardStepHeading
         title="Tu playlist"
         subtitle="Revisa la lista, ajusta lo que quieras y créala en tu cuenta de Spotify."
@@ -422,7 +423,7 @@ export function ResultStep({
         }
         hasSpotifySession={hasSpotifySession}
       />
-    </div>
+    </WizardStep>
   );
 }
 

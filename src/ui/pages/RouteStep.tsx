@@ -15,6 +15,7 @@ import { FileDropzone } from '@ui/components/FileDropzone';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { RouteSummary } from '@ui/components/RouteSummary';
 import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import { SessionBuilder } from '@ui/pages/SessionBuilder';
@@ -149,7 +150,7 @@ function GpxRouteFlow({
   }, []);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10 space-y-4 md:space-y-6 pb-32 md:pb-10">
+    <WizardStep maxWidth="max-w-3xl">
       <WizardStepHeading
         title="Tu ruta"
         subtitle="Sube el GPX que exportaste de Strava o Komoot. Lo procesamos en local."
@@ -296,7 +297,7 @@ function GpxRouteFlow({
         canGoNext={phase === 'ready'}
         canReset={phase === 'ready' || phase === 'error'}
       />
-    </div>
+    </WizardStep>
   );
 }
 

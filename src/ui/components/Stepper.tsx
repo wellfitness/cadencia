@@ -138,10 +138,22 @@ function StepIndicator({
       <button
         type="button"
         onClick={onClick}
-        className="flex items-center gap-2 rounded-full hover:opacity-80 transition-opacity duration-200 cursor-pointer min-h-[44px]"
+        className="group flex items-center gap-2 rounded-full hover:opacity-90 transition-opacity duration-200 cursor-pointer min-h-[44px]"
         aria-label={`Volver al paso ${index + 1}: ${step.label}`}
       >
-        {innerContent}
+        <span className={`${circleBase} ${circleState}`}>
+          {isCompleted ? (
+            <MaterialIcon name="check" size="medium" />
+          ) : (
+            <MaterialIcon name={step.icon} size="medium" />
+          )}
+          <span className="sr-only">Paso {index + 1}</span>
+        </span>
+        <span
+          className={`text-sm md:text-base whitespace-nowrap ${labelState} group-hover:underline underline-offset-4`}
+        >
+          {step.label}
+        </span>
       </button>
     );
   }

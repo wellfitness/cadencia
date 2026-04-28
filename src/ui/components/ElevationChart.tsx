@@ -80,13 +80,13 @@ export function ElevationChart({
   const yPadding = Math.max(10, (maxEle - minEle) * 0.1);
 
   return (
-    <div
-      className={`w-full ${className}`.trim()}
-      role="img"
-      aria-label={`Perfil de elevación de ${totalKm.toFixed(1)} kilómetros con intensidad por zonas`}
-    >
-      <ResponsiveContainer width="100%" height={240} minWidth={280}>
-        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+    <div className={`w-full ${className}`.trim()}>
+      <div
+        role="img"
+        aria-label={`Perfil de elevación de ${totalKm.toFixed(1)} kilómetros con intensidad por zonas`}
+      >
+        <ResponsiveContainer width="100%" height={240} minWidth={280}>
+          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="elevation-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#9ca3af" stopOpacity={0.55} />
@@ -127,13 +127,84 @@ export function ElevationChart({
             fill="url(#elevation-fill)"
             isAnimationActive={false}
           />
-          <Tooltip
-            content={(props: TooltipProps<number, string>) => (
-              <ChartTooltip {...props} segments={segments} karvonenZones={karvonenZones} />
-            )}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
+            <Tooltip
+              content={(props: TooltipProps<number, string>) => (
+                <ChartTooltip {...props} segments={segments} karvonenZones={karvonenZones} />
+              )}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <details className="mt-3 group [&_summary::-webkit-details-marker]:hidden">
+        <summary className="flex items-center gap-2 cursor-pointer list-none text-sm font-semibold text-turquesa-700 hover:text-turquesa-800 min-h-[36px]">
+          <span className="material-icons text-base transition-transform group-open:rotate-90">
+            chevron_right
+          </span>
+          Ver datos por segmento
+        </summary>
+        <div className="mt-2 overflow-x-auto rounded-md border border-gris-200">
+          <table className="w-full text-xs md:text-sm text-left">
+            <thead className="bg-gris-50 text-gris-600">
+              <tr>
+                <th scope="col" className="px-2 py-1.5 font-semibold">
+                  #
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-semibold tabular-nums">
+                  km
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-semibold tabular-nums">
+                  Elev. (m)
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-semibold">
+                  Zona
+                </th>
+                <th scope="col" className="px-2 py-1.5 font-semibold tabular-nums">
+                  W
+                </th>
+                {karvonenZones !== undefined && (
+                  <th scope="col" className="px-2 py-1.5 font-semibold tabular-nums">
+                    BPM
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {segments.map((s, i) => {
+                const bpm = karvonenZones?.find((r) => r.zone === s.zone);
+                return (
+                  <tr
+                    key={s.startSec}
+                    className="odd:bg-white even:bg-gris-50/50 border-t border-gris-100"
+                  >
+                    <td className="px-2 py-1.5 text-gris-500 tabular-nums">{i + 1}</td>
+                    <td className="px-2 py-1.5 tabular-nums">
+                      {(s.startDistanceMeters / 1000).toFixed(2)}–
+                      {(s.endDistanceMeters / 1000).toFixed(2)}
+                    </td>
+                    <td className="px-2 py-1.5 tabular-nums">
+                      {Math.round(s.endElevationMeters - s.startElevationMeters) >= 0 ? '+' : ''}
+                      {Math.round(s.endElevationMeters - s.startElevationMeters)}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <ZoneBadge zone={s.zone} label={ZONE_LABEL[s.zone]} size="sm" />
+                    </td>
+                    <td className="px-2 py-1.5 tabular-nums">
+                      {Math.round(s.avgPowerWatts)}
+                    </td>
+                    {karvonenZones !== undefined && (
+                      <td className="px-2 py-1.5 tabular-nums">
+                        {bpm !== undefined
+                          ? `${Math.round(bpm.minBpm)}–${Math.round(bpm.maxBpm)}`
+                          : '—'}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

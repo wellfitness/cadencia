@@ -25,6 +25,7 @@ import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
+import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 
@@ -223,7 +224,7 @@ export function MusicStep({
   const needsUserUpload = sourceMode === 'mine' && !hasUserTracks;
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+    <WizardStep>
       <WizardStepHeading
         title="Tu música"
         subtitle="Elige de dónde sale el catálogo y marca los géneros que te van."
@@ -419,7 +420,7 @@ export function MusicStep({
         onNext={handleNext}
         canGoNext={matched.length > 0 && tracks.length > 0 && !needsUserUpload}
       />
-    </div>
+    </WizardStep>
   );
 }
 

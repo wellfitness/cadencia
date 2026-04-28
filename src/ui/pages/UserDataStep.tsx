@@ -6,6 +6,7 @@ import {
 import { Button } from '@ui/components/Button';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { UserDataForm } from '@ui/components/UserDataForm';
+import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import type { UserInputsAction } from '@ui/state/userInputsReducer';
@@ -59,7 +60,7 @@ export function UserDataStep({
       : 'Necesitamos tu peso y, si lo conoces, tu FTP o frecuencia cardíaca.';
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+    <WizardStep>
       <WizardStepHeading title="Tus datos" subtitle={subtitle} />
       <UserDataForm
         inputs={inputs}
@@ -88,7 +89,7 @@ export function UserDataStep({
         onBack={onBack}
         nextLabel={nextLabel}
       />
-    </div>
+    </WizardStep>
   );
 }
 

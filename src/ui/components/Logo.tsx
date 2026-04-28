@@ -75,13 +75,13 @@ export function Logo({
       {variant !== 'mark' && (
         <div className={textBlockClass}>
           <span
-            className={`font-display text-tulipTree-600 ${wordmarkClass} leading-none`}
+            className={`font-display text-turquesa-700 ${wordmarkClass} leading-none`}
           >
             Cadencia
           </span>
           {variant === 'full' && (
             <span
-              className={`text-tulipTree-600/80 ${taglineClass} mt-1 tracking-widest uppercase`}
+              className={`text-turquesa-700/80 ${taglineClass} mt-1 tracking-widest uppercase`}
             >
               by Movimiento Funcional
             </span>

@@ -49,7 +49,7 @@ export function RepeatGroup({
             <MaterialIcon name="repeat" size="small" decorative />
             <span className="tabular-nums">× {repeat}</span>
           </span>
-          <span className="text-xs text-gris-500 tabular-nums">≈ {minutes} min</span>
+          <span className="text-xs text-gris-700 tabular-nums">≈ {minutes} min</span>
         </div>
         <div className="flex items-center gap-1">
           <button

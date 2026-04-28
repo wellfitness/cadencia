@@ -68,15 +68,21 @@ export function ZoneTimelineChart({ blocks, className = '' }: ZoneTimelineChartP
       >
         {blocks.map((block, i) => {
           const widthPct = (block.durationSec / totalDurationSec) * 100;
+          const isActive = hoverIndex === i;
+          const phaseLabel = PHASE_LABELS[block.phase] ?? block.phase;
           return (
-            <div
+            <button
               key={block.id}
+              type="button"
               className={`${ZONE_BG[block.zone]} cursor-pointer transition-opacity ${
-                hoverIndex !== null && hoverIndex !== i ? 'opacity-60' : 'opacity-100'
+                hoverIndex !== null && !isActive ? 'opacity-60' : 'opacity-100'
               }`}
               style={{ width: `${widthPct}%` }}
               onMouseEnter={() => setHoverIndex(i)}
-              title={`${PHASE_LABELS[block.phase] ?? block.phase} · Z${block.zone} · ${formatDuration(block.durationSec)}`}
+              onClick={() => setHoverIndex((prev) => (prev === i ? null : i))}
+              aria-label={`Bloque ${i + 1}: ${phaseLabel}, zona ${block.zone}, ${formatDuration(block.durationSec)}`}
+              aria-pressed={isActive}
+              title={`${phaseLabel} · Z${block.zone} · ${formatDuration(block.durationSec)}`}
             />
           );
         })}

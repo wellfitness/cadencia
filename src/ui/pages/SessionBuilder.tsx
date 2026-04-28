@@ -17,6 +17,7 @@ import type { ValidatedUserInputs } from '@core/user/userInputs';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import { ZoneTimelineChart } from '@ui/components/ZoneTimelineChart';
@@ -206,7 +207,7 @@ export function SessionBuilder({
   }, [state.plan, validatedInputs, onProcessed, onNext]);
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10 space-y-4 md:space-y-6 pb-32 md:pb-10">
+    <WizardStep maxWidth="max-w-3xl">
       <WizardStepHeading
         title="Construye tu sesión"
         subtitle="Parte de una plantilla científica o crea tu propia secuencia de bloques."
@@ -274,7 +275,7 @@ export function SessionBuilder({
         onContinue={handleContinue}
         canContinue={expandedBlocks.length > 0}
       />
-    </div>
+    </WizardStep>
   );
 }
 
