@@ -42,7 +42,7 @@ La app se publica como webapp + PWA (instalable desde el navegador con "Añadir 
 - `src/core/` — Lógica pura (sin React, sin DOM): cálculos fisiológicos (Karvonen, Coggan, Gulati ♀ / Tanaka ♂), parser GPX, ecuación de potencia, motor de matching, plantillas de sesión. 100% unitestable.
 - `src/integrations/spotify/` — Cliente OAuth PKCE de Spotify (único servicio externo con autenticación).
 - `src/ui/` — Componentes React + Tailwind. Wizard de 5 pasos: Tipo → Datos → Ruta → Música → Resultado, además de Landing y Modo TV.
-- `src/data/tracks/` — CSVs de Spotify embebidos como librería por defecto.
+- `src/data/tracks/` — Librería por defecto: `all.csv` (catálogo unificado bundled) + `sources/` (listas fuente, recompiladas con `pnpm build:tracks`).
 
 Para guías de contribución y reglas vinculantes del proyecto ver [CLAUDE.md](./CLAUDE.md).
 

@@ -55,6 +55,7 @@ pnpm test                 # Vitest unit, modo watch
 pnpm test:run             # Vitest unit, run-once
 pnpm test:coverage        # Cobertura sobre src/core/
 pnpm test:e2e             # Playwright E2E
+pnpm build:tracks         # Recompila src/data/tracks/all.csv desde sources/
 pnpm deploy               # Sube dist/ a Hostinger por FTP (requiere .env.local)
 pnpm deploy:full          # build + deploy en una sola tanda
 ```
@@ -112,7 +113,7 @@ src/
                               # ResultStep, SessionBuilder, SessionTVMode, SpotifyCallback
     state/                    # wizardStorage, userInputsReducer (state global del wizard)
 
-  data/tracks/                # CSVs embebidos (cinelli_rider, mix_alegre, trainingpeaks_virtual)
+  data/tracks/                # all.csv (catalogo unificado bundled) + sources/ (12 listas fuente)
 ```
 
 ### Reglas de capas (vinculantes)
@@ -231,8 +232,10 @@ Se trabaja con **6 zonas** (Z1-Z6 lineales, sin sub-zonas), siguiendo el estánd
 | Profile | Cadencia (rpm) 1:1 | BPM canción 1:1 ∪ 2:1 | Aplicable a |
 |---|---|---|---|
 | `flat` | **70-90** | 70-90 ∪ 140-180 BPM | Z1, Z2, Z3, Z4 (pedaleo continuo sostenible) |
-| `climb` | **60-80** | 60-80 ∪ 120-160 BPM | Z3, Z4, Z5 (escalada, cadencia baja, fuerza) |
-| `sprint` | **90-110** | 90-110 ∪ 180-220 BPM | Z6 (anaeróbico, máxima cadencia) |
+| `climb` | **55-80** | 55-80 ∪ 110-160 BPM | Z3, Z4, Z5 (escalada, cadencia baja, fuerza) |
+| `sprint` | **90-115** | 90-115 ∪ 180-230 BPM | Z6 (anaeróbico, máxima cadencia) |
+
+**Por qué los límites son 55-80 (climb) y 90-115 (sprint)**: la "zona muerta" 110-120 BPM en el catálogo musical concentra mucho rock y dance clásico (Bowie, Zeppelin, Hendrix, Queen, Metallica, MJ, Avicii…). Ampliar climb 1:1 a 55 rpm rescata todo ese rango como climb 2:1 (110-160 BPM), y sprint 1:1 a 115 rpm añade 110-115 BPM al pool de sprint. 55 rpm en escalada es válido para muros Z5 (fuerza pura); 115 rpm en sprint sigue siendo cadencia muy alta pero alcanzable en Z6 supramáximo de pocos segundos.
 
 **Perfil sonoro IDEAL por zona** (afecta al score, no excluye):
 
@@ -288,6 +291,15 @@ Para cada segmento `(zona, profile, duración)`:
 
 **Pre-check de cobertura** (`src/core/matching/poolCoverage.ts`): `MusicStep` invoca `analyzePoolCoverage(segments, tracks, preferences)`. **NO bloquea el avance** — es informativo. Si `neededTotal > availableTotal`, la UI muestra un panel sugiriendo subir más listas para evitar repeticiones, pero el usuario puede seguir adelante (la playlist se genera con repeticiones marcadas).
 
+**Sustitución manual ("Otro tema")** (`src/core/matching/replaceTrack.ts` → `getAlternativesForSegment`, `replaceTrackInSegment`): el usuario puede sustituir cualquier track de la playlist final desde un dropdown que muestra alternativas válidas no repetidas. Política en dos niveles:
+
+1. **Strict primero**: por defecto solo se ofrecen tracks que pasan filtro de cadencia (1:1 ∪ 2:1) y no están en uso en otro slot.
+2. **Fallback al catálogo entero**: si ningún strict queda libre (catálogo agotado o sin candidatos ideales para esa zona), cae al resto del catálogo libre, ordenado por score. Garantiza que el dropdown nunca aparezca vacío mientras quede algún track no usado.
+3. **Aviso pre-elección**: cada `AlternativeCandidate` lleva un flag `passesCadence: boolean`. Si todas las opciones del dropdown son `passesCadence: false`, la UI pinta una cabecera dorada **"Sin opciones ideales libres"** antes del listado para avisar al usuario.
+4. **Calidad del nuevo slot**: se recalcula track-a-track via `passesCadenceFilter` al sustituir (no se hereda del slot anterior). Si el track elegido encaja en cadencia → `'strict'`; si no → `'best-effort'`.
+
+**Banner "Encaje libre" global** (`@ui/components/BestEffortBanner`): en `MusicStep` y `ResultStep`, si la playlist tiene ≥1 segmento con `matchQuality === 'best-effort'`, se muestra un banner dorado explicando el concepto y recomendando subir más listas. Reemplaza al chip pequeño que antes pasaba desapercibido.
+
 **Determinista**: misma entrada → misma salida. Si se introduce aleatoriedad para variedad, debe ser con semilla fija configurable.
 
 **Referencias bibliográficas (PubMed):**
@@ -298,20 +310,25 @@ Para cada segmento `(zona, profile, duración)`:
 
 ## Librería de tracks
 
-3 CSVs nativos de Spotify viven en `src/data/tracks/`:
+El catálogo nativo unificado vive en `src/data/tracks/all.csv` (un solo archivo, ~800 tracks) y se carga con un único `import` (`vite ?raw`). Se **compila** desde las listas individuales en `src/data/tracks/sources/` mediante el script `scripts/build-tracks.mjs`, ejecutable con `pnpm build:tracks`.
 
-- `cinelli_rider.csv`
-- `mix_alegre.csv`
-- `trainingpeaks_virtual.csv`
+El compilador:
 
-El loader los **une y deduplica por `Track URI`**. Columnas relevantes:
+- **Deduplica por `Track URI`** (first-wins) entre listas que se solapan.
+- **Descarta huérfanos**: tracks cuyo `tempoBpm` no encaja en NINGUNA cadencia válida (60-80 ∪ 70-90 ∪ 90-115 ∪ 110-160 ∪ 140-180 ∪ 180-230 BPM). El motor jamás los consideraría — dejarlos solo añade peso al bundle.
+- **Anota la columna `Source`** con el nombre del CSV origen (informativo, para trazabilidad humana al inspeccionar `all.csv`).
+
+Para añadir o reemplazar listas: deja el CSV nuevo (export de Spotify) en `src/data/tracks/sources/` y vuelve a ejecutar `pnpm build:tracks`. Commitea el CSV fuente nuevo + el `all.csv` regenerado en el mismo commit. Los rangos válidos en el script deben mantenerse en sync con `src/core/matching/zoneCriteria.ts`.
+
+Columnas usadas:
 
 - `Tempo` → BPM
 - `Energy`, `Valence` → discriminadores principales para zonas
 - `Genres` → matching de género preferido
 - `Track URI` → identificador único + uso directo para añadir a playlist Spotify
+- `Source` → trazabilidad informativa (no usado en el matching)
 
-En `MusicStep` el usuario elige fuente: `'predefined'` (solo CSVs embebidos), `'mine'` (solo CSVs propios subidos en runtime) o `'both'` (mergea ambos en memoria, dedup por URI).
+En `MusicStep` el usuario elige fuente: `'predefined'` (solo `all.csv`), `'mine'` (solo CSVs propios subidos en runtime) o `'both'` (mergea ambos en memoria, dedup por URI). El catálogo activo viaja como prop a `ResultStep` (state `livePool` en `App.tsx`, no persistido en `sessionStorage` para no inflarlo) — así la sustitución manual ("Otro tema") busca alternativas en el mismo pool con el que se generó la playlist.
 
 ---
 
