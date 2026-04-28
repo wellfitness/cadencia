@@ -74,4 +74,22 @@ describe('computeSegments', () => {
     const [s] = computeSegments(track);
     expect(Math.abs(s!.slopePercent)).toBeLessThanOrEqual(30);
   });
+
+  it('diente de sierra GPS: pendiente suavizada se mantiene cercana a 0%', () => {
+    // Puntos cada ~11 m con elevación oscilando ±1 m sobre línea base llana.
+    // Sin smoothing producirían pendientes ±9% alternantes; con smoothing,
+    // < ±2%.
+    const points = Array.from({ length: 21 }, (_, i) => ({
+      lat: 42 + 0.0001 * i,
+      lon: -8,
+      ele: i % 2 === 0 ? 100 : 102,
+    }));
+    const track = makeTrack(points);
+    const segments = computeSegments(track);
+    // Ignorar primer y último segmento (efectos de borde de la ventana)
+    const middle = segments.slice(2, segments.length - 2);
+    for (const s of middle) {
+      expect(Math.abs(s.slopePercent)).toBeLessThan(5);
+    }
+  });
 });
