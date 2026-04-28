@@ -64,7 +64,7 @@ export function UserDataStep({
   };
 
   const submitDisabled = !validation.ok;
-  const nextLabel = mode === 'session' ? 'Siguiente: Sesión' : 'Siguiente: Ruta';
+  const nextLabel = 'Siguiente: Plan';
 
   // P3: copy reescrito.
   const subtitle =

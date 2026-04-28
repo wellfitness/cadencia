@@ -25,6 +25,8 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
       <main className="flex-1">
         <Hero onTry={openModal} />
         <HowItWorks />
+        <InteropZwo />
+        <PersonalizedRanges />
         <WhyItWorks />
         <Privacy />
         <Faq />
@@ -71,14 +73,16 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
               id="hero-title"
               className="font-display text-4xl md:text-6xl leading-tight mb-6"
             >
-              <span className="block text-gris-800">Tu plan. Tu intensidad.</span>
+              <span className="block text-gris-800">Tu plan. </span>
+              <span className="block text-rosa-600">Tu intensidad.</span>
               <span className="block text-turquesa-600">Tu música.</span>
             </h1>
 
             <p className="text-lg md:text-xl text-gris-700 max-w-2xl lg:mx-0 mx-auto mb-6">
               Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
               La app te genera una playlist de Spotify donde cada canción encaja
-              con la intensidad real de cada tramo o bloque.
+              con la intensidad real de cada tramo. Y exportas tu sesión a Zwift,
+              TrainingPeaks Virtual y otros simuladores.
             </p>
 
             <ul className="flex flex-wrap justify-center lg:justify-start gap-3 md:gap-6 mb-8 text-gris-700">
@@ -289,7 +293,7 @@ function HowItWorks(): JSX.Element {
             num={1}
             icon="person"
             title="Tus datos"
-            desc="Peso y, opcionalmente, tu FTP o frecuencia cardíaca máxima. Calculamos tus zonas de intensidad personalizadas."
+            desc="Tu peso, tu frecuencia cardíaca máxima (medida o estimada por edad y sexo) y, si tienes potenciómetro, tu FTP. Con eso calculamos tus zonas con Karvonen y Coggan."
           />
           <StepCard
             num={2}
@@ -333,6 +337,267 @@ function StepCard({ num, icon, title, desc }: StepCardProps): JSX.Element {
       <h3 className="font-display text-gris-800 text-xl mb-2">{title}</h3>
       <p className="text-gris-600">{desc}</p>
     </li>
+  );
+}
+
+/**
+ * Bloque "Tu sesión, en cualquier rodillo": destaca la interop bidireccional
+ * con .zwo (Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh, TrainingPeaks Virtual).
+ * Acompañado de un mockup-card visual hermano del HeroMockup: barras de zona
+ * + meta de la sesión + chip ".zwo" descargable.
+ */
+function InteropZwo(): JSX.Element {
+  return (
+    <section aria-labelledby="interop-zwo-title" className="bg-gris-50">
+      <div className="mx-auto w-full max-w-6xl px-4 py-12 md:py-16">
+        <div className="grid lg:grid-cols-[1fr,1.1fr] gap-8 lg:gap-12 items-center">
+          <div className="text-center lg:text-left">
+            <h2
+              id="interop-zwo-title"
+              className="font-display text-gris-800 text-3xl md:text-4xl mb-4"
+            >
+              Tu sesión, <span className="text-turquesa-600">en cualquier rodillo</span>
+            </h2>
+            <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
+              Cadencia exporta tu plan en formato <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code> estándar.
+              Pásalo a Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh o
+              TrainingPeaks Virtual con un clic. ¿Tienes ya un workout en{' '}
+              <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code>?
+              Súbelo y conviértelo en sesión con música sincronizada.
+            </p>
+            <ul className="flex flex-wrap justify-center lg:justify-start gap-3 md:gap-5 mb-4 text-gris-700">
+              <li className="flex items-center gap-2">
+                <MaterialIcon name="download" className="text-turquesa-600" />
+                <span className="font-semibold">Exporta a Zwift y compatibles</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <MaterialIcon name="upload" className="text-turquesa-600" />
+                <span className="font-semibold">Importa cualquier .zwo</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <MaterialIcon name="sync" className="text-turquesa-600" />
+                <span className="font-semibold">Ida y vuelta sin servidor</span>
+              </li>
+            </ul>
+            <p className="text-sm text-gris-500">
+              Formato abierto <code className="font-mono bg-gris-100 px-1 py-0.5 rounded">.zwo</code> (XML).
+              Tu rodillo y tu plataforma siguen siendo tuyos.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <ZwoMockup />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Mock visual del export .zwo: card flotante con barras de zona del Noruego
+ * 4×4, meta del workout y chip ".zwo" descargable. Hermano del HeroMockup
+ * para mantener el lenguaje visual de toda la Landing.
+ */
+function ZwoMockup(): JSX.Element {
+  // Secuencia de zonas del Noruego 4×4: warmup Z2 + 4× (Z4 work + Z2 recovery) + cooldown Z1
+  const blocks: { zone: 1 | 2 | 3 | 4 | 5 | 6; flex: number; label: string }[] = [
+    { zone: 2, flex: 6, label: 'Calent.' },
+    { zone: 4, flex: 4, label: '4 min' },
+    { zone: 2, flex: 3, label: '3 min' },
+    { zone: 4, flex: 4, label: '4 min' },
+    { zone: 2, flex: 3, label: '3 min' },
+    { zone: 4, flex: 4, label: '4 min' },
+    { zone: 2, flex: 3, label: '3 min' },
+    { zone: 4, flex: 4, label: '4 min' },
+    { zone: 2, flex: 3, label: '3 min' },
+    { zone: 1, flex: 6, label: 'V. calma' },
+  ];
+  const ZONE_BG: Record<number, string> = {
+    1: 'bg-zone-1',
+    2: 'bg-zone-2',
+    3: 'bg-zone-3',
+    4: 'bg-zone-4',
+    5: 'bg-zone-5',
+    6: 'bg-zone-6',
+  };
+  return (
+    <div
+      aria-hidden="true"
+      className="relative w-full max-w-md transform -rotate-1 transition-transform duration-300 hover:rotate-0"
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-gris-200 p-5 md:p-6 space-y-4">
+        <header className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wider text-gris-500 mb-0.5">
+              Workout exportable
+            </p>
+            <p className="font-display text-lg text-gris-800 leading-tight truncate">
+              Noruego 4×4
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-rosa-700 bg-rosa-100 border border-rosa-300 px-2.5 py-1 rounded-full whitespace-nowrap">
+            <MaterialIcon name="download" size="small" />
+            .zwo
+          </span>
+        </header>
+        <div className="space-y-2">
+          <div className="flex gap-1 h-10 rounded-md overflow-hidden border border-gris-200">
+            {blocks.map((b, i) => (
+              <span
+                key={i}
+                className={`${ZONE_BG[b.zone] ?? 'bg-zone-2'}`}
+                style={{ flex: b.flex }}
+              />
+            ))}
+          </div>
+          <div className="flex justify-between text-[10px] text-gris-500 tabular-nums px-0.5">
+            <span>0&apos;</span>
+            <span>24&apos;</span>
+            <span>48&apos;</span>
+          </div>
+        </div>
+        <p className="text-sm text-gris-700 tabular-nums">
+          <strong className="text-gris-900">48 min</strong> · 4×(4&apos; + 3&apos;) · 10 bloques
+        </p>
+        <div className="border-t border-gris-100 pt-3">
+          <p className="text-xs uppercase tracking-wider text-gris-500 mb-1.5">
+            Compatible con
+          </p>
+          <ul className="flex flex-wrap gap-x-2 gap-y-1 text-xs font-semibold text-gris-700">
+            <li>Zwift</li>
+            <li className="text-gris-300">·</li>
+            <li>TrainingPeaks Virtual</li>
+            <li className="text-gris-300">·</li>
+            <li>TrainerRoad</li>
+            <li className="text-gris-300">·</li>
+            <li>Wahoo SYSTM</li>
+            <li className="text-gris-300">·</li>
+            <li>MyWhoosh</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Bloque "Tus números, no los de un manual": muestra cómo cada bloque del
+ * SessionBuilder presenta los rangos bpm (Karvonen) y vatios (Coggan)
+ * personalizados. 3 cards lado a lado representando una zona suave (Z2),
+ * una de umbral (Z4) y una sprint (Z6).
+ */
+function PersonalizedRanges(): JSX.Element {
+  return (
+    <section aria-labelledby="personalized-ranges-title" className="bg-white">
+      <div className="mx-auto w-full max-w-5xl px-4 py-12 md:py-16">
+        <h2
+          id="personalized-ranges-title"
+          className="font-display text-gris-800 text-3xl md:text-4xl text-center mb-3"
+        >
+          Tus números, <span className="text-turquesa-600">no los de un manual</span>
+        </h2>
+        <p className="text-center text-gris-600 max-w-2xl mx-auto mb-10">
+          Cada bloque de tu sesión muestra el rango exacto de pulsaciones y
+          vatios que <strong>a ti</strong> te corresponde. Ya sabes cuándo subir,
+          cuándo aguantar y cuándo soltar.
+        </p>
+        <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+          <ZoneRangeCard
+            zone={2}
+            zoneName="Aeróbico base"
+            duration="12 min"
+            bpm="122-138"
+            watts="145-195"
+            description="Pedaleo continuo, conversación posible. Construye base."
+          />
+          <ZoneRangeCard
+            zone={4}
+            zoneName="Umbral"
+            duration="4 min"
+            bpm="152-168"
+            watts="235-275"
+            description="Justo en el filo. Sostenible si no te pasas."
+          />
+          <ZoneRangeCard
+            zone={6}
+            zoneName="Sprint"
+            duration="30 s"
+            bpm=">168"
+            watts=">315"
+            description="Anaeróbico puro. Pocos segundos a tope."
+          />
+        </div>
+        <p className="text-center text-xs text-gris-500 mt-6">
+          Calculado con Karvonen (FC reserva) y Coggan (% FTP) sobre tus datos.
+          Editable bloque a bloque.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+interface ZoneRangeCardProps {
+  zone: 1 | 2 | 3 | 4 | 5 | 6;
+  zoneName: string;
+  duration: string;
+  bpm: string;
+  watts: string;
+  description: string;
+}
+
+function ZoneRangeCard({
+  zone,
+  zoneName,
+  duration,
+  bpm,
+  watts,
+  description,
+}: ZoneRangeCardProps): JSX.Element {
+  const ZONE_BG: Record<number, string> = {
+    1: 'bg-zone-1',
+    2: 'bg-zone-2',
+    3: 'bg-zone-3',
+    4: 'bg-zone-4',
+    5: 'bg-zone-5',
+    6: 'bg-zone-6',
+  };
+  const TEXT_ON_BG: Record<number, string> = {
+    1: 'text-white',
+    2: 'text-gris-900',
+    3: 'text-gris-900',
+    4: 'text-white',
+    5: 'text-white',
+    6: 'text-white',
+  };
+  const bg = ZONE_BG[zone] ?? 'bg-zone-3';
+  const txt = TEXT_ON_BG[zone] ?? 'text-white';
+  return (
+    <article className="bg-white border-2 border-gris-200 rounded-xl p-5 shadow-sm hover:border-turquesa-300 transition-colors">
+      <header className="flex items-center justify-between mb-3 gap-2">
+        <span
+          className={`flex items-center justify-center rounded-md ${bg} ${txt} px-2.5 py-1 font-bold text-sm`}
+        >
+          Z{zone}
+        </span>
+        <span className="text-xs font-semibold text-gris-500 uppercase tracking-wider">
+          {duration}
+        </span>
+      </header>
+      <h3 className="font-display text-gris-800 text-xl mb-3">{zoneName}</h3>
+      <ul className="space-y-1.5 mb-3 tabular-nums">
+        <li className="flex items-center gap-2 text-gris-700">
+          <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
+          <span className="font-semibold">{bpm}</span>
+          <span className="text-gris-500 text-sm">bpm</span>
+        </li>
+        <li className="flex items-center gap-2 text-gris-700">
+          <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
+          <span className="font-semibold">{watts}</span>
+          <span className="text-gris-500 text-sm">W</span>
+        </li>
+      </ul>
+      <p className="text-sm text-gris-600 leading-snug">{description}</p>
+    </article>
   );
 }
 
@@ -474,11 +739,19 @@ function Privacy(): JSX.Element {
 const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   {
     q: '¿Necesito conocer mi FTP?',
-    a: 'No. Si no tienes potenciómetro, basta con tu peso y tu frecuencia cardíaca máxima (medida o estimada por edad y sexo: Gulati en mujeres, Tanaka en hombres). Calculamos las zonas con la fórmula de Karvonen.',
+    a: 'No. Si no tienes potenciómetro, basta con tu peso y tu frecuencia cardíaca máxima (medida o estimada por edad y sexo: Gulati en mujeres, Tanaka en hombres). Calculamos las zonas con la fórmula de Karvonen. Si tienes FTP, las añadimos como rangos de vatios complementarios.',
   },
   {
     q: '¿Sirve para entrenamiento indoor (rodillo o bici estática)?',
     a: 'Sí. Además de procesar GPX outdoor, Cadencia tiene un constructor de sesiones indoor: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas (SIT, HIIT, Noruego 4×4) y la app te genera la playlist sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar.',
+  },
+  {
+    q: '¿Es compatible con Zwift, TrainerRoad o TrainingPeaks?',
+    a: 'Sí. Cadencia exporta tu sesión en formato .zwo (estándar abierto de workouts) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte un workout ya hecho y convertirlo en sesión con música sincronizada.',
+  },
+  {
+    q: '¿Puedo personalizar el catálogo de canciones?',
+    a: 'Sí. Durante el flujo puedes subir tus propios CSV exportados desde Spotify (o desde Exportify) y combinarlos con el catálogo nativo. Además hay un editor avanzado en la ruta /catalogo para depurar el catálogo nativo (BPM, energía, géneros) y descargar el resultado.',
   },
   {
     q: '¿Funciona sin Spotify Premium?',

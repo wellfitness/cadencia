@@ -56,19 +56,19 @@ test.describe('Cadencia - shell + paso Datos', () => {
     const stepper = page.getByRole('navigation', { name: /progreso del flujo/i });
     await expect(stepper).toBeVisible();
     await expect(stepper.getByText('Datos', { exact: true })).toBeVisible();
-    await expect(stepper.getByText('Ruta', { exact: true })).toBeVisible();
+    await expect(stepper.getByText('Plan', { exact: true })).toBeVisible();
     await expect(stepper.getByText('Música', { exact: true })).toBeVisible();
-    await expect(stepper.getByText('Resultado', { exact: true })).toBeVisible();
+    await expect(stepper.getByText('¡A pedalear!', { exact: true })).toBeVisible();
   });
 
   test('boton Siguiente deshabilitado sin datos', async ({ page }) => {
-    const submit = page.getByRole('button', { name: /siguiente: ruta/i }).first();
+    const submit = page.getByRole('button', { name: /siguiente: plan/i }).first();
     await expect(submit).toBeDisabled();
   });
 
   test('boton Siguiente se habilita con peso + FC valida', async ({ page }) => {
     await fillUserData(page);
-    const submit = page.getByRole('button', { name: /siguiente: ruta/i }).first();
+    const submit = page.getByRole('button', { name: /siguiente: plan/i }).first();
     await expect(submit).toBeEnabled();
   });
 
@@ -88,7 +88,7 @@ test.describe('Cadencia - paso Ruta', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await fillUserData(page);
-    await page.getByRole('button', { name: /siguiente: ruta/i }).first().click();
+    await page.getByRole('button', { name: /siguiente: plan/i }).first().click();
   });
 
   test('muestra dropzone tras navegar a Ruta', async ({ page }) => {
@@ -124,7 +124,7 @@ test.describe('Cadencia - paso Música', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await fillUserData(page);
-    await page.getByRole('button', { name: /siguiente: ruta/i }).first().click();
+    await page.getByRole('button', { name: /siguiente: plan/i }).first().click();
     await uploadGpx(page, buildSyntheticGpx());
     await page.getByRole('heading', { name: /perfil de la ruta/i }).waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /siguiente: música/i }).first().click();
@@ -152,16 +152,16 @@ test.describe('Cadencia - paso Música', () => {
   });
 });
 
-test.describe('Cadencia - paso Resultado', () => {
+test.describe('Cadencia - paso ¡A pedalear!', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await fillUserData(page);
-    await page.getByRole('button', { name: /siguiente: ruta/i }).first().click();
+    await page.getByRole('button', { name: /siguiente: plan/i }).first().click();
     await uploadGpx(page, buildSyntheticGpx());
     await page.getByRole('heading', { name: /perfil de la ruta/i }).waitFor({ timeout: 10_000 });
     await page.getByRole('button', { name: /siguiente: música/i }).first().click();
     await page.getByText(/temas para/i).first().waitFor({ timeout: 5_000 });
-    await page.getByRole('button', { name: /siguiente: resultado/i }).first().click();
+    await page.getByRole('button', { name: /siguiente: .a pedalear/i }).first().click();
   });
 
   test('muestra mensaje de Configura tu Client ID si no hay env var', async ({ page }) => {

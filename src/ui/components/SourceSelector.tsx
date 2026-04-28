@@ -7,7 +7,7 @@ export interface SourceSelectorProps {
 }
 
 /**
- * Pantalla inicial del paso "Ruta": el usuario elige si va a subir un GPX
+ * Pantalla inicial del paso "Plan": el usuario elige si va a subir un GPX
  * (ruta exterior) o construir una sesion indoor cycling. Ambas ramas
  * convergen luego en el mismo motor de matching.
  */

@@ -42,9 +42,9 @@ import {
 const STEPS: readonly StepperStep[] = [
   { label: 'Tipo', icon: 'tune' },
   { label: 'Datos', icon: 'person' },
-  { label: 'Ruta', icon: 'route' },
+  { label: 'Plan', icon: 'list_alt' },
   { label: 'Música', icon: 'music_note' },
-  { label: 'Resultado', icon: 'playlist_play' },
+  { label: '¡A pedalear!', icon: 'playlist_play' },
 ] as const;
 
 const STEP_TYPE = 0;
@@ -581,7 +581,7 @@ function NeedsRouteMessage({ onBack }: { onBack: () => void }): JSX.Element {
       <Card variant="info" title="Define tu ruta o sesión antes" titleIcon="warning">
         <p className="text-gris-700 mb-4">
           Para elegir la música necesitamos saber qué zonas tendrá tu entrenamiento.
-          Vuelve al paso de Ruta para subir un GPX o construir una sesión indoor.
+          Vuelve al paso de Plan para subir un GPX o construir una sesión indoor.
         </p>
         <button
           type="button"
@@ -589,7 +589,7 @@ function NeedsRouteMessage({ onBack }: { onBack: () => void }): JSX.Element {
           className="inline-flex items-center gap-2 text-turquesa-700 font-semibold hover:underline"
         >
           <MaterialIcon name="arrow_back" size="small" />
-          Volver al paso de Ruta
+          Volver al paso de Plan
         </button>
       </Card>
     </div>

@@ -336,7 +336,7 @@ export function MusicStep({
         </div>
         {list.length === 0 ? (
           <p className="text-sm text-gris-500 italic">
-            Sin temas que mostrar. Vuelve a Ruta para procesar un GPX.
+            Sin temas que mostrar. Vuelve a Plan para procesar un GPX.
           </p>
         ) : (
           <ul className="space-y-1.5 md:max-h-[55vh] md:overflow-y-auto md:pr-1">
@@ -475,7 +475,7 @@ function FooterActions({ onBack, onNext, canGoNext }: FooterActionsProps): JSX.E
             onClick={onNext}
             fullWidth
           >
-            Siguiente: Resultado
+            Siguiente: ¡A pedalear!
           </Button>
         </>
       }
@@ -490,7 +490,7 @@ function FooterActions({ onBack, onNext, canGoNext }: FooterActionsProps): JSX.E
             disabled={!canGoNext}
             onClick={onNext}
           >
-            Siguiente: Resultado
+            Siguiente: ¡A pedalear!
           </Button>
         </>
       }
