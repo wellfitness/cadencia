@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   calculateTotalDurationSec,
   expandSessionPlan,
@@ -21,6 +22,12 @@ export interface TemplateGalleryProps {
   activeTemplateId: string | null;
   onSelect: (template: SessionTemplate) => void;
   onStartFromScratch: () => void;
+  /**
+   * Importar un workout desde archivo .zwo (Zwift, TrainingPeaks Virtual,
+   * TrainerRoad, Wahoo SYSTM, MyWhoosh). Si se proporciona, aparece un
+   * tercer botón "Importar (.zwo)" en el header de la galería.
+   */
+  onImportFile?: (file: File) => void;
 }
 
 const TEMPLATE_ICONS: Record<string, string> = {
@@ -38,21 +45,60 @@ export function TemplateGallery({
   activeTemplateId,
   onSelect,
   onStartFromScratch,
+  onImportFile,
 }: TemplateGalleryProps): JSX.Element {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = (): void => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    if (file !== undefined && onImportFile !== undefined) {
+      onImportFile(file);
+    }
+    // Reset para permitir reimportar el mismo archivo
+    e.target.value = '';
+  };
+
   return (
     <div className="space-y-3">
-      <header className="flex items-baseline justify-between">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-base md:text-lg font-semibold text-gris-800 flex items-center gap-2">
           <MaterialIcon name="auto_awesome" size="small" className="text-turquesa-600" />
           Empieza con una plantilla
         </h3>
-        <button
-          type="button"
-          onClick={onStartFromScratch}
-          className="text-xs md:text-sm text-turquesa-700 hover:text-turquesa-800 hover:underline font-medium"
-        >
-          O empieza desde cero
-        </button>
+        <div className="flex items-center gap-3 text-xs md:text-sm">
+          <button
+            type="button"
+            onClick={onStartFromScratch}
+            className="text-turquesa-700 hover:text-turquesa-800 hover:underline font-medium"
+          >
+            O empieza desde cero
+          </button>
+          {onImportFile !== undefined && (
+            <>
+              <span className="text-gris-300" aria-hidden>·</span>
+              <button
+                type="button"
+                onClick={handleImportClick}
+                className="text-turquesa-700 hover:text-turquesa-800 hover:underline font-medium inline-flex items-center gap-1"
+              >
+                <MaterialIcon name="upload_file" size="small" />
+                Importar .zwo
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zwo,.xml,application/xml,text/xml"
+                onChange={handleFileChange}
+                className="hidden"
+                aria-label="Selecciona un archivo .zwo"
+              />
+            </>
+          )}
+        </div>
       </header>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
         {SESSION_TEMPLATES.map((template) => (

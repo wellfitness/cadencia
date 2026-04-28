@@ -70,7 +70,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 |---|---|---|---|
 | 0 | **Tipo** | `SourceTypeStep` | Elige modalidad: GPX outdoor o sesión indoor. |
 | 1 | **Datos** | `UserDataStep` | Recoge inputs fisiológicos. Validación **bifurcada por modo** (ver "Modelo de dominio"). |
-| 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según el modo elegido. | Outdoor: sube GPX y procesa segmentos. Indoor: construye sesión por bloques desde plantilla o desde cero; cada bloque muestra los rangos bpm/W del usuario para su zona. |
+| 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según el modo elegido. | Outdoor: sube GPX y procesa segmentos. Indoor: construye sesión por bloques desde plantilla, desde cero o **importando un .zwo** (Zwift Workout); cada bloque muestra los rangos bpm/W del usuario para su zona. Permite **descargar el plan como .zwo** para Zwift, TrainingPeaks Virtual, TrainerRoad, Wahoo SYSTM, MyWhoosh. |
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
@@ -101,6 +101,7 @@ src/
       validation.ts           # validateUserInputs(raw, currentYear, mode)
       storage.ts              # sessionStorage wrapper
     playlist/                 # Builders de nombre y descripción de la playlist Spotify
+    sessionFormats/           # Import/export de planes en formatos externos (zwo.ts → Zwift Workout)
 
   integrations/
     spotify/                  # OAuth PKCE + endpoints search/playlists/items

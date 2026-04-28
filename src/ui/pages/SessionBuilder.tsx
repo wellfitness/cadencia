@@ -14,6 +14,7 @@ import {
   type SessionItem,
   type SessionTemplate,
 } from '@core/segmentation';
+import { exportZwo, importZwo } from '@core/sessionFormats';
 import type { ValidatedUserInputs } from '@core/user/userInputs';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
@@ -53,6 +54,7 @@ interface BuilderState {
 
 type BuilderAction =
   | { type: 'loadTemplate'; template: SessionTemplate }
+  | { type: 'loadPlan'; plan: EditableSessionPlan }
   | { type: 'startFromScratch' }
   | { type: 'setItems'; items: SessionItem[] }
   | { type: 'addBlock' }
@@ -66,6 +68,17 @@ function reducer(state: BuilderState, action: BuilderAction): BuilderState {
       return {
         plan: { name: action.template.name, items },
         activeTemplateId: action.template.id,
+        nextId: state.nextId,
+      };
+    }
+    case 'loadPlan': {
+      // Clona el plan recibido (importado de archivo) por la misma razon
+      // que loadTemplate. activeTemplateId queda en null porque no
+      // corresponde a ninguna de las plantillas predefinidas.
+      const items: SessionItem[] = action.plan.items.map((it) => cloneItem(it));
+      return {
+        plan: { name: action.plan.name, items },
+        activeTemplateId: null,
         nextId: state.nextId,
       };
     }
@@ -125,6 +138,16 @@ function defaultName(): string {
 }
 
 /**
+ * Limpia caracteres problematicos para nombres de archivo (Windows/macOS).
+ * Espacios y acentos sí se aceptan; lo que se quita son separadores de ruta
+ * y caracteres reservados.
+ */
+function sanitizeFilename(name: string): string {
+  const trimmed = name.trim().replace(/[\\/:*?"<>|]/g, '');
+  return trimmed.length > 0 ? trimmed : 'workout';
+}
+
+/**
  * Constructor visual de sesiones indoor cycling. Permite cargar una de las
  * 4 plantillas o empezar desde cero, editar bloques y grupos × N, y al
  * pulsar "Continuar" convierte el plan editable en ClassifiedSegment[] +
@@ -150,6 +173,7 @@ export function SessionBuilder({
     }),
   );
   const [error, setError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
 
   // Notifica al padre cada cambio del plan (debounced en App via persistencia)
   const handleItemsChange = useCallback(
@@ -189,6 +213,49 @@ export function SessionBuilder({
     if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
     setError(null);
   }, [onActiveTemplateIdChange]);
+
+  // Import .zwo: lee el archivo, parsea, y carga el plan resultante. Avisos
+  // de error van a `setError`; un mensaje de exito breve a `importNotice`.
+  const handleImportZwo = useCallback(
+    (file: File): void => {
+      setError(null);
+      setImportNotice(null);
+      const reader = new FileReader();
+      reader.onload = (): void => {
+        const text = typeof reader.result === 'string' ? reader.result : '';
+        const result = importZwo(text);
+        if (!result.ok) {
+          setError(`No se pudo importar el archivo: ${result.error}`);
+          return;
+        }
+        dispatch({ type: 'loadPlan', plan: result.plan });
+        onChange(result.plan);
+        if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
+        setImportNotice(
+          `Workout "${result.plan.name}" importado. Revisa los bloques antes de continuar — ZWO no preserva si cada bloque era llano, escalada o sprint.`,
+        );
+      };
+      reader.onerror = (): void => {
+        setError('No se pudo leer el archivo.');
+      };
+      reader.readAsText(file);
+    },
+    [onChange, onActiveTemplateIdChange],
+  );
+
+  // Export .zwo: serializa el plan actual y dispara la descarga via Blob URL.
+  const handleExportZwo = useCallback((): void => {
+    const xml = exportZwo(state.plan);
+    const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = sanitizeFilename(state.plan.name) + '.zwo';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [state.plan]);
 
   const handleNameChange = useCallback(
     (name: string): void => {
@@ -256,7 +323,21 @@ export function SessionBuilder({
           activeTemplateId={state.activeTemplateId}
           onSelect={handleLoadTemplate}
           onStartFromScratch={handleStartFromScratch}
+          onImportFile={handleImportZwo}
         />
+        {importNotice !== null && (
+          <p
+            role="status"
+            className="mt-3 text-xs text-turquesa-800 bg-turquesa-50 border border-turquesa-200 rounded-md px-3 py-2 flex items-start gap-2"
+          >
+            <MaterialIcon
+              name="check_circle"
+              size="small"
+              className="text-turquesa-600 flex-shrink-0 mt-0.5"
+            />
+            <span>{importNotice}</span>
+          </p>
+        )}
       </Card>
 
       <Card title="Bloques de la sesión" titleIcon="view_list">
@@ -303,6 +384,8 @@ export function SessionBuilder({
         onBack={onBack}
         onContinue={handleContinue}
         canContinue={expandedBlocks.length > 0}
+        canExport={expandedBlocks.length > 0}
+        onExport={handleExportZwo}
       />
     </WizardStep>
   );
@@ -312,9 +395,17 @@ interface FooterActionsProps {
   onBack: () => void;
   onContinue: () => void;
   canContinue: boolean;
+  canExport: boolean;
+  onExport: () => void;
 }
 
-function FooterActions({ onBack, onContinue, canContinue }: FooterActionsProps): JSX.Element {
+function FooterActions({
+  onBack,
+  onContinue,
+  canContinue,
+  canExport,
+  onExport,
+}: FooterActionsProps): JSX.Element {
   return (
     <WizardStepFooter
       mobile={
@@ -322,6 +413,18 @@ function FooterActions({ onBack, onContinue, canContinue }: FooterActionsProps):
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {canExport && (
+            <Button
+              variant="critical"
+              size="sm"
+              iconLeft="download"
+              onClick={onExport}
+              aria-label="Descargar workout en formato .zwo"
+              title="Descargar para Zwift / TrainingPeaks Virtual / TrainerRoad / Wahoo SYSTM"
+            >
+              .zwo
+            </Button>
+          )}
           <Button
             variant="primary"
             iconRight="arrow_forward"
@@ -338,6 +441,16 @@ function FooterActions({ onBack, onContinue, canContinue }: FooterActionsProps):
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {canExport && (
+            <Button
+              variant="critical"
+              iconLeft="download"
+              onClick={onExport}
+              title="Descargar para Zwift / TrainingPeaks Virtual / TrainerRoad / Wahoo SYSTM"
+            >
+              Descargar .zwo
+            </Button>
+          )}
           <Button
             variant="primary"
             iconRight="arrow_forward"
