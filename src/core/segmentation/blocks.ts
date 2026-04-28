@@ -5,6 +5,7 @@ import { estimatePowerWatts } from '../power/equation';
 import { buildPowerConstants, type PowerConstants } from '../power/types';
 import type { ValidatedUserInputs } from '../user/userInputs';
 import { classifyZone } from './classifyZone';
+import { calculateNormalizedPower, type PowerSample } from './normalizedPower';
 import type { CadenceProfile } from './sessionPlan';
 import type { ClassifiedSegment, RouteMeta } from './types';
 
@@ -47,6 +48,7 @@ export function segmentInto60SecondBlocks(
 ): SegmentationResult {
   const distSegments = computeSegments(track);
   const blocks: ClassifiedSegment[] = [];
+  const powerSamples: PowerSample[] = [];
 
   let totalDistance = 0;
   let totalGain = 0;
@@ -106,6 +108,7 @@ export function segmentInto60SecondBlocks(
     }
 
     const power = estimatePowerWatts(ds, validated.weightKg, constants);
+    powerSamples.push({ powerWatts: power, durationSec: ds.durationSeconds });
     blockDuration += ds.durationSeconds;
     blockDistance += ds.distanceMeters;
     blockEnergyJoules += power * ds.durationSeconds;
@@ -129,14 +132,11 @@ export function segmentInto60SecondBlocks(
   const totalEnergy = blocks.reduce((acc, b) => acc + b.avgPowerWatts * b.durationSec, 0);
   const averagePower = totalDuration > 0 ? totalEnergy / totalDuration : 0;
 
-  // Normalized Power: NP = (sum(P^4 * dt) / totalDuration)^(1/4) sobre los bloques.
-  // Nota: Coggan original usa moving avg 30s, no bloques fijos. Esta es una
-  // aproximacion razonable para esta primera version.
-  const npNumerator = blocks.reduce(
-    (acc, b) => acc + Math.pow(b.avgPowerWatts, 4) * b.durationSec,
-    0,
-  );
-  const np = totalDuration > 0 ? Math.pow(npNumerator / totalDuration, 0.25) : 0;
+  // Normalized Power Coggan riguroso: rolling 30s sobre malla 1s a partir
+  // de la potencia por DistanceSegment (no por bloque de 60s) para preservar
+  // la información de micro-esfuerzos (sprints, repechos cortos) que el ^4
+  // amplifica. Ver ./normalizedPower.ts para el detalle del algoritmo.
+  const np = calculateNormalizedPower(powerSamples);
 
   const zoneDurations: Record<HeartRateZone, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
   for (const b of blocks) zoneDurations[b.zone] += b.durationSec;
