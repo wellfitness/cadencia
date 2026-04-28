@@ -70,7 +70,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 |---|---|---|---|
 | 0 | **Tipo** | `SourceTypeStep` | Elige modalidad: GPX outdoor o sesión indoor. |
 | 1 | **Datos** | `UserDataStep` | Recoge inputs fisiológicos. Validación **bifurcada por modo** (ver "Modelo de dominio"). |
-| 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según el modo elegido. | Outdoor: sube GPX y procesa segmentos. Indoor: construye sesión por bloques desde plantilla o desde cero. |
+| 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según el modo elegido. | Outdoor: sube GPX y procesa segmentos. Indoor: construye sesión por bloques desde plantilla o desde cero; cada bloque muestra los rangos bpm/W del usuario para su zona. |
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
@@ -134,12 +134,11 @@ src/
 
 ```
 Peso corporal (kg)               obligatorio en modo gpx; opcional en modo session (default 70)
-FTP en vatios (W)                opcional
-  └── Si no hay FTP:
-      FC máxima (bpm)            opcional
-      FC en reposo (bpm)         opcional (necesaria para Karvonen)
-      Año de nacimiento          obligatorio si no hay FC máx Y modo gpx
-      Sexo biológico             obligatorio si se estima FC máx por edad (gpx)
+FTP en vatios (W)                opcional (suma rangos de potencia al builder y al modo TV)
+FC máxima (bpm)                  obligatoria en session si no hay birthYear + sex
+FC en reposo (bpm)               opcional (necesaria para zonas Karvonen completas)
+Año de nacimiento                obligatorio en session si no hay FC máxima
+Sexo biológico                   obligatorio si se estima FC máxima por edad
 ```
 
 **Validación bifurcada por modo** (`src/core/user/validation.ts`):
@@ -147,10 +146,14 @@ FTP en vatios (W)                opcional
 | Campo | Modo `gpx` | Modo `session` |
 |---|---|---|
 | Peso | obligatorio (alimenta ecuación de potencia) | opcional, default 70 kg |
-| FTP / FC máx / FC reposo / año nac | uno mínimo (FTP, o FC máx, o birthYear) | todos opcionales (el usuario marca zonas a mano) |
-| Sexo biológico | obligatorio sii `birthYear && !maxHeartRate` (para elegir fórmula) | opcional; sin él, no se estima FC máx por edad |
+| FTP | opcional; junto con FC máx/birthYear, uno mínimo | opcional (suma rangos de vatios al builder y al modo TV) |
+| FC máx **o** (birthYear + sex) | uno mínimo si no hay FTP | **mínimo obligatorio** — sin esto, el modo TV no podría mostrar pulsaciones objetivo y el builder se quedaría sin guía de bpm por bloque |
+| FC reposo | opcional (necesaria para zonas Karvonen) | opcional (necesaria para zonas Karvonen) |
+| Sexo biológico | obligatorio sii `birthYear && !maxHeartRate` (para elegir fórmula) | obligatorio sii `birthYear && !maxHeartRate` (misma regla) |
 
-La pública objetivo prioritaria son **ciclistas con pulsómetro** (FC), no con potenciómetro (FTP). El UI prioriza inputs de FC; FTP es la excepción para usuarios avanzados.
+La pública objetivo prioritaria son **ciclistas con pulsómetro** (FC), no con potenciómetro (FTP). Por eso en `session` se exige FC al menos como dato derivable (FC máx o estimable por edad+sexo): sin ello, el `SessionBuilder` y el modo TV pierden la mitad de su valor (los rangos de pulsaciones por bloque). FTP es la excepción para usuarios avanzados con potenciómetro y suma rangos de vatios cuando se rellena.
+
+**Rangos por zona en el `SessionBuilder`**: cada bloque de la lista (y el editor inline al elegir zona) muestra los rangos bpm y vatios concretos del usuario para esa zona — ej. "Z3 → 138-148 bpm · 195-235 W". Los rangos se calculan una sola vez por sesión en `SessionBuilder` con `calculateKarvonenZones` + `calculatePowerZones` (ver `src/core/physiology/`) y viajan como `PhysioContext` (definido en `BlockList`) hasta cada `BlockRow` y `BlockEditor`. Helpers de formato compartidos en `src/ui/components/session-builder/zoneRangeFormat.ts`. La banda de FC se omite en Z6 (la FC se satura en máxima); la banda de vatios usa "<X W" para Z1 (abierta por debajo) y ">X W" para Z6 (abierta por arriba).
 
 ### FC máxima teórica (fórmulas por sexo biológico)
 

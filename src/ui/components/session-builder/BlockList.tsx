@@ -1,9 +1,21 @@
 import { useState, type DragEvent } from 'react';
+import type { KarvonenZoneRange, PowerZoneRange } from '@core/physiology';
 import type { CadenceProfile, SessionBlock, SessionItem } from '@core/segmentation';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
 import { BlockEditor } from './BlockEditor';
 import { RepeatGroup } from './RepeatGroup';
+import { formatBpmRange, formatWattsRange } from './zoneRangeFormat';
+
+/**
+ * Bandas de FC y vatios precalculadas a partir de los inputs validados del
+ * usuario. Cada slot es opcional: solo se rellena si el usuario tiene datos
+ * suficientes (Karvonen exige FC max + reposo; Coggan exige FTP).
+ */
+export interface PhysioContext {
+  karvonen: readonly KarvonenZoneRange[] | null;
+  power: readonly PowerZoneRange[] | null;
+}
 
 export interface BlockListProps {
   items: readonly SessionItem[];
@@ -12,6 +24,8 @@ export interface BlockListProps {
   onLoadSitTemplate?: () => void;
   /** CTA del empty state: empezar desde cero (anyade un bloque vacio). */
   onStartFromScratch?: () => void;
+  /** Bandas bpm/W del usuario. Si se pasan, cada bloque muestra el rango de su zona. */
+  physioContext?: PhysioContext;
 }
 
 const PHASE_ICONS: Record<string, string> = {
@@ -51,6 +65,7 @@ export function BlockList({
   onItemsChange,
   onLoadSitTemplate,
   onStartFromScratch,
+  physioContext,
 }: BlockListProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   // Drag&drop nativo: el indice arrastrado vive en estado para poder hacer
@@ -213,6 +228,7 @@ export function BlockList({
                   block={block}
                   onSave={handleSaveEdit(itemIndex, null)}
                   onCancel={() => setEditingKey(null)}
+                  {...(physioContext !== undefined ? { physioContext } : {})}
                 />
               </li>
             );
@@ -226,6 +242,7 @@ export function BlockList({
                 {...(canMoveUp ? { onMoveUp: () => moveItem(itemIndex, -1) } : {})}
                 {...(canMoveDown ? { onMoveDown: () => moveItem(itemIndex, 1) } : {})}
                 showDragHandle
+                {...(physioContext !== undefined ? { physioContext } : {})}
               />
             </li>
           );
@@ -274,6 +291,7 @@ export function BlockList({
                         block={block}
                         onSave={handleSaveEdit(itemIndex, blockIndex)}
                         onCancel={() => setEditingKey(null)}
+                        {...(physioContext !== undefined ? { physioContext } : {})}
                       />
                     );
                   }
@@ -284,6 +302,7 @@ export function BlockList({
                       onEdit={() => setEditingKey(editKey(itemIndex, block.id))}
                       onRemove={() => removeBlockFromGroup(itemIndex, blockIndex)}
                       compact
+                      {...(physioContext !== undefined ? { physioContext } : {})}
                     />
                   );
                 })}
@@ -305,6 +324,7 @@ interface BlockRowProps {
   compact?: boolean;
   /** Muestra el handle de drag (solo desktop, hover-visible). */
   showDragHandle?: boolean;
+  physioContext?: PhysioContext;
 }
 
 function BlockRow({
@@ -315,7 +335,11 @@ function BlockRow({
   onMoveDown,
   compact = false,
   showDragHandle = false,
+  physioContext,
 }: BlockRowProps): JSX.Element {
+  const bpm = formatBpmRange(block.zone, physioContext?.karvonen ?? null);
+  const watts = formatWattsRange(block.zone, physioContext?.power ?? null);
+  const hasRange = bpm !== null || watts !== null;
   return (
     <div
       className={`flex items-center gap-2 rounded-md border bg-white px-2.5 py-2 ${
@@ -372,6 +396,22 @@ function BlockRow({
           </span>
           <span className="text-xs text-gris-500">{PHASE_LABELS[block.phase] ?? block.phase}</span>
         </div>
+        {hasRange && (
+          <p className="text-xs text-gris-500 mt-0.5 flex items-center gap-2 flex-wrap tabular-nums">
+            {bpm !== null && (
+              <span className="inline-flex items-center gap-1">
+                <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
+                {bpm}
+              </span>
+            )}
+            {watts !== null && (
+              <span className="inline-flex items-center gap-1">
+                <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
+                {watts}
+              </span>
+            )}
+          </p>
+        )}
         {block.description !== undefined && (
           <p className="text-xs text-gris-500 italic truncate mt-0.5">{block.description}</p>
         )}

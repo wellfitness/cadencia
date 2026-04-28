@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useReducer, useState } from 'react';
+import { calculateKarvonenZones, calculatePowerZones } from '@core/physiology';
 import {
   buildSessionRouteMeta,
   calculateTotalDurationSec,
@@ -21,7 +22,7 @@ import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import { ZoneTimelineChart } from '@ui/components/ZoneTimelineChart';
-import { BlockList } from '@ui/components/session-builder/BlockList';
+import { BlockList, type PhysioContext } from '@ui/components/session-builder/BlockList';
 import { TemplateGallery } from '@ui/components/session-builder/TemplateGallery';
 
 export interface SessionBuilderProps {
@@ -201,6 +202,21 @@ export function SessionBuilder({
   const totalDurationSec = useMemo(() => calculateTotalDurationSec(state.plan), [state.plan]);
   const totalMinutes = Math.round(totalDurationSec / 60);
 
+  // Bandas Karvonen / Coggan derivadas de los inputs validados. Se calculan
+  // una sola vez por cambio en los datos del usuario y se propagan a cada
+  // BlockRow para que el usuario vea bpm/W concretos al construir la sesion.
+  const physioContext = useMemo<PhysioContext>(() => {
+    const karvonen =
+      validatedInputs.hasHeartRateZones &&
+      validatedInputs.effectiveMaxHr !== null &&
+      validatedInputs.restingHeartRate !== null
+        ? calculateKarvonenZones(validatedInputs.effectiveMaxHr, validatedInputs.restingHeartRate)
+        : null;
+    const power =
+      validatedInputs.ftpWatts !== null ? calculatePowerZones(validatedInputs.ftpWatts) : null;
+    return { karvonen, power };
+  }, [validatedInputs]);
+
   const handleContinue = useCallback((): void => {
     const validation = validateSessionPlan(state.plan);
     if (!validation.ok) {
@@ -263,6 +279,7 @@ export function SessionBuilder({
             if (sit !== undefined) handleLoadTemplate(sit);
           }}
           onStartFromScratch={handleAddBlock}
+          physioContext={physioContext}
         />
 
         {error !== null && (

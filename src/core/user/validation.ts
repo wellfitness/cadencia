@@ -13,6 +13,7 @@ export type ValidationError =
   | { code: 'WEIGHT_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'FTP_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'NEED_FTP_OR_HR_DATA' }
+  | { code: 'NEED_HR_DATA' }
   | { code: 'BIRTH_YEAR_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'MAX_HR_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'RESTING_HR_OUT_OF_RANGE'; min: number; max: number }
@@ -32,9 +33,10 @@ export type ValidationResult =
  *   de potencia GPX), zonas requieren FTP o FC o birthYear. Bici relevante.
  * - 'session': el usuario construye bloques manualmente y elige la zona de
  *   cada uno, asi que el peso/bici no son load-bearing y pueden quedar
- *   vacios. Si no hay FTP/FC/birthYear, las zonas siguen siendo elegibles
- *   por el usuario y solo perdemos la estimacion de potencia (cosmetica)
- *   y los BPM esperados por zona en el modo TV. Todo opcional.
+ *   vacios. EXIGE minimo FC maxima O (birthYear + sex) para que el modo TV
+ *   pueda mostrar pulsaciones objetivo en cada bloque; sin ese dato la
+ *   experiencia se queda muda y el usuario no sabria a que ritmo pedalear.
+ *   FTP, FC reposo, peso y bici siguen siendo opcionales.
  */
 export type ValidationMode = 'gpx' | 'session';
 
@@ -269,12 +271,21 @@ function validateSession(raw: UserInputsRaw, currentYear: number): ValidationRes
     });
   }
 
+  // Minimo de FC: el modo TV necesita poder mostrar pulsaciones objetivo
+  // por bloque. Aceptamos FC max directa o (birthYear + sex) para estimarla
+  // por edad. Sin esto, el usuario llegaria al modo TV sin guia de ritmo.
+  const hasMaxHr = raw.maxHeartRate !== null;
+  const canEstimateMaxHr = raw.birthYear !== null && raw.sex !== null;
+  if (!hasMaxHr && !canEstimateMaxHr) {
+    errors.push({ code: 'NEED_HR_DATA' });
+  }
+
   if (errors.length > 0) {
     return { ok: false, errors };
   }
 
-  // Calcular FC max efectiva. Si el usuario dio birthYear pero no sex, no
-  // podemos estimar desde edad (fail open: ya esta todo opcional en session).
+  // Calcular FC max efectiva. Tras el check anterior, hasMaxHr ||
+  // canEstimateMaxHr esta garantizado, asi que effectiveMaxHr nunca queda null.
   let effectiveMaxHr: number | null = null;
   if (raw.maxHeartRate !== null) {
     effectiveMaxHr = raw.maxHeartRate;
@@ -328,6 +339,8 @@ export function describeValidationError(err: ValidationError): string {
       return `La FTP debe estar entre ${err.min} y ${err.max} W.`;
     case 'NEED_FTP_OR_HR_DATA':
       return 'Necesitamos tu FTP o, en su defecto, tu FC máxima o tu año de nacimiento.';
+    case 'NEED_HR_DATA':
+      return 'Necesitamos tu FC máxima — o tu año de nacimiento y sexo, y la estimamos.';
     case 'BIRTH_YEAR_OUT_OF_RANGE':
       return `El año de nacimiento debe estar entre ${err.min} y ${err.max}.`;
     case 'MAX_HR_OUT_OF_RANGE':

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { HeartRateZone } from '@core/physiology/karvonen';
+import type { HeartRateZone } from '@core/physiology';
 import { getZoneCriteria } from '@core/matching';
 import {
   defaultCadenceProfile,
@@ -13,11 +13,15 @@ import {
 import { Button } from '../Button';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
+import type { PhysioContext } from './BlockList';
+import { formatBpmRange, formatWattsRange } from './zoneRangeFormat';
 
 export interface BlockEditorProps {
   block: SessionBlock;
   onSave: (block: SessionBlock) => void;
   onCancel: () => void;
+  /** Bandas bpm/W del usuario; si se pasan, se muestran junto a la zona seleccionada. */
+  physioContext?: PhysioContext;
 }
 
 const PHASE_LABELS: Record<Phase, string> = {
@@ -61,7 +65,7 @@ const PROFILE_LABELS: Record<CadenceProfile, string> = {
  * El editor mantiene su propio state para que el usuario pueda cancelar
  * sin perder el bloque original.
  */
-export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.Element {
+export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEditorProps): JSX.Element {
   const [phase, setPhase] = useState<Phase>(block.phase);
   const [zone, setZone] = useState<HeartRateZone>(block.zone);
   const [cadenceProfile, setCadenceProfile] = useState<CadenceProfile>(
@@ -89,6 +93,9 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
 
   const criteria = getZoneCriteria(zone, cadenceProfile);
   const cadenceHint = `${criteria.cadenceMin}-${criteria.cadenceMax} rpm`;
+
+  const bpmHint = formatBpmRange(zone, physioContext?.karvonen ?? null);
+  const wattsHint = formatWattsRange(zone, physioContext?.power ?? null);
 
   const totalSec = Math.max(1, minutes * 60 + seconds);
   const isValid = totalSec > 0;
@@ -139,6 +146,22 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
               </option>
             ))}
           </select>
+          {(bpmHint !== null || wattsHint !== null) && (
+            <p className="text-xs text-gris-500 mt-1 flex items-center gap-2 flex-wrap tabular-nums">
+              {bpmHint !== null && (
+                <span className="inline-flex items-center gap-1">
+                  <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
+                  {bpmHint}
+                </span>
+              )}
+              {wattsHint !== null && (
+                <span className="inline-flex items-center gap-1">
+                  <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
+                  {wattsHint}
+                </span>
+              )}
+            </p>
+          )}
         </label>
       </div>
 

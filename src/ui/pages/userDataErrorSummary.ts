@@ -15,6 +15,7 @@ const ERROR_FIELD_LABEL: Record<ValidationError['code'], string> = {
   BIRTH_YEAR_OUT_OF_RANGE: 'año de nacimiento',
   SEX_REQUIRED: 'sexo biológico',
   NEED_FTP_OR_HR_DATA: 'FC máxima o año de nacimiento',
+  NEED_HR_DATA: 'frecuencia cardíaca',
   BIKE_WEIGHT_OUT_OF_RANGE: 'peso de la bici',
   BIKE_TYPE_INVALID: 'tipo de bici',
 };

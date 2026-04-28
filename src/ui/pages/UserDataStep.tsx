@@ -69,7 +69,7 @@ export function UserDataStep({
   // P3: copy reescrito.
   const subtitle =
     mode === 'session'
-      ? 'Solo lo imprescindible para calcular tus zonas. Todo es opcional.'
+      ? 'Necesitamos tu FC máxima — o tu año de nacimiento y sexo, y la estimamos. Con eso te guiamos en pulsaciones y vatios durante el modo TV.'
       : 'Necesitamos tu peso. Para tus zonas vale tu FC, tu FTP o tu año de nacimiento — lo que tengas.';
 
   // Resumen de errores para aria-live (P2). Solo se calcula cuando hay errores
@@ -84,11 +84,7 @@ export function UserDataStep({
 
   return (
     <WizardStep>
-      <WizardStepHeading
-        title="Tus datos"
-        subtitle={subtitle}
-        {...(mode === 'session' ? { badge: 'Opcional' } : {})}
-      />
+      <WizardStepHeading title="Tus datos" subtitle={subtitle} />
 
       {/* P2: anuncio aria-live de errores agregados tras intento de submit. */}
       {showAllErrors && !validation.ok && errorSummary !== '' && (

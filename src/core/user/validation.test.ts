@@ -316,28 +316,57 @@ describe('validateUserInputs', () => {
   });
 
   describe("modo 'session' (sesion indoor)", () => {
-    it('sin ningun dato fisiologico es valido (peso default 70)', () => {
+    it('sin ningun dato fisiologico falla con NEED_HR_DATA (modo TV necesita FC)', () => {
       const result = validateUserInputs(buildRaw({}), CURRENT_YEAR, 'session');
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'NEED_HR_DATA')).toBe(true);
+      }
+    });
+
+    it('FC max sola (sin reposo, sin birthYear) es valida', () => {
+      const result = validateUserInputs(
+        buildRaw({ maxHeartRate: 185 }),
+        CURRENT_YEAR,
+        'session',
+      );
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.data.weightKg).toBe(70);
-        expect(result.data.hasFtp).toBe(false);
-        expect(result.data.hasHeartRateZones).toBe(false);
-        expect(result.data.effectiveMaxHr).toBeNull();
+        expect(result.data.effectiveMaxHr).toBe(185);
+        expect(result.data.hasHeartRateZones).toBe(false); // sin reposo no hay Karvonen
       }
     });
 
     it('peso opcional pero validado si se rellena', () => {
+      // weightKg: 5 -> WEIGHT_OUT_OF_RANGE (independiente del check de FC)
       const tooLow = validateUserInputs(buildRaw({ weightKg: 5 }), CURRENT_YEAR, 'session');
       expect(tooLow.ok).toBe(false);
-      const valid = validateUserInputs(buildRaw({ weightKg: 80 }), CURRENT_YEAR, 'session');
+      // weightKg: 80 + FC max -> valido
+      const valid = validateUserInputs(
+        buildRaw({ weightKg: 80, maxHeartRate: 185 }),
+        CURRENT_YEAR,
+        'session',
+      );
       expect(valid.ok).toBe(true);
       if (valid.ok) expect(valid.data.weightKg).toBe(80);
     });
 
-    it('FTP opcional pero validado si se rellena', () => {
+    it('FTP solo (sin FC) NO desbloquea: en session el modo TV necesita FC', () => {
       const result = validateUserInputs(
         buildRaw({ ftpWatts: 220 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'NEED_HR_DATA')).toBe(true);
+      }
+    });
+
+    it('FTP + FC max es valido (FTP es complementario, no sustituye FC)', () => {
+      const result = validateUserInputs(
+        buildRaw({ ftpWatts: 220, maxHeartRate: 185 }),
         CURRENT_YEAR,
         'session',
       );
@@ -345,6 +374,7 @@ describe('validateUserInputs', () => {
       if (result.ok) {
         expect(result.data.ftpWatts).toBe(220);
         expect(result.data.hasFtp).toBe(true);
+        expect(result.data.effectiveMaxHr).toBe(185);
       }
     });
 
@@ -375,11 +405,19 @@ describe('validateUserInputs', () => {
       }
     });
 
-    it('NO exige FTP/FC/birthYear (a diferencia de modo gpx)', () => {
+    it('exige FC max o (birthYear + sex) — distinto de gpx que tambien acepta FTP solo', () => {
       const session = validateUserInputs(buildRaw({}), CURRENT_YEAR, 'session');
       const gpx = validateUserInputs(buildRaw({}), CURRENT_YEAR);
-      expect(session.ok).toBe(true);
+      expect(session.ok).toBe(false);
       expect(gpx.ok).toBe(false);
+      // En gpx, FTP solo desbloquea (sin peso seguiria fallando, pero ese
+      // es otro error distinto). En session, FTP solo NO basta.
+      const sessionWithFtp = validateUserInputs(
+        buildRaw({ ftpWatts: 220 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(sessionWithFtp.ok).toBe(false);
     });
 
     it('birthYear + sex calcula effectiveMaxHr (Gulati / Tanaka)', () => {
@@ -400,16 +438,15 @@ describe('validateUserInputs', () => {
       if (male.ok) expect(male.data.effectiveMaxHr).toBeCloseTo(175.8, 2);
     });
 
-    it('birthYear sin sex en session NO dispara SEX_REQUIRED (todo opcional)', () => {
+    it('birthYear sin sex en session falla con NEED_HR_DATA (no podemos estimar FC max)', () => {
       const result = validateUserInputs(
         buildRaw({ birthYear: 1980 }),
         CURRENT_YEAR,
         'session',
       );
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        // Sin sex no podemos estimar; effectiveMaxHr queda null.
-        expect(result.data.effectiveMaxHr).toBeNull();
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'NEED_HR_DATA')).toBe(true);
       }
     });
   });
