@@ -17,8 +17,14 @@ import type { ZoneMusicCriteria } from './types';
  *
  * Rangos definidos por el curso de ciclo indoor del usuario:
  *   - flat:   70-90 rpm (1:1) o 140-180 BPM (2:1)
- *   - climb:  60-80 rpm (1:1) o 120-160 BPM (2:1)
- *   - sprint: 90-110 rpm (1:1) o 180-220 BPM (2:1)
+ *   - climb:  55-80 rpm (1:1) o 110-160 BPM (2:1)
+ *   - sprint: 90-115 rpm (1:1) o 180-230 BPM (2:1)
+ *
+ * Los rangos de climb (extendido a 55) y sprint (extendido a 115) cubren la
+ * "zona muerta" pop 110-120 BPM donde se concentra mucho rock y dance clasico
+ * (Bowie, Zeppelin, Hendrix, Queen, MJ...). 55 rpm en climb es valido para
+ * fuerza pura en muros (Z5), y 115 rpm en sprint sigue siendo cadencia muy
+ * alta pero alcanzable en Z6 supramaximo de pocos segundos.
  *
  * Refs PubMed:
  *   - Dunst et al. 2024 (10.3389/fphys.2024.1343601): cadencia optima por
@@ -28,8 +34,8 @@ import type { ZoneMusicCriteria } from './types';
  */
 const CADENCE_BY_PROFILE: Record<CadenceProfile, { min: number; max: number }> = {
   flat: { min: 70, max: 90 },
-  climb: { min: 60, max: 80 },
-  sprint: { min: 90, max: 110 },
+  climb: { min: 55, max: 80 },
+  sprint: { min: 90, max: 115 },
 };
 
 /**

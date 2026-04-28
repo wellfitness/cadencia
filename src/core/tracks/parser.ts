@@ -58,6 +58,8 @@ interface ColumnIndices {
   valence: number;
   tempo: number;
   durationMs: number;
+  /** Opcional: solo presente en el catalogo nativo unificado (all.csv). */
+  source: number;
 }
 
 function buildColumnIndices(header: string[]): ColumnIndices {
@@ -68,6 +70,8 @@ function buildColumnIndices(header: string[]): ColumnIndices {
     }
     return idx;
   };
+  const findOptional = (name: string): number =>
+    header.findIndex((h) => h.trim() === name);
   return {
     uri: find('Track URI'),
     name: find('Track Name'),
@@ -79,6 +83,7 @@ function buildColumnIndices(header: string[]): ColumnIndices {
     valence: find('Valence'),
     tempo: find('Tempo'),
     durationMs: find('Duration (ms)'),
+    source: findOptional('Source'),
   };
 }
 
@@ -105,10 +110,17 @@ function normalizeArtists(raw: string): string[] {
 
 /**
  * Parsea un CSV de tracks de Spotify a Track[].
- * Salta filas con datos criticos invalidos (URI vacio, tempo no numerico)
- * con un warning en dev. No lanza por filas individuales.
+ *
+ * `source` es opcional:
+ *   - Si el CSV tiene columna 'Source' (caso del catalogo nativo unificado
+ *     `all.csv`), cada track usa el valor de esa columna.
+ *   - Si no, se usa el override pasado como argumento (ej. 'user' para CSVs
+ *     subidos en runtime). Si tampoco se pasa, queda vacio.
+ *
+ * Salta filas con datos criticos invalidos (URI vacio, tempo no numerico).
+ * No lanza por filas individuales.
  */
-export function parseTrackCsv(csv: string, source: TrackSource): Track[] {
+export function parseTrackCsv(csv: string, source: TrackSource = ''): Track[] {
   const lines = csv.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (lines.length < 2) return [];
   const headerLine = lines[0];
@@ -135,6 +147,8 @@ export function parseTrackCsv(csv: string, source: TrackSource): Track[] {
     const valence = Number(fields[cols.valence]?.trim() ?? '');
     const danceability = Number(fields[cols.danceability]?.trim() ?? '');
     const durationMs = Number(fields[cols.durationMs]?.trim() ?? '');
+    const rowSource =
+      cols.source >= 0 ? (fields[cols.source]?.trim() ?? source) : source;
 
     out.push({
       uri,
@@ -147,7 +161,7 @@ export function parseTrackCsv(csv: string, source: TrackSource): Track[] {
       valence: Number.isFinite(valence) ? valence : 0,
       danceability: Number.isFinite(danceability) ? danceability : 0,
       durationMs: Number.isFinite(durationMs) ? durationMs : 0,
-      source,
+      source: rowSource,
     });
   }
 

@@ -35,12 +35,13 @@ describe('dedupeByUri', () => {
   });
 });
 
-describe('loadNativeTracks (CSVs reales bundled)', () => {
-  it('carga al menos 100 tracks unicos tras dedupe', () => {
-    // En el catalogo real, trainingpeaks_virtual es subconjunto de cinelli_rider
-    // y mix_alegre es independiente. Total esperado tras dedup ~140 tracks.
+describe('loadNativeTracks (catalogo unificado bundled)', () => {
+  it('carga al menos 500 tracks unicos', () => {
+    // El catalogo unificado (src/data/tracks/all.csv) se construye con
+    // scripts/build-tracks.mjs a partir de las listas en sources/. Con las
+    // listas actuales son ~800 tracks tras dedup y descarte de huerfanos.
     const tracks = loadNativeTracks();
-    expect(tracks.length).toBeGreaterThan(100);
+    expect(tracks.length).toBeGreaterThan(500);
   });
 
   it('todas las URIs son unicas (dedup correcto)', () => {
@@ -49,19 +50,39 @@ describe('loadNativeTracks (CSVs reales bundled)', () => {
     expect(new Set(uris).size).toBe(uris.length);
   });
 
-  it('hay tracks de al menos cinelli_rider y mix_alegre', () => {
-    const tracks = loadNativeTracks();
-    const sources = new Set(tracks.map((t) => t.source));
-    expect(sources.has('cinelli_rider')).toBe(true);
-    expect(sources.has('mix_alegre')).toBe(true);
-  });
-
   it('los tracks tienen tempo > 0 y energy en [0,1]', () => {
     const tracks = loadNativeTracks();
     for (const t of tracks) {
       expect(t.tempoBpm).toBeGreaterThan(0);
       expect(t.energy).toBeGreaterThanOrEqual(0);
       expect(t.energy).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('source de cada track refleja su CSV de origen (no vacio)', () => {
+    const tracks = loadNativeTracks();
+    const sources = new Set(tracks.map((t) => t.source));
+    expect(sources.size).toBeGreaterThan(1);
+    for (const t of tracks) {
+      expect(t.source).not.toBe('');
+    }
+  });
+
+  it('todos los tracks encajan en al menos una cadencia (huerfanos descartados)', () => {
+    // El script build-tracks.mjs filtra los tracks fuera de los rangos:
+    //  60-80 ∪ 70-90 ∪ 90-115 ∪ 110-160 ∪ 140-180 ∪ 180-230 BPM.
+    const tracks = loadNativeTracks();
+    const ranges: [number, number][] = [
+      [60, 80],
+      [70, 90],
+      [90, 115],
+      [110, 160],
+      [140, 180],
+      [180, 230],
+    ];
+    for (const t of tracks) {
+      const fits = ranges.some(([lo, hi]) => t.tempoBpm >= lo && t.tempoBpm <= hi);
+      expect(fits, `${t.name} (${t.tempoBpm} BPM) deberia encajar`).toBe(true);
     }
   });
 });

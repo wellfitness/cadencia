@@ -19,6 +19,7 @@
     "test:e2e:install": "playwright install --with-deps",
     "deploy": "bash scripts/deploy.sh",
     "deploy:full": "pnpm build && bash scripts/deploy.sh",
+    "build:tracks": "node scripts/build-tracks.mjs",
     "prepare": "husky"
   },
   "dependencies": {

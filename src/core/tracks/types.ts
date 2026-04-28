@@ -1,11 +1,9 @@
 /**
- * Origen del track. 'user' queda reservado para uploads en runtime (fase 5).
+ * Origen del track. En el catalogo nativo unificado, refleja el nombre del
+ * CSV de procedencia (informativo). En tracks subidos por el usuario en
+ * runtime se usa la cadena 'user'.
  */
-export type TrackSource =
-  | 'cinelli_rider'
-  | 'mix_alegre'
-  | 'trainingpeaks_virtual'
-  | 'user';
+export type TrackSource = string;
 
 /**
  * Track tal y como lo consume el motor de matching. Mantiene solo los campos

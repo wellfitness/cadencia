@@ -18,29 +18,29 @@ describe('getZoneCriteria — cadencia (excluyente) + ideales energy/valence (in
     expect(z2.energyIdeal).toBe(0.55);
   });
 
-  it('Z3 flat / climb: cadencia distinta segun profile (flat 70-90 vs climb 60-80)', () => {
+  it('Z3 flat / climb: cadencia distinta segun profile (flat 70-90 vs climb 55-80)', () => {
     const flat = getZoneCriteria(3, 'flat');
     const climb = getZoneCriteria(3, 'climb');
     expect(flat.cadenceMin).toBe(70);
     expect(flat.cadenceMax).toBe(90);
-    expect(climb.cadenceMin).toBe(60);
+    expect(climb.cadenceMin).toBe(55);
     expect(climb.cadenceMax).toBe(80);
     // Misma zona = mismos ideales (lo que cambia es la cadencia).
     expect(flat.energyIdeal).toBe(climb.energyIdeal);
     expect(flat.valenceIdeal).toBe(climb.valenceIdeal);
   });
 
-  it('Z5 climb: cadencia 60-80, energy ideal 0.90', () => {
+  it('Z5 climb: cadencia 55-80, energy ideal 0.90', () => {
     const c = getZoneCriteria(5, 'climb');
-    expect(c.cadenceMin).toBe(60);
+    expect(c.cadenceMin).toBe(55);
     expect(c.cadenceMax).toBe(80);
     expect(c.energyIdeal).toBe(0.9);
   });
 
-  it('Z6 sprint: cadencia 90-110 (exclusiva), energy ideal 0.95', () => {
+  it('Z6 sprint: cadencia 90-115 (exclusiva), energy ideal 0.95', () => {
     const c = getZoneCriteria(6, 'sprint');
     expect(c.cadenceMin).toBe(90);
-    expect(c.cadenceMax).toBe(110);
+    expect(c.cadenceMax).toBe(115);
     expect(c.energyIdeal).toBe(0.95);
   });
 
@@ -61,7 +61,7 @@ describe('getZoneCriteria — cadencia (excluyente) + ideales energy/valence (in
   it('combinacion invalida (Z5 + flat) cae al default climb', () => {
     const c = getZoneCriteria(5, 'flat');
     expect(c.cadenceProfile).toBe('climb');
-    expect(c.cadenceMin).toBe(60);
+    expect(c.cadenceMin).toBe(55);
   });
 
   it('combinacion invalida (Z6 + flat) cae al default sprint', () => {
