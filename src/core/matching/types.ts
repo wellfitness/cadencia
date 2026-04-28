@@ -11,6 +11,16 @@ export interface MatchPreferences {
   preferredGenres: string[];
   /** True = sube Energy minima a 0.70 incluso en zonas suaves (Z1-Z2). */
   allEnergetic: boolean;
+  /**
+   * Semilla aleatoria entera. Si está definida, el motor introduce variedad
+   * controlada eligiendo entre los top-K candidatos de cada slot con
+   * probabilidad ponderada por score (siempre buena calidad, distinta
+   * cada vez que cambia la semilla). Si está `undefined`, comportamiento
+   * legacy 100% determinista (siempre el #1 del ranking).
+   *
+   * Misma semilla + mismo input → siempre misma playlist (reproducible).
+   */
+  seed?: number;
 }
 
 export const EMPTY_PREFERENCES: MatchPreferences = {

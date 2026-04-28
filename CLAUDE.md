@@ -300,7 +300,7 @@ Para cada segmento `(zona, profile, duración)`:
 
 **Banner "Encaje libre" global** (`@ui/components/BestEffortBanner`): en `MusicStep` y `ResultStep`, si la playlist tiene ≥1 segmento con `matchQuality === 'best-effort'`, se muestra un banner dorado explicando el concepto y recomendando subir más listas. Reemplaza al chip pequeño que antes pasaba desapercibido.
 
-**Determinista**: misma entrada → misma salida. Si se introduce aleatoriedad para variedad, debe ser con semilla fija configurable.
+**Determinista dada una semilla**: misma entrada `(segments, tracks, preferences, seed)` → misma salida. El motor admite variedad controlada vía `MatchPreferences.seed` (entero 32 bits): cuando está definida, en cada slot strict se hace **weighted sampling entre los top-K=5** candidatos del ranking de cadencia (PRNG mulberry32 con sub-semilla `hashSeed(seed, slotIndex)` por tramo, asegurando reproducibilidad por slot). Cuando es `undefined`, comportamiento legacy 100% determinista (top-1). La UI auto-genera una semilla en el primer mount y la persiste con el resto de `musicPreferences` en `sessionStorage`, así el callback OAuth de Spotify regenera la misma playlist. El botón "🎲 Regenerar lista" en `ResultStep` cambia la semilla y dispara un rematch — pensado para sesiones recurrentes (Noruego 4×4 cada martes con música distinta sin perder calidad). Las alternativas del dropdown "Otro tema" siguen siendo deterministas: el usuario espera ver las MEJORES, no más variedad ahí.
 
 **Referencias bibliográficas (PubMed):**
 - Dunst et al. 2024, *Frontiers in Physiology*: cadencia óptima por umbral metabólico — LT1 66 rpm, MLSS 82 rpm, VO₂max 84 rpm, sprint sin fatiga 135 rpm. [DOI: 10.3389/fphys.2024.1343601](https://doi.org/10.3389/fphys.2024.1343601)

@@ -78,6 +78,12 @@ export interface ResultStepProps {
   onGoToDataStep?: () => void;
   /** Vuelve al paso «Música» para subir mas listas o ajustar preferencias. */
   onGoToMusicStep?: () => void;
+  /**
+   * Genera una nueva semilla aleatoria → recalcula la playlist con la misma
+   * ruta/sesión y catálogo pero con elecciones de tracks distintas (entre
+   * los top-K de cada slot). Pensado para variedad en sesiones recurrentes.
+   */
+  onRegenerateSeed?: () => void;
   /** Modo de matching: overlap (GPX, default) o discrete (sesion indoor). */
   crossZoneMode?: CrossZoneMode;
 }
@@ -102,6 +108,7 @@ export function ResultStep({
   onResetWizard,
   onGoToDataStep,
   onGoToMusicStep,
+  onRegenerateSeed,
   crossZoneMode = 'overlap',
 }: ResultStepProps): JSX.Element {
   void validation;
@@ -337,8 +344,21 @@ export function ResultStep({
         )}
       </Card>
 
-      {(onGoToDataStep !== undefined || onGoToMusicStep !== undefined) && (
+      {(onGoToDataStep !== undefined ||
+        onGoToMusicStep !== undefined ||
+        onRegenerateSeed !== undefined) && (
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {onRegenerateSeed !== undefined && (
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="casino"
+              onClick={onRegenerateSeed}
+              title="Genera una playlist nueva con la misma ruta y catálogo, eligiendo tracks distintos entre los mejores candidatos de cada tramo."
+            >
+              Regenerar lista
+            </Button>
+          )}
           {onGoToDataStep !== undefined && (
             <Button variant="secondary" size="sm" iconLeft="tune" onClick={onGoToDataStep}>
               Ajustar mis datos

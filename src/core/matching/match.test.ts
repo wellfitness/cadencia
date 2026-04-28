@@ -402,4 +402,48 @@ describe('matchTracksToSegments', () => {
       expect(withDefault).toEqual(withOverlap);
     });
   });
+
+  describe('seeded variety (preferences.seed)', () => {
+    function uris(matched: ReturnType<typeof matchTracksToSegments>): string[] {
+      return matched.map((m) => m.track?.uri ?? '<null>');
+    }
+
+    function manyZ3Tracks(n: number): Track[] {
+      // Tracks de 30 s -> cada track ocupa un slot, sin overlap. BPM 80-95
+      // (cadencia Z3 flat). Energy/valence variando para que los scores
+      // difieran y el sampling tenga peso real.
+      return Array.from({ length: n }, (_, i) =>
+        track({
+          tempoBpm: 80 + (i % 16),
+          energy: 0.6 + (i % 10) * 0.03,
+          valence: 0.5 + (i % 7) * 0.05,
+          durationMs: 30_000,
+        }),
+      );
+    }
+
+    it('reproducible: misma seed + mismo input -> misma playlist', () => {
+      const tracks = manyZ3Tracks(40);
+      const segments = Array.from({ length: 12 }, () => segment(3));
+      const prefs: MatchPreferences = { ...EMPTY_PREFERENCES, seed: 42 };
+      const a = matchTracksToSegments(segments, tracks, prefs);
+      const b = matchTracksToSegments(segments, tracks, prefs);
+      expect(uris(a)).toEqual(uris(b));
+    });
+
+    it('seeds distintas -> al menos un slot distinto con catalogo abundante', () => {
+      const tracks = manyZ3Tracks(40);
+      const segments = Array.from({ length: 12 }, () => segment(3));
+      const a = matchTracksToSegments(segments, tracks, {
+        ...EMPTY_PREFERENCES,
+        seed: 42,
+      });
+      const b = matchTracksToSegments(segments, tracks, {
+        ...EMPTY_PREFERENCES,
+        seed: 43,
+      });
+      expect(uris(a)).not.toEqual(uris(b));
+    });
+
+  });
 });

@@ -1,9 +1,13 @@
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
 import { findCandidates } from './candidates';
+import { hashSeed, mulberry32, pickWeightedFromTopK } from './random';
 import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment, ZoneMusicCriteria } from './types';
 import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
+
+/** Tamaño del top-K para el sampling ponderado cuando hay seed. */
+const RANDOM_TOP_K = 5;
 
 /**
  * Modo de asignacion de tracks frente a la estructura de zonas:
@@ -52,11 +56,24 @@ function chooseTrack(
   preferredGenres: readonly string[],
   allTracks: readonly Track[],
   used: ReadonlySet<string>,
+  seed: number | undefined,
+  slotIndex: number,
 ): ChoiceResult | null {
   // 1. Strict: cadencia OK + no usado.
-  const fresh = scoredCadenceCandidates.find((c) => !used.has(c.track.uri));
-  if (fresh) {
-    return { track: fresh.track, score: fresh.score, quality: cadenceQuality };
+  //    - Sin seed: el primero (top-1) del ranking, comportamiento legacy.
+  //    - Con seed: weighted sampling entre los top-K frescos. Misma semilla
+  //      reproduce la misma eleccion gracias a hashSeed(seed, slotIndex).
+  const freshCandidates = scoredCadenceCandidates.filter((c) => !used.has(c.track.uri));
+  if (freshCandidates.length > 0) {
+    if (seed === undefined) {
+      const top = freshCandidates[0]!;
+      return { track: top.track, score: top.score, quality: cadenceQuality };
+    }
+    const prng = mulberry32(hashSeed(seed, slotIndex));
+    const pick = pickWeightedFromTopK(freshCandidates, prng, RANDOM_TOP_K);
+    if (pick) {
+      return { track: pick.track, score: pick.score, quality: cadenceQuality };
+    }
   }
 
   // 2. Best-effort cross-zone: cualquier track no usado, aunque cadencia no encaje.
@@ -106,6 +123,9 @@ function matchOverlap(
 ): MatchedSegment[] {
   const used = new Set<string>();
   const out: MatchedSegment[] = [];
+  // slotIndex monotonico: cada chooseTrack consume una sub-semilla distinta.
+  // No es lo mismo que `i` porque en overlap un track tapa varios segmentos.
+  let slotIndex = 0;
 
   let i = 0;
   while (i < segments.length) {
@@ -131,7 +151,10 @@ function matchOverlap(
       preferences.preferredGenres,
       tracks,
       used,
+      preferences.seed,
+      slotIndex,
     );
+    slotIndex++;
 
     if (!choice) {
       out.push({ ...seg, track: null, matchScore: 0, matchQuality: 'insufficient' });
@@ -166,6 +189,7 @@ function matchDiscrete(
 ): MatchedSegment[] {
   const used = new Set<string>();
   const out: MatchedSegment[] = [];
+  let slotIndex = 0;
 
   for (const seg of segments) {
     const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile);
@@ -190,7 +214,10 @@ function matchDiscrete(
         preferences.preferredGenres,
         tracks,
         used,
+        preferences.seed,
+        slotIndex,
       );
+      slotIndex++;
       if (!choice) {
         out.push({
           ...seg,

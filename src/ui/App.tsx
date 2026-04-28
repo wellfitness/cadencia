@@ -63,6 +63,14 @@ export function App(): JSX.Element {
   return <WizardApp />;
 }
 
+/**
+ * Genera una semilla aleatoria entera positiva (32 bits). Usada para
+ * sembrar el motor de matching y conseguir variedad entre sesiones.
+ */
+function makeRandomSeed(): number {
+  return Math.floor(Math.random() * 0xffffffff) >>> 0;
+}
+
 function WizardApp(): JSX.Element {
   // Carga lazy del state del wizard desde sessionStorage. Necesario para
   // sobrevivir al redirect de Spotify en /callback (full page navigation).
@@ -146,9 +154,17 @@ function WizardApp(): JSX.Element {
   const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(
     persisted?.matchedList ?? null,
   );
-  const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(
-    persisted?.musicPreferences ?? EMPTY_PREFERENCES,
-  );
+  const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(() => {
+    const base = persisted?.musicPreferences ?? EMPTY_PREFERENCES;
+    // Auto-seed la primera vez. La semilla se persiste con el resto de
+    // musicPreferences en sessionStorage, asi el OAuth callback de Spotify
+    // (full reload) reproduce exactamente la misma playlist al volver.
+    return base.seed === undefined ? { ...base, seed: makeRandomSeed() } : base;
+  });
+
+  const handleRegenerateSeed = useCallback((): void => {
+    setMusicPreferences((prev) => ({ ...prev, seed: makeRandomSeed() }));
+  }, []);
 
   // Indices del matching reemplazados manualmente por el usuario via "Otro tema".
   // Se levanta a App para sobrevivir a remountajes de Music/Result al volver atras.
@@ -342,7 +358,7 @@ function WizardApp(): JSX.Element {
     setRouteSegments(null);
     setRouteMeta(null);
     setMatchedList(null);
-    setMusicPreferences(EMPTY_PREFERENCES);
+    setMusicPreferences({ ...EMPTY_PREFERENCES, seed: makeRandomSeed() });
     setReplacedIndices(new Set());
     setUploadedCsvs([]);
     setPlaylistName('');
@@ -496,6 +512,7 @@ function WizardApp(): JSX.Element {
               onResetWizard={handleResetWizard}
               onGoToDataStep={handleGoToDataStep}
               onGoToMusicStep={handleGoToMusicStep}
+              onRegenerateSeed={handleRegenerateSeed}
               crossZoneMode={crossZoneMode}
               {...(sourceType === 'session' ? { onEnterTVMode: handleEnterTVMode } : {})}
             />
