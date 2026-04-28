@@ -333,19 +333,19 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   },
   {
     q: '¿Funciona sin Spotify Premium?',
-    a: 'Para crear la playlist sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción. Sin cuenta de Spotify la app sigue calculándote la potencia y la segmentación, pero no podrás guardar la lista.',
+    a: 'Para crear la playlist sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción.',
   },
   {
-    q: '¿Cómo escucho la playlist en ruta sin saltarme la ley?',
+    q: '¿Cómo puedo escuchar mi música en ruta?',
     a: 'En España (Reglamento General de Circulación, art. 18.2) está prohibido conducir cualquier vehículo, bici incluida, con auriculares conectados a un reproductor de sonido. La sanción son 200 € y 3 puntos del carné de coche. La prohibición abarca también los auriculares de conducción ósea, porque la norma no distingue por tipo. Opciones legales: altavoz Bluetooth montado en el manillar o en el cuadro, o un altavoz portátil en la mochila o en el bolsillo del maillot. Para sesiones indoor (rodillo, bici estática, Modo TV) no hay restricción: ahí los auriculares son perfectos.',
   },
   {
     q: '¿Es gratis?',
-    a: 'Sí. Es código abierto bajo licencia PolyForm Noncommercial. Puedes usarla libremente para tu uso personal o sin fines comerciales.',
+    a: 'Sí. Es código abierto bajo licencia PolyForm Noncommercial. Puedes usarla libremente para tu uso personal o sin fines comerciales. Puedes colaborar y proponer mejoras a través de GitHub',
   },
   {
     q: '¿Mis datos físicos se guardan en algún sitio?',
-    a: 'No. Los datos viven solo en la pestaña actual del navegador (sessionStorage) y se borran cuando la cierras. No tenemos servidores donde almacenarlos.',
+    a: 'No. Los datos viven solo en la pestaña actual del navegador y se borran cuando la cierras. No tenemos servidores donde almacenarlos.',
   },
 ] as const;
 
