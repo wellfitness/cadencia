@@ -202,6 +202,21 @@ export function App(): JSX.Element {
     setMusicPreferences(preferences);
   };
 
+  // "Crear otra playlist" desde el DonePanel: vuelve al inicio del wizard
+  // limpiando todos los datos derivados, pero conserva los inputs fisiologicos
+  // del usuario (peso, FC, etc.) — son los mismos para una segunda sesion.
+  const handleResetWizard = (): void => {
+    setRouteSegments(null);
+    setRouteMeta(null);
+    setMatchedList(null);
+    setMusicPreferences(EMPTY_PREFERENCES);
+    setSessionPlan(null);
+    setSourceType(null);
+    setLivePool(null);
+    setCompletedSteps([]);
+    setCurrentStep(STEP_TYPE);
+  };
+
   // Modo TV pantalla completa: solo accesible si hay sessionPlan.
   if (tvModeActive && sessionPlan !== null && validation.ok) {
     return (
@@ -305,6 +320,7 @@ export function App(): JSX.Element {
               tracks={livePool}
               onMatchedChange={handleMatchedChange}
               onBack={handleBack}
+              onResetWizard={handleResetWizard}
               {...(sourceType === 'session'
                 ? {
                     mode: 'session' as const,

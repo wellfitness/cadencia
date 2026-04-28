@@ -48,7 +48,7 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
       aria-labelledby="hero-title"
       className="bg-white"
     >
-      <div className="mx-auto w-full max-w-4xl px-4 py-10 md:py-16 text-center">
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
         {/* Logo + wordmark horizontal centrado */}
         <div className="flex justify-center mb-6">
           <Logo variant="full" size="xl" orientation="horizontal" />
@@ -57,71 +57,220 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
         {/* Divisor estilo carretera: linea central discontinua larga */}
         <div
           aria-hidden="true"
-          className="mx-auto mb-8 h-1 max-w-md"
+          className="mx-auto mb-8 md:mb-12 h-1 max-w-md"
           style={{
             backgroundImage:
               'repeating-linear-gradient(to right, #9ca3af 0 28px, transparent 28px 44px)',
           }}
         />
 
-        {/* H1 con remate cromatico en la ultima frase */}
-        <h1
-          id="hero-title"
-          className="font-display text-4xl md:text-6xl leading-tight mb-6"
-        >
-          <span className="block text-gris-800">Tu plan. Tu intensidad.</span>
-          <span className="block text-turquesa-600">Tu música.</span>
-        </h1>
-
-        {/* Subtitulo */}
-        <p className="text-lg md:text-xl text-gris-700 max-w-2xl mx-auto mb-6">
-          Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
-          La app te genera una playlist de Spotify donde cada canción encaja
-          con la intensidad real de cada tramo o bloque.
-        </p>
-
-        {/* Pills de beneficio */}
-        <ul className="flex flex-wrap justify-center gap-3 md:gap-6 mb-8 text-gris-700">
-          <li className="flex items-center gap-2">
-            <MaterialIcon name="favorite" className="text-turquesa-600" />
-            <span className="font-semibold">Más adherencia</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <MaterialIcon name="mood" className="text-turquesa-600" />
-            <span className="font-semibold">Más disfrute</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <MaterialIcon name="trending_up" className="text-turquesa-600" />
-            <span className="font-semibold">Más rendimiento</span>
-          </li>
-        </ul>
-
-        {/* CTA unico: abre el modal con los requisitos antes de entrar al wizard */}
-        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
-            Probar aplicación
-          </Button>
-          {/* Boton de instalacion PWA: solo visible si Chrome ha cedido el prompt
-              (Chromium-based, criterios PWA cumplidos, no instalada todavia). */}
-          {canInstall ? (
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={() => {
-                void install();
-              }}
-              loading={installing}
-              iconLeft="install_mobile"
+        <div className="grid lg:grid-cols-[1.1fr,1fr] gap-8 lg:gap-12 items-center">
+          <div className="text-center lg:text-left">
+            {/* H1 con remate cromatico en la ultima frase */}
+            <h1
+              id="hero-title"
+              className="font-display text-4xl md:text-6xl leading-tight mb-6"
             >
-              Instalar app
-            </Button>
-          ) : null}
+              <span className="block text-gris-800">Tu plan. Tu intensidad.</span>
+              <span className="block text-turquesa-600">Tu música.</span>
+            </h1>
+
+            <p className="text-lg md:text-xl text-gris-700 max-w-2xl lg:mx-0 mx-auto mb-6">
+              Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
+              La app te genera una playlist de Spotify donde cada canción encaja
+              con la intensidad real de cada tramo o bloque.
+            </p>
+
+            <ul className="flex flex-wrap justify-center lg:justify-start gap-3 md:gap-6 mb-8 text-gris-700">
+              <li className="flex items-center gap-2">
+                <MaterialIcon name="favorite" className="text-turquesa-600" />
+                <span className="font-semibold">Más adherencia</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <MaterialIcon name="mood" className="text-turquesa-600" />
+                <span className="font-semibold">Más disfrute</span>
+              </li>
+              <li className="flex items-center gap-2">
+                <MaterialIcon name="trending_up" className="text-turquesa-600" />
+                <span className="font-semibold">Más rendimiento</span>
+              </li>
+            </ul>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center">
+              <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
+                Probar aplicación
+              </Button>
+              {canInstall ? (
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={() => {
+                    void install();
+                  }}
+                  loading={installing}
+                  iconLeft="install_mobile"
+                >
+                  Instalar app
+                </Button>
+              ) : null}
+            </div>
+            <p className="text-sm text-gris-500 mt-3 text-center lg:text-left">
+              Gratis. Sin cuenta. Sin servidor.
+            </p>
+          </div>
+
+          {/* Mock visual del producto: solo se muestra a partir de lg para no
+              comer espacio en mobile/tablet (el hero ya tiene mucha densidad). */}
+          <div className="hidden lg:flex justify-center">
+            <HeroMockup />
+          </div>
         </div>
-        <p className="text-sm text-gris-500 mt-3">
-          Gratis. Sin cuenta. Sin servidor.
-        </p>
       </div>
     </section>
+  );
+}
+
+/**
+ * Mock visual del producto: una card "flotante" inclinada con un perfil de
+ * elevacion estilizado (SVG) y 3 tracks simulados ya emparejados con su
+ * zona. Todo SVG/CSS, sin imagenes externas (cliente-only).
+ */
+function HeroMockup(): JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      className="relative w-full max-w-md transform rotate-1 transition-transform duration-300 hover:rotate-0"
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-gris-200 p-5 md:p-6 space-y-4">
+        <header className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-gris-500 mb-0.5">
+              Ruta procesada
+            </p>
+            <p className="font-display text-lg text-gris-800 leading-tight">
+              Subida al Naranco
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-turquesa-700 bg-turquesa-50 px-2 py-1 rounded-full">
+            <span
+              className="inline-block w-1.5 h-1.5 rounded-full bg-turquesa-600"
+              aria-hidden
+            />
+            10,8 km
+          </span>
+        </header>
+
+        {/* Mini perfil de elevacion en SVG con bandas de zona */}
+        <div className="relative h-24 rounded-lg overflow-hidden bg-gradient-to-b from-gris-50 to-white border border-gris-100">
+          <svg
+            viewBox="0 0 200 80"
+            preserveAspectRatio="none"
+            className="absolute inset-0 w-full h-full"
+          >
+            <defs>
+              <linearGradient id="hero-elev" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#00bec8" stopOpacity="0.55" />
+                <stop offset="100%" stopColor="#00bec8" stopOpacity="0.05" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M0,70 L20,62 L40,55 L60,45 L80,30 L100,18 L120,22 L140,40 L160,55 L180,68 L200,72 L200,80 L0,80 Z"
+              fill="url(#hero-elev)"
+            />
+            <path
+              d="M0,70 L20,62 L40,55 L60,45 L80,30 L100,18 L120,22 L140,40 L160,55 L180,68 L200,72"
+              fill="none"
+              stroke="#088b96"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
+          </svg>
+          <div className="absolute inset-x-2 bottom-1 flex justify-between text-[10px] text-gris-500 tabular-nums">
+            <span>0 km</span>
+            <span>5,4 km</span>
+            <span>10,8 km</span>
+          </div>
+        </div>
+
+        {/* Tracks simulados: 3 ejemplos con su zona destino */}
+        <ul className="space-y-2" role="presentation">
+          <HeroTrackRow
+            title="Eye of the Tiger"
+            artist="Survivor"
+            bpm={108}
+            zone={4}
+            zoneLabel="Umbral"
+          />
+          <HeroTrackRow
+            title="Born to Be Wild"
+            artist="Steppenwolf"
+            bpm={147}
+            zone={5}
+            zoneLabel="Muros"
+          />
+          <HeroTrackRow
+            title="Don't Stop Me Now"
+            artist="Queen"
+            bpm={156}
+            zone={3}
+            zoneLabel="Tempo"
+          />
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+interface HeroTrackRowProps {
+  title: string;
+  artist: string;
+  bpm: number;
+  zone: 1 | 2 | 3 | 4 | 5 | 6;
+  zoneLabel: string;
+}
+
+function HeroTrackRow({
+  title,
+  artist,
+  bpm,
+  zone,
+  zoneLabel,
+}: HeroTrackRowProps): JSX.Element {
+  const ZONE_BG: Record<number, string> = {
+    1: 'bg-zone-1',
+    2: 'bg-zone-2',
+    3: 'bg-zone-3',
+    4: 'bg-zone-4',
+    5: 'bg-zone-5',
+    6: 'bg-zone-6',
+  };
+  const TEXT: Record<number, string> = {
+    1: 'text-white',
+    2: 'text-gris-900',
+    3: 'text-gris-900',
+    4: 'text-white',
+    5: 'text-white',
+    6: 'text-white',
+  };
+  const bg = ZONE_BG[zone] ?? 'bg-zone-3';
+  const txt = TEXT[zone] ?? 'text-white';
+  return (
+    <li className="flex items-center gap-3 p-2 rounded-lg bg-gris-50 border border-gris-100">
+      <span
+        className={`flex items-center justify-center rounded-md ${bg} ${txt} w-9 h-9 flex-shrink-0 font-bold text-xs`}
+      >
+        Z{zone}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-gris-800 truncate">{title}</p>
+        <p className="text-xs text-gris-500 truncate">
+          {artist} · {zoneLabel}
+        </p>
+      </div>
+      <span className="text-xs font-semibold text-gris-700 tabular-nums whitespace-nowrap">
+        {bpm} BPM
+      </span>
+    </li>
   );
 }
 

@@ -290,6 +290,7 @@ export function SessionTVMode({
         sessionName={plan.name}
         totalElapsedSec={totalElapsed}
         phaseCount={blocks.length}
+        blocks={blocks}
         onRestart={restart}
         onClose={onClose}
       />
@@ -374,13 +375,13 @@ export function SessionTVMode({
                   <h2 className="text-2xl md:text-4xl font-bold leading-tight">
                     {PHASE_LABELS[currentBlock.phase] ?? currentBlock.phase.toUpperCase()}
                   </h2>
-                  <p className="text-base md:text-xl opacity-90">
+                  <p className="font-display text-3xl md:text-5xl leading-tight mt-1">
                     Zona {currentBlock.zone} · {CADENCE_PROFILE_LABELS[currentBlock.cadenceProfile]}
                   </p>
                   {(() => {
                     const c = getZoneCriteria(currentBlock.zone, currentBlock.cadenceProfile);
                     return (
-                      <p className="text-sm md:text-base opacity-80 mt-0.5 flex items-center gap-1.5">
+                      <p className="text-base md:text-xl opacity-90 mt-1 flex items-center gap-1.5">
                         <MaterialIcon name="speed" size="small" />
                         Cadencia: {c.cadenceMin}-{c.cadenceMax} rpm
                       </p>
@@ -390,14 +391,18 @@ export function SessionTVMode({
               </div>
               {currentZoneFc !== null && (
                 <div className="text-right flex-shrink-0">
-                  <div className="flex items-center justify-end gap-1.5 md:gap-2 text-xl md:text-3xl font-bold">
-                    <MaterialIcon name="favorite" size="medium" className="animate-pulse" />
+                  <div className="flex items-center justify-end gap-1.5 md:gap-2 text-2xl md:text-4xl font-bold">
+                    <MaterialIcon
+                      name="favorite"
+                      size="medium"
+                      className="motion-safe:animate-pulse"
+                    />
                     <span className="tabular-nums">
                       {Math.round(currentZoneFc.minBpm)}-{Math.round(currentZoneFc.maxBpm)}
                     </span>
-                    <span className="text-sm md:text-xl opacity-70">bpm</span>
+                    <span className="text-base md:text-2xl opacity-70">bpm</span>
                   </div>
-                  <p className="text-sm md:text-lg font-semibold mt-0.5 opacity-90">
+                  <p className="text-base md:text-xl font-semibold mt-0.5 opacity-90">
                     {ZONE_PERCENT_FCR[currentBlock.zone]}
                   </p>
                 </div>
@@ -509,30 +514,32 @@ interface PhaseTimelineProps {
 function PhaseTimeline({ blocks, currentIndex, onSelect }: PhaseTimelineProps): JSX.Element {
   const totalDuration = blocks.reduce((acc, b) => acc + b.durationSec, 0);
   return (
-    <div className="bg-black/30 px-2 py-2 overflow-x-auto">
+    <div className="bg-black/30 px-2 py-3 overflow-x-auto">
       <div className="flex gap-1 min-w-min justify-center">
         {blocks.map((block, idx) => {
           const isActive = idx === currentIndex;
           const isPast = idx < currentIndex;
+          // Bloques futuros: opacidad creciente (1 por delante mas opaco que 5 por delante)
+          const stepsAhead = idx - currentIndex;
+          const futureOpacity =
+            isActive || isPast ? '' : stepsAhead <= 1 ? '' : stepsAhead <= 3 ? 'opacity-80' : 'opacity-60';
           const widthPct = totalDuration > 0 ? (block.durationSec / totalDuration) * 100 : 0;
           return (
             <button
               key={block.id}
               type="button"
               onClick={() => onSelect(idx)}
-              aria-label={`Saltar al bloque ${idx + 1}`}
-              className={`flex-shrink-0 px-2 py-1 rounded transition-all ${
+              aria-label={`Saltar al bloque ${idx + 1}: ${PHASE_LABELS[block.phase] ?? block.phase}, zona ${block.zone}, ${formatTime(block.durationSec)}`}
+              className={`flex-shrink-0 px-2 py-3 min-w-[40px] rounded transition-all ${
                 isActive
-                  ? `${ZONE_BG_DARK[block.zone]} text-white ring-2 ring-white scale-105`
+                  ? `${ZONE_BG_DARK[block.zone]} ${zoneTextColor(block.zone)} ring-2 ring-white scale-105`
                   : isPast
-                    ? 'bg-white/5 opacity-40 hover:opacity-60'
-                    : 'bg-white/5 hover:bg-white/15'
+                    ? `bg-white/5 opacity-40 hover:opacity-60 ${ZONE_TEXT[block.zone]}`
+                    : `bg-white/10 hover:bg-white/20 ${ZONE_TEXT[block.zone]} ${futureOpacity}`
               }`}
-              style={{ minWidth: `${Math.max(28, Math.min(120, widthPct * 4))}px` }}
+              style={{ minWidth: `${Math.max(40, Math.min(120, widthPct * 4))}px` }}
             >
-              <span className={`text-[10px] md:text-xs font-semibold ${ZONE_TEXT[block.zone]}`}>
-                Z{block.zone}
-              </span>
+              <span className="text-base font-bold">Z{block.zone}</span>
             </button>
           );
         })}
@@ -545,6 +552,7 @@ interface CompletionScreenProps {
   sessionName: string;
   totalElapsedSec: number;
   phaseCount: number;
+  blocks: readonly SessionBlock[];
   onRestart: () => void;
   onClose: () => void;
 }
@@ -553,32 +561,120 @@ function CompletionScreen({
   sessionName,
   totalElapsedSec,
   phaseCount,
+  blocks,
   onRestart,
   onClose,
 }: CompletionScreenProps): JSX.Element {
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'shared'>('idle');
+
+  // Count-up animado: arranca a 0 y avanza a los valores reales con un
+  // requestAnimationFrame loop (CSS-only no permite count-up con tabular-nums).
+  const elapsedDisplay = useCountUp(totalElapsedSec, 1200);
+  const phaseDisplay = useCountUp(phaseCount, 1200);
+
+  // % por zona: cuanto tiempo se invirtio en cada zona Z1..Z6.
+  const zoneShare = useMemo(() => {
+    const totals: Record<HeartRateZone, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+    let sum = 0;
+    for (const b of blocks) {
+      totals[b.zone] += b.durationSec;
+      sum += b.durationSec;
+    }
+    if (sum === 0) return [] as { zone: HeartRateZone; pct: number }[];
+    const zones: HeartRateZone[] = [1, 2, 3, 4, 5, 6];
+    return zones
+      .map((z) => ({ zone: z, pct: (totals[z] / sum) * 100 }))
+      .filter((entry) => entry.pct > 0);
+  }, [blocks]);
+
+  const handleShare = (): void => {
+    const text = `He completado «${sessionName}» en Cadencia: ${formatTime(totalElapsedSec)} en ${phaseCount} bloques.`;
+    if (typeof navigator.share === 'function') {
+      navigator
+        .share({ title: 'Cadencia', text })
+        .then(() => setShareState('shared'))
+        .catch(() => {
+          // El usuario cerró el sheet o el navegador rechazó: degradamos a copiar.
+          void writeClipboard(text).then(() => setShareState('copied'));
+        });
+      return;
+    }
+    void writeClipboard(text).then(() => setShareState('copied'));
+  };
+
+  const shareLabel =
+    shareState === 'copied'
+      ? 'Texto copiado'
+      : shareState === 'shared'
+        ? 'Compartido'
+        : 'Compartir';
+  const shareIcon = shareState === 'idle' ? 'share' : 'check';
+
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-turquesa-700 via-turquesa-600 to-turquesa-800 text-white flex items-center justify-center p-6 md:p-8">
-      <div className="text-center max-w-2xl w-full">
+    <div className="relative overflow-hidden min-h-[100dvh] bg-gradient-to-br from-turquesa-700 via-turquesa-600 to-turquesa-800 text-white flex items-center justify-center p-6 md:p-8">
+      <Confetti />
+      <div className="relative text-center max-w-2xl w-full">
         <div className="w-24 h-24 md:w-32 md:h-32 mx-auto mb-6 md:mb-8 rounded-full bg-white/20 flex items-center justify-center">
           <MaterialIcon name="emoji_events" size="xlarge" className="text-tulipTree-300" />
         </div>
         <h1 className="font-display text-3xl md:text-5xl mb-2 md:mb-4">¡Sesión completada!</h1>
         <p className="text-lg md:text-2xl opacity-90 mb-6 md:mb-10">{sessionName}</p>
 
-        <div className="grid grid-cols-2 gap-3 md:gap-6 mb-8 md:mb-12">
+        <div className="grid grid-cols-2 gap-3 md:gap-6 mb-6 md:mb-8">
           <div className="bg-white/10 rounded-xl md:rounded-2xl p-4 md:p-6">
             <p className="text-xs md:text-base opacity-70 mb-1">Tiempo total</p>
             <p className="text-2xl md:text-4xl font-bold tabular-nums">
-              {formatTime(totalElapsedSec)}
+              {formatTime(elapsedDisplay)}
             </p>
           </div>
           <div className="bg-white/10 rounded-xl md:rounded-2xl p-4 md:p-6">
             <p className="text-xs md:text-base opacity-70 mb-1">Bloques completados</p>
-            <p className="text-2xl md:text-4xl font-bold tabular-nums">{phaseCount}</p>
+            <p className="text-2xl md:text-4xl font-bold tabular-nums">{phaseDisplay}</p>
           </div>
         </div>
 
+        {zoneShare.length > 0 && (
+          <div className="mb-8 md:mb-12">
+            <p className="text-xs md:text-sm opacity-70 mb-2 text-left">
+              Tiempo por zona trabajada
+            </p>
+            <div
+              className="flex h-3 md:h-4 w-full rounded-full overflow-hidden bg-white/10"
+              role="img"
+              aria-label="Distribución del tiempo por zona"
+            >
+              {zoneShare.map(({ zone, pct }) => (
+                <div
+                  key={zone}
+                  className={`${ZONE_BG_DARK[zone]} h-full`}
+                  style={{ width: `${pct}%` }}
+                  title={`Zona ${zone}: ${pct.toFixed(0)}%`}
+                />
+              ))}
+            </div>
+            <ul className="mt-2 flex flex-wrap gap-2 text-xs md:text-sm opacity-90 justify-center">
+              {zoneShare.map(({ zone, pct }) => (
+                <li key={zone} className="inline-flex items-center gap-1.5 tabular-nums">
+                  <span
+                    className={`inline-block w-2.5 h-2.5 rounded-sm ${ZONE_BG_DARK[zone]}`}
+                    aria-hidden
+                  />
+                  Z{zone}: {pct.toFixed(0)}%
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-stretch sm:items-center">
+          <button
+            type="button"
+            onClick={handleShare}
+            className="px-6 py-3 rounded-xl bg-white/20 hover:bg-white/30 transition-colors text-base md:text-lg font-semibold inline-flex items-center justify-center gap-2 min-h-[48px]"
+          >
+            <MaterialIcon name={shareIcon} size="small" />
+            {shareLabel}
+          </button>
           <button
             type="button"
             onClick={onRestart}
@@ -597,6 +693,82 @@ function CompletionScreen({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Hook util: anima un valor numerico de 0 al target en `durationMs`.
+ * Respeta `prefers-reduced-motion`: salta directo al target sin animar.
+ */
+function useCountUp(target: number, durationMs: number): number {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduced || target === 0) {
+      setValue(target);
+      return;
+    }
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - start) / durationMs);
+      // Easing out-cubic: rapido al inicio, suaviza al final
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs]);
+  return value;
+}
+
+async function writeClipboard(text: string): Promise<void> {
+  if (typeof navigator.clipboard?.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Algunos navegadores rechazan clipboard sin gesto reciente: degradamos
+      // silenciosamente para no romper la pantalla de completado.
+    }
+  }
+}
+
+/**
+ * Confeti CSS-only: 8 piezas absolutas con animacion `fall` definida en
+ * index.css. Respeta prefers-reduced-motion (devuelve null).
+ */
+function Confetti(): JSX.Element | null {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(mq.matches);
+  }, []);
+  if (reduced) return null;
+  const PIECES: ReadonlyArray<{ left: string; delay: string; color: string; rotate: string }> = [
+    { left: '8%', delay: '0s', color: 'bg-turquesa-400', rotate: '15deg' },
+    { left: '18%', delay: '0.2s', color: 'bg-tulipTree-400', rotate: '-30deg' },
+    { left: '32%', delay: '0.4s', color: 'bg-rosa-400', rotate: '40deg' },
+    { left: '46%', delay: '0.1s', color: 'bg-turquesa-200', rotate: '-15deg' },
+    { left: '58%', delay: '0.5s', color: 'bg-tulipTree-500', rotate: '20deg' },
+    { left: '70%', delay: '0.3s', color: 'bg-rosa-500', rotate: '-45deg' },
+    { left: '84%', delay: '0.05s', color: 'bg-turquesa-400', rotate: '10deg' },
+    { left: '92%', delay: '0.45s', color: 'bg-tulipTree-400', rotate: '-25deg' },
+  ];
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {PIECES.map((piece, i) => (
+        <span
+          key={i}
+          className={`absolute top-[-10%] w-2 h-3 rounded-sm ${piece.color} animate-confetti-fall`}
+          style={{
+            left: piece.left,
+            animationDelay: piece.delay,
+            transform: `rotate(${piece.rotate})`,
+          }}
+        />
+      ))}
     </div>
   );
 }

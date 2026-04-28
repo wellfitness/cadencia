@@ -69,6 +69,11 @@ export interface ResultStepProps {
   onBack: () => void;
   /** Si la ruta vino de una sesion indoor, callback para abrir el modo TV. */
   onEnterTVMode?: () => void;
+  /**
+   * Callback para volver al primer paso del wizard ("crear otra playlist").
+   * Solo se ofrece desde el DonePanel; opcional para no romper compatibilidad.
+   */
+  onResetWizard?: () => void;
   /** Modo del formulario de "Ajustar mis datos": gpx (default) o session. */
   mode?: 'gpx' | 'session';
   /** Modo de matching: overlap (GPX, default) o discrete (sesion indoor). */
@@ -91,6 +96,7 @@ export function ResultStep({
   onMatchedChange,
   onBack,
   onEnterTVMode,
+  onResetWizard,
   mode = 'gpx',
   crossZoneMode = 'overlap',
 }: ResultStepProps): JSX.Element {
@@ -250,7 +256,14 @@ export function ResultStep({
   const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
 
   if (phase === 'done' && created !== null) {
-    return <DonePanel playlist={created} />;
+    return (
+      <DonePanel
+        playlist={created}
+        matched={matched}
+        {...(onEnterTVMode !== undefined ? { onEnterTVMode } : {})}
+        {...(onResetWizard !== undefined ? { onResetWizard } : {})}
+      />
+    );
   }
 
   return (
@@ -480,28 +493,126 @@ function FooterActions({ onBack, onCreate, creating, canCreate }: FooterActionsP
 
 interface DonePanelProps {
   playlist: CreatedPlaylist;
+  matched: readonly MatchedSegment[];
+  onEnterTVMode?: () => void;
+  onResetWizard?: () => void;
 }
 
-function DonePanel({ playlist }: DonePanelProps): JSX.Element {
+function DonePanel({
+  playlist,
+  matched,
+  onEnterTVMode,
+  onResetWizard,
+}: DonePanelProps): JSX.Element {
+  const [shareState, setShareState] = useState<'idle' | 'copied' | 'shared'>('idle');
+  const previewTracks = matched
+    .map((m) => m.track)
+    .filter((t): t is NonNullable<typeof t> => t !== null)
+    .slice(0, 8);
+
+  const handleShare = (): void => {
+    const text = `Escucha mi playlist «${playlist.name}» creada con Cadencia: ${playlist.externalUrl}`;
+    if (typeof navigator.share === 'function') {
+      navigator
+        .share({ title: playlist.name, text, url: playlist.externalUrl })
+        .then(() => setShareState('shared'))
+        .catch(() => {
+          void copyShareToClipboard(text).then(() => setShareState('copied'));
+        });
+      return;
+    }
+    void copyShareToClipboard(text).then(() => setShareState('copied'));
+  };
+
+  const shareLabel =
+    shareState === 'copied'
+      ? 'Enlace copiado'
+      : shareState === 'shared'
+        ? 'Compartido'
+        : 'Compartir enlace';
+
   return (
-    <div className="mx-auto w-full max-w-2xl px-3 py-6 md:py-12 space-y-4">
+    <div className="mx-auto w-full max-w-2xl px-3 py-6 md:py-12 space-y-4 animate-fade-up">
       <Card variant="tip" title="¡Lista creada en Spotify!" titleIcon="check_circle">
         <p className="text-gris-700 mb-4">
-          Tu lista <strong>"{playlist.name}"</strong> con{' '}
+          Tu lista <strong>«{playlist.name}»</strong> con{' '}
           <strong>{playlist.trackCount} temas</strong> está lista en tu cuenta.
         </p>
-        <a
-          href={playlist.externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 bg-turquesa-600 text-white border-2 border-turquesa-700 hover:bg-turquesa-700 font-semibold rounded-lg px-4 py-2.5 min-h-[44px] md:min-h-[48px] transition-all duration-200 ease-out"
-        >
-          <MaterialIcon name="open_in_new" size="small" />
-          Abrir en Spotify
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={playlist.externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 bg-turquesa-600 text-white border-2 border-turquesa-700 hover:bg-turquesa-700 font-semibold rounded-lg px-4 py-2.5 min-h-[44px] md:min-h-[48px] transition-all duration-200 ease-out"
+          >
+            <MaterialIcon name="open_in_new" size="small" />
+            Abrir en Spotify
+          </a>
+          <Button
+            variant="secondary"
+            iconLeft={shareState === 'idle' ? 'share' : 'check'}
+            onClick={handleShare}
+          >
+            {shareLabel}
+          </Button>
+        </div>
       </Card>
+
+      {onEnterTVMode !== undefined && (
+        <Card variant="info" title="Sigue tu sesión a pantalla completa" titleIcon="cast">
+          <p className="text-gris-700 mb-3">
+            Activa el modo sesión para ver el cronómetro y avisos sonoros mientras suena
+            la lista en Spotify.
+          </p>
+          <Button variant="primary" iconLeft="play_circle" onClick={onEnterTVMode}>
+            Iniciar Modo TV
+          </Button>
+        </Card>
+      )}
+
+      {previewTracks.length > 0 && (
+        <Card title="Primeros temas de la lista" titleIcon="queue_music">
+          <ol className="space-y-1.5">
+            {previewTracks.map((t, i) => (
+              <li
+                key={t.uri}
+                className="flex items-center gap-3 px-2 py-1.5 rounded-md odd:bg-gris-50"
+              >
+                <span className="text-xs font-semibold text-gris-500 tabular-nums w-6 text-right">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gris-800 truncate">{t.name}</p>
+                  <p className="text-xs text-gris-500 truncate">{t.artists.join(', ')}</p>
+                </div>
+                <span className="text-xs text-gris-500 tabular-nums whitespace-nowrap">
+                  {Math.round(t.tempoBpm)} BPM
+                </span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
+      {onResetWizard !== undefined && (
+        <div className="flex justify-center pt-2">
+          <Button variant="secondary" iconLeft="refresh" onClick={onResetWizard}>
+            Crear otra playlist
+          </Button>
+        </div>
+      )}
     </div>
   );
+}
+
+async function copyShareToClipboard(text: string): Promise<void> {
+  if (typeof navigator.clipboard?.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback silencioso si el navegador rechaza sin gesto reciente.
+    }
+  }
 }
 
 interface MissingClientIdMessageProps {
