@@ -73,6 +73,13 @@ export interface UserDataFormProps {
    *   se usan en la pipeline indoor, asi que no se piden.
    */
   mode?: 'gpx' | 'session';
+  /**
+   * Opt-in del usuario a persistir sus datos fisiologicos entre sesiones
+   * en localStorage. Si se pasa junto con onPersistentStorageChange, se
+   * renderiza el bloque del checkbox al pie del formulario.
+   */
+  persistentStorage?: boolean;
+  onPersistentStorageChange?: (enabled: boolean) => void;
 }
 
 /**
@@ -83,7 +90,16 @@ export interface UserDataFormProps {
  */
 export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
   function UserDataForm(
-    { inputs, dispatch, validation, currentYear, showAllErrors = false, mode = 'gpx' },
+    {
+      inputs,
+      dispatch,
+      validation,
+      currentYear,
+      showAllErrors = false,
+      mode = 'gpx',
+      persistentStorage,
+      onPersistentStorageChange,
+    },
     ref,
   ): JSX.Element {
     const isSession = mode === 'session';
@@ -505,7 +521,82 @@ export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
             </p>
           </Card>
         )}
+
+        {persistentStorage !== undefined && onPersistentStorageChange !== undefined && (
+          <RememberMeBlock
+            enabled={persistentStorage}
+            onChange={onPersistentStorageChange}
+          />
+        )}
       </div>
     );
   },
 );
+
+interface RememberMeBlockProps {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
+/**
+ * Checkbox opt-in para persistir los datos fisiologicos en localStorage.
+ * Inactivo por defecto: se respeta la decision original de no persistir mas
+ * alla de la pestana, salvo que el usuario lo pida explicitamente.
+ *
+ * El disclaimer subraya que los datos siguen sin salir del navegador y avisa
+ * sobre dispositivos compartidos, donde marcar esto seria un riesgo.
+ */
+function RememberMeBlock({ enabled, onChange }: RememberMeBlockProps): JSX.Element {
+  const checkboxId = useId();
+  const handleToggle = (e: ChangeEvent<HTMLInputElement>): void => {
+    onChange(e.target.checked);
+  };
+  const handleForget = (): void => {
+    onChange(false);
+  };
+  return (
+    <div className="rounded-xl border border-gris-200 bg-gris-50 p-3 md:p-4">
+      <label
+        htmlFor={checkboxId}
+        className="flex items-start gap-3 cursor-pointer select-none"
+      >
+        <input
+          id={checkboxId}
+          type="checkbox"
+          checked={enabled}
+          onChange={handleToggle}
+          className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-turquesa-600"
+        />
+        <span className="flex-1 min-w-0">
+          <span className="flex items-center gap-2 text-sm md:text-base font-semibold text-gris-800">
+            <MaterialIcon name="save" size="small" className="text-turquesa-600" />
+            Recordar mis datos en este dispositivo
+          </span>
+          <span className="block mt-1 text-xs md:text-sm text-gris-600 leading-snug">
+            Para no rellenarlo cada vez. Los datos siguen sin salir de tu navegador. No
+            actives esto si compartes el ordenador.
+          </span>
+        </span>
+      </label>
+      {enabled && (
+        <div className="mt-3 pt-3 border-t border-gris-200 flex items-center justify-between gap-3 motion-safe:animate-fade-in">
+          <span
+            className="flex items-center gap-1.5 text-xs text-turquesa-700"
+            role="status"
+          >
+            <MaterialIcon name="check_circle" size="small" className="text-turquesa-600" />
+            Datos guardados en este dispositivo
+          </span>
+          <button
+            type="button"
+            onClick={handleForget}
+            className="text-xs md:text-sm text-rosa-600 hover:text-rosa-700 underline-offset-2 hover:underline transition-colors min-h-[36px] inline-flex items-center gap-1"
+          >
+            <MaterialIcon name="delete_outline" size="small" />
+            Olvidar mis datos guardados
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

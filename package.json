@@ -20,6 +20,7 @@
     "deploy": "bash scripts/deploy.sh",
     "deploy:full": "pnpm build && bash scripts/deploy.sh",
     "build:tracks": "node scripts/build-tracks.mjs",
+    "build:assets": "python scripts/generate-assets.py",
     "prepare": "husky"
   },
   "dependencies": {

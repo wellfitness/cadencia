@@ -257,6 +257,45 @@ export function SessionBuilder({
     URL.revokeObjectURL(url);
   }, [state.plan]);
 
+  // Web Share API Level 2: ¿puede el navegador compartir un .zwo como File?
+  // Doble gate:
+  //   1. Soporte real de Web Share Files (probe con XML mínimo).
+  //   2. Input primario táctil (`pointer: coarse`): móvil y tablet. En desktop
+  //      con ratón el sheet del sistema da una UX pobre para .zwo aunque la
+  //      API funcione, así que escondemos el botón y dejamos solo "Descargar".
+  const canShareZwo = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    if (typeof navigator.share !== 'function') return false;
+    if (typeof navigator.canShare !== 'function') return false;
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    if (!window.matchMedia('(pointer: coarse)').matches) return false;
+    try {
+      const probe = new File(['<workout_file/>'], 'probe.zwo', {
+        type: 'application/xml',
+      });
+      return navigator.canShare({ files: [probe] });
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handleShareZwo = useCallback((): void => {
+    if (!canShareZwo) return;
+    const xml = exportZwo(state.plan);
+    const filename = sanitizeFilename(state.plan.name) + '.zwo';
+    const file = new File([xml], filename, { type: 'application/xml' });
+    navigator
+      .share({
+        title: state.plan.name,
+        text: `Workout «${state.plan.name}» creado con Cadencia`,
+        files: [file],
+      })
+      .catch(() => {
+        // Usuario cierra el sheet o el navegador rechaza el payload:
+        // no caemos a download (el botón "Descargar" sigue al lado).
+      });
+  }, [canShareZwo, state.plan]);
+
   const handleNameChange = useCallback(
     (name: string): void => {
       dispatch({ type: 'setName', name });
@@ -386,6 +425,8 @@ export function SessionBuilder({
         canContinue={expandedBlocks.length > 0}
         canExport={expandedBlocks.length > 0}
         onExport={handleExportZwo}
+        canShare={canShareZwo && expandedBlocks.length > 0}
+        onShare={handleShareZwo}
       />
     </WizardStep>
   );
@@ -397,6 +438,8 @@ interface FooterActionsProps {
   canContinue: boolean;
   canExport: boolean;
   onExport: () => void;
+  canShare: boolean;
+  onShare: () => void;
 }
 
 function FooterActions({
@@ -405,6 +448,8 @@ function FooterActions({
   canContinue,
   canExport,
   onExport,
+  canShare,
+  onShare,
 }: FooterActionsProps): JSX.Element {
   return (
     <WizardStepFooter
@@ -413,9 +458,19 @@ function FooterActions({
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {canShare && (
+            <Button
+              variant="accent"
+              size="sm"
+              iconLeft="share"
+              onClick={onShare}
+              aria-label="Compartir workout .zwo"
+              title="Compartir .zwo (WhatsApp, Mail, Drive…)"
+            />
+          )}
           {canExport && (
             <Button
-              variant="critical"
+              variant="accent"
               size="sm"
               iconLeft="download"
               onClick={onExport}
@@ -441,9 +496,19 @@ function FooterActions({
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {canShare && (
+            <Button
+              variant="accent"
+              iconLeft="share"
+              onClick={onShare}
+              title="Compartir .zwo (WhatsApp, Mail, Drive…)"
+            >
+              Compartir .zwo
+            </Button>
+          )}
           {canExport && (
             <Button
-              variant="critical"
+              variant="accent"
               iconLeft="download"
               onClick={onExport}
               title="Descargar para Zwift / TrainingPeaks Virtual / TrainerRoad / Wahoo SYSTM"

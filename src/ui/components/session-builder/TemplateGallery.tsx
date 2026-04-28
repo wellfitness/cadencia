@@ -7,6 +7,7 @@ import {
 } from '@core/segmentation';
 import type { HeartRateZone } from '@core/physiology/karvonen';
 import { MaterialIcon } from '../MaterialIcon';
+import { Button } from '../Button';
 
 const ZONE_BG_BAR: Record<HeartRateZone, string> = {
   1: 'bg-zone-1',
@@ -64,30 +65,25 @@ export function TemplateGallery({
 
   return (
     <div className="space-y-3">
-      <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h3 className="text-base md:text-lg font-semibold text-gris-800 flex items-center gap-2">
           <MaterialIcon name="auto_awesome" size="small" className="text-turquesa-600" />
           Empieza con una plantilla
         </h3>
-        <div className="flex items-center gap-3 text-xs md:text-sm">
-          <button
-            type="button"
-            onClick={onStartFromScratch}
-            className="text-turquesa-700 hover:text-turquesa-800 hover:underline font-medium"
-          >
-            O empieza desde cero
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={onStartFromScratch}>
+            Empieza desde cero
+          </Button>
           {onImportFile !== undefined && (
             <>
-              <span className="text-gris-300" aria-hidden>·</span>
-              <button
-                type="button"
+              <Button
+                variant="accent"
+                size="sm"
+                iconLeft="upload_file"
                 onClick={handleImportClick}
-                className="text-turquesa-700 hover:text-turquesa-800 hover:underline font-medium inline-flex items-center gap-1"
               >
-                <MaterialIcon name="upload_file" size="small" />
                 Importar .zwo
-              </button>
+              </Button>
               <input
                 ref={fileInputRef}
                 type="file"

@@ -1,8 +1,25 @@
 """
 Genera assets de marca a partir de public/logo.png:
-  - public/pwa-192x192.png  (icono PWA "any")
-  - public/pwa-512x512.png  (icono PWA "any" + "maskable", safe-zone 80%)
-  - public/og-image.png     (1200x630 social card)
+
+  Favicons (silueta turquesa sobre transparente):
+    public/favicon-16x16.png
+    public/favicon-32x32.png
+    public/favicon-64x64.png
+
+  Apple Touch Icon (logo turquesa sobre fondo blanco, sin recorte):
+    public/apple-touch-icon.png  (180x180)
+
+  PWA icons (logo turquesa sobre fondo blanco, safe-zone para maskable):
+    public/pwa-192x192.png
+    public/pwa-512x512.png
+
+  Open Graph (1200x630 social card):
+    public/og-image.png
+
+El logo de marca esta en silueta negra (public/logo.png). Aqui se TINTA en
+turquesa-700 (#0e7e85) para que sea coherente con como se renderiza en la
+Landing (componente <Logo tinted />). El tinte se aplica usando el canal alpha
+del PNG original como mascara.
 
 Las fuentes Righteous y ABeeZee (Google Fonts, SIL OFL) se descargan a
 scripts/fonts/ la primera vez. Esa carpeta esta en .gitignore.
@@ -14,6 +31,11 @@ import ssl
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGO = os.path.join(ROOT, 'public', 'logo.png')
+
+OUT_FAVICON_16 = os.path.join(ROOT, 'public', 'favicon-16x16.png')
+OUT_FAVICON_32 = os.path.join(ROOT, 'public', 'favicon-32x32.png')
+OUT_FAVICON_64 = os.path.join(ROOT, 'public', 'favicon-64x64.png')
+OUT_APPLE = os.path.join(ROOT, 'public', 'apple-touch-icon.png')
 OUT_192 = os.path.join(ROOT, 'public', 'pwa-192x192.png')
 OUT_512 = os.path.join(ROOT, 'public', 'pwa-512x512.png')
 OUT_OG = os.path.join(ROOT, 'public', 'og-image.png')
@@ -45,96 +67,159 @@ ensure_fonts()
 
 # Paleta Cadencia (de tailwind.config.ts / design-system)
 WHITE = (255, 255, 255, 255)
-TURQUESA = (0, 190, 200, 255)       # #00bec8
-TULIP_TREE = (234, 179, 8, 255)     # #eab308 (tulipTree-500)
-GRIS_800 = (38, 41, 48, 255)        # #262930
+TURQUESA_600 = (0, 190, 200, 255)        # #00bec8 - acento, OG
+TURQUESA_700 = (14, 126, 133, 255)       # #0e7e85 - silueta tintada (coincide con <Logo tinted />)
+TULIP_TREE = (234, 179, 8, 255)          # #eab308 (tulipTree-500)
+GRIS_800 = (38, 41, 48, 255)             # #262930
 
-logo = Image.open(LOGO).convert('RGBA')
-print(f'[input] logo: {logo.size}')
+logo_silhouette = Image.open(LOGO).convert('RGBA')
+print(f'[input] logo: {logo_silhouette.size}')
 
 
-def make_pwa_icon(size: int, logo_pct: float, out_path: str) -> None:
-    """Crea icono cuadrado con logo centrado sobre fondo blanco.
+def tint_logo(color: tuple[int, int, int, int]) -> Image.Image:
+    """Devuelve el logo con la silueta pintada en `color` y mismo alpha que el original.
+
+    El logo de origen es silueta negra opaca sobre transparente. Para tintarlo,
+    creamos un lienzo del color objetivo y le aplicamos el canal alpha del
+    original como mascara: el resultado es la misma silueta pero en el color
+    pedido, con bordes antialias preservados.
+    """
+    canvas = Image.new('RGBA', logo_silhouette.size, color)
+    canvas.putalpha(logo_silhouette.getchannel('A'))
+    return canvas
+
+
+# Logo tintado turquesa - reutilizado por todos los generadores
+logo = tint_logo(TURQUESA_700)
+
+
+def make_favicon(size: int, out_path: str) -> None:
+    """Favicon transparente con silueta turquesa centrada al ancho completo del lienzo.
+
+    A 16x16 los detalles internos del logo (ranuras del piñón) se pierden, pero
+    la silueta global sigue siendo reconocible como nota musical + rueda.
+    """
+    aspect = logo.width / logo.height
+    target_h = size
+    target_w = int(target_h * aspect)
+    if target_w > size:
+        target_w = size
+        target_h = int(target_w / aspect)
+    scaled = logo.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    pos = ((size - target_w) // 2, (size - target_h) // 2)
+    canvas.alpha_composite(scaled, pos)
+    canvas.save(out_path, format='PNG', optimize=True)
+    kb = os.path.getsize(out_path) / 1024
+    print(f'[ok] {out_path}: {size}x{size} -> {kb:.1f} KB')
+
+
+def make_pwa_icon(size: int, logo_pct: float, out_path: str, bg=WHITE) -> None:
+    """Icono cuadrado con logo centrado sobre fondo solido.
 
     logo_pct: ancho del logo como fraccion del lienzo (0-1).
-              <=0.7 deja safe-zone para maskable (80% inner area).
+              <=0.7 deja safe-zone para maskable (Android recorta el 20% exterior).
+    bg: color de fondo del lienzo (RGBA).
     """
-    canvas = Image.new('RGBA', (size, size), WHITE)
+    canvas = Image.new('RGBA', (size, size), bg)
     target_w = int(size * logo_pct)
     aspect = logo.width / logo.height
     target_h = int(target_w / aspect)
-    # No queremos que el logo desborde verticalmente (raro en 2:1, pero seguro)
     if target_h > size * logo_pct:
         target_h = int(size * logo_pct)
         target_w = int(target_h * aspect)
     scaled = logo.resize((target_w, target_h), Image.Resampling.LANCZOS)
     pos = ((size - target_w) // 2, (size - target_h) // 2)
     canvas.alpha_composite(scaled, pos)
-    # Quantize 256 colores para reducir peso
     quant = canvas.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
     quant.save(out_path, format='PNG', optimize=True)
     kb = os.path.getsize(out_path) / 1024
     print(f'[ok] {out_path}: {size}x{size} -> {kb:.1f} KB (logo {target_w}x{target_h})')
 
 
-# 192x192: solo "any". Logo grande (85% ancho).
+# Favicons - silueta turquesa transparente
+make_favicon(16, OUT_FAVICON_16)
+make_favicon(32, OUT_FAVICON_32)
+make_favicon(64, OUT_FAVICON_64)
+
+# Apple Touch Icon - 180x180, fondo blanco, logo al 80% (iOS no recorta pero
+# se ve mejor con un poco de aire)
+make_pwa_icon(180, 0.80, OUT_APPLE)
+
+# PWA 192x192 - "any". Logo grande (85% ancho).
 make_pwa_icon(192, 0.85, OUT_192)
 
-# 512x512: "any" + "maskable". Safe zone 80% -> logo a 70% ancho para holgura.
+# PWA 512x512 - "any" + "maskable". Safe zone 80% -> logo a 70% para holgura.
 make_pwa_icon(512, 0.70, OUT_512)
 
 
 # ----------- OG image (1200x630) -----------
 def make_og_image(out_path: str) -> None:
+    """Open Graph card 1200x630 con layout horizontal: logo izquierda, texto derecha.
+
+    El logo es cuadrado (~1:1). Un layout vertical lo haria desbordar verticalmente
+    en 630px de alto. El layout horizontal aprovecha la proporcion 1200:630 ≈ 2:1
+    y deja respiracion alrededor del texto.
+    """
     W, H = 1200, 630
     canvas = Image.new('RGBA', (W, H), WHITE)
     draw = ImageDraw.Draw(canvas)
 
     # Bandas decorativas turquesa (top/bottom)
     BAND = 10
-    draw.rectangle([0, 0, W, BAND], fill=TURQUESA)
-    draw.rectangle([0, H - BAND, W, H], fill=TURQUESA)
+    draw.rectangle([0, 0, W, BAND], fill=TURQUESA_600)
+    draw.rectangle([0, H - BAND, W, H], fill=TURQUESA_600)
 
-    # Layout: logo arriba centrado + bloque de texto debajo, ambos centrados.
-    # Esto evita problemas de overflow y queda equilibrado para preview social.
-
-    # Logo: 480x240 (ratio 2:1) centrado horizontalmente
-    logo_w_target = 480
+    # Logo izquierda: cuadrado 420x420 con margen 80, centrado verticalmente
+    logo_size = 420
     aspect = logo.width / logo.height
-    logo_h_target = int(logo_w_target / aspect)  # 240
-    scaled = logo.resize((logo_w_target, logo_h_target), Image.Resampling.LANCZOS)
-    logo_x = (W - logo_w_target) // 2
-    logo_y = 70
+    if aspect >= 1:
+        logo_w = logo_size
+        logo_h = int(logo_size / aspect)
+    else:
+        logo_h = logo_size
+        logo_w = int(logo_size * aspect)
+    scaled = logo.resize((logo_w, logo_h), Image.Resampling.LANCZOS)
+    logo_x = 80
+    logo_y = (H - logo_h) // 2
     canvas.alpha_composite(scaled, (logo_x, logo_y))
 
-    # "Cadencia" en Righteous, color tulipTree, centrado
-    font_brand = ImageFont.truetype(FONT_DISPLAY, 96)
+    # Bloque de texto a la derecha del logo, centrado verticalmente
+    text_x = logo_x + logo_size + 60  # 80 (margen) + 420 (logo) + 60 (gap) = 560
+    text_block_center_y = H // 2
+
+    # "Cadencia" en Righteous turquesa
+    font_brand = ImageFont.truetype(FONT_DISPLAY, 110)
     brand_text = 'Cadencia'
-    bb = draw.textbbox((0, 0), brand_text, font=font_brand)
-    brand_w = bb[2] - bb[0]
-    brand_x = (W - brand_w) // 2
-    brand_y = logo_y + logo_h_target + 20
-    draw.text((brand_x, brand_y), brand_text, font=font_brand, fill=TULIP_TREE)
+    bb_brand = draw.textbbox((0, 0), brand_text, font=font_brand)
+    brand_h = bb_brand[3] - bb_brand[1]
 
-    # Tagline (uppercase con tracking manual via espacios) centrada
-    font_tag = ImageFont.truetype(FONT_BODY, 30)
+    # Tagline (uppercase con tracking) en gris.
+    # Tamano calibrado para que quepa en text_x..W-margen sin recortar la
+    # ultima letra ('O' de RITMO).
+    font_tag = ImageFont.truetype(FONT_BODY, 26)
     tag_text = 'P A R A   C I C L I S T A S   C O N   R I T M O'
-    bb = draw.textbbox((0, 0), tag_text, font=font_tag)
-    tag_w = bb[2] - bb[0]
-    tag_x = (W - tag_w) // 2
-    tag_y = brand_y + 110
-    draw.text((tag_x, tag_y), tag_text, font=font_tag, fill=GRIS_800)
+    bb_tag = draw.textbbox((0, 0), tag_text, font=font_tag)
+    tag_h = bb_tag[3] - bb_tag[1]
 
-    # URL pequena en turquesa
-    font_url = ImageFont.truetype(FONT_BODY, 22)
+    # URL en tulipTree
+    font_url = ImageFont.truetype(FONT_BODY, 26)
     url_text = 'cadencia.movimientofuncional.app'
-    bb = draw.textbbox((0, 0), url_text, font=font_url)
-    url_w = bb[2] - bb[0]
-    url_x = (W - url_w) // 2
-    url_y = tag_y + 50
-    draw.text((url_x, url_y), url_text, font=font_url, fill=TURQUESA)
+    bb_url = draw.textbbox((0, 0), url_text, font=font_url)
+    url_h = bb_url[3] - bb_url[1]
 
-    # Quantize para reducir peso
+    # Espaciados entre lineas
+    GAP_BRAND_TAG = 30
+    GAP_TAG_URL = 50
+    total_block_h = brand_h + GAP_BRAND_TAG + tag_h + GAP_TAG_URL + url_h
+    block_top = text_block_center_y - total_block_h // 2
+
+    # Render: brand (turquesa-700, mismo color que logo), tagline (gris), url (tulipTree)
+    draw.text((text_x, block_top), brand_text, font=font_brand, fill=TURQUESA_700)
+    draw.text((text_x, block_top + brand_h + GAP_BRAND_TAG), tag_text, font=font_tag, fill=GRIS_800)
+    draw.text((text_x, block_top + brand_h + GAP_BRAND_TAG + tag_h + GAP_TAG_URL),
+              url_text, font=font_url, fill=TULIP_TREE)
+
     quant = canvas.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
     quant.save(out_path, format='PNG', optimize=True)
     kb = os.path.getsize(out_path) / 1024

@@ -350,7 +350,7 @@ export function ResultStep({
         <div className="flex flex-wrap items-center justify-start md:justify-end gap-2">
           {onRegenerateSeed !== undefined && (
             <Button
-              variant="secondary"
+              variant="accent"
               size="sm"
               iconLeft="casino"
               onClick={onRegenerateSeed}

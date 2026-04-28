@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   EMPTY_USER_INPUTS,
-  loadUserInputsFromSession,
-  saveUserInputsToSession,
+  clearUserInputsFromLocal,
+  isPersistentStorageEnabled,
+  loadUserInputs,
+  saveUserInputs,
+  saveUserInputsToLocal,
   validateUserInputs,
   type UserInputsRaw,
 } from '@core/user';
@@ -116,19 +119,43 @@ function WizardApp(): JSX.Element {
   const [inputs, dispatch] = useReducer(
     userInputsReducer,
     null,
-    (): UserInputsRaw => loadUserInputsFromSession() ?? EMPTY_USER_INPUTS,
+    (): UserInputsRaw => loadUserInputs() ?? EMPTY_USER_INPUTS,
   );
 
   // currentYear cacheado en una sesion (no cambia significativamente durante el uso normal).
   const [currentYear] = useState(() => new Date().getFullYear());
 
-  // Persistencia debounceada en sessionStorage
+  // Opt-in del usuario a persistir sus datos fisiologicos entre sesiones en
+  // este dispositivo (localStorage). La fuente de verdad arranca en la
+  // presencia de la key, asi que estados imposibles (flag sin datos /
+  // datos sin flag) no existen.
+  const [persistentStorage, setPersistentStorageState] = useState<boolean>(
+    () => isPersistentStorageEnabled(),
+  );
+
+  const handlePersistentStorageChange = useCallback(
+    (enabled: boolean): void => {
+      setPersistentStorageState(enabled);
+      if (enabled) {
+        // Snapshot inmediato: si el usuario marca el checkbox tras rellenar
+        // el formulario, no esperamos al siguiente render para escribir.
+        saveUserInputsToLocal(inputs);
+      } else {
+        clearUserInputsFromLocal();
+      }
+    },
+    [inputs],
+  );
+
+  // Persistencia debounceada. sessionStorage se actualiza siempre (necesario
+  // para sobrevivir al OAuth de Spotify); localStorage solo si el opt-in
+  // esta activo.
   useEffect(() => {
     const id = setTimeout(() => {
-      saveUserInputsToSession(inputs);
+      saveUserInputs(inputs, persistentStorage);
     }, 300);
     return () => clearTimeout(id);
-  }, [inputs]);
+  }, [inputs, persistentStorage]);
 
   // Origen de la ruta y plan de sesion editable (rama indoor cycling).
   const [sourceType, setSourceType] = useState<RouteSourceType | null>(
@@ -449,6 +476,8 @@ function WizardApp(): JSX.Element {
             onBack={handleBack}
             onNext={handleNext}
             mode={sourceType === 'session' ? 'session' : 'gpx'}
+            persistentStorage={persistentStorage}
+            onPersistentStorageChange={handlePersistentStorageChange}
           />
         )}
         {currentStep === STEP_DATA && sourceType === null && (
@@ -620,7 +649,7 @@ function Header(): JSX.Element {
   return (
     <header className="border-b border-gris-200 bg-white">
       <div className="mx-auto w-full max-w-4xl px-4 py-4 flex items-center gap-3">
-        <Logo variant="full" size="md" />
+        <Logo variant="full" size="md" tinted />
       </div>
     </header>
   );

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Card } from '@ui/components/Card';
 import { Button } from '@ui/components/Button';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -53,7 +52,7 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
       <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
         {/* Logo + wordmark horizontal centrado */}
         <div className="flex justify-center mb-6">
-          <Logo variant="full" size="xl" orientation="horizontal" />
+          <Logo variant="full" size="xl" orientation="horizontal" tinted />
         </div>
 
         {/* Divisor estilo carretera: linea central discontinua larga */}
@@ -81,7 +80,7 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
             <p className="text-lg md:text-xl text-gris-700 max-w-2xl lg:mx-0 mx-auto mb-6">
               Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
               La app te genera una playlist de Spotify donde cada canción encaja
-              con la intensidad real de cada tramo. Y exportas tu sesión a Zwift,
+              con la intensidad real de cada tramo. Puedes exportar tu sesión a Zwift,
               TrainingPeaks Virtual y otros simuladores.
             </p>
 
@@ -358,10 +357,13 @@ function InteropZwo(): JSX.Element {
             >
               Tu sesión, <span className="text-turquesa-600">en cualquier rodillo</span>
             </h2>
-            <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
+            <p className="text-lg text-gris-700 mb-3 max-w-xl lg:mx-0 mx-auto">
               Cadencia exporta tu plan en formato <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code> estándar.
               Pásalo a Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh o
-              TrainingPeaks Virtual con un clic. ¿Tienes ya un workout en{' '}
+              TrainingPeaks Virtual con un clic.
+            </p>
+            <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
+              ¿Tienes ya un workout en{' '}
               <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code>?
               Súbelo y conviértelo en sesión con música sincronizada.
             </p>
@@ -642,6 +644,7 @@ function WhyItWorks(): JSX.Element {
             citation="Terry et al. 2020"
             doi="10.1037/bul0000216"
             n={3599}
+            accent="gold"
           />
         </div>
         <p className="text-center text-xs text-gris-500 mt-6">
@@ -661,6 +664,13 @@ interface EvidenceCardProps {
   citation: string;
   doi: string;
   n: number;
+  /**
+   * Acento cromatico opcional. Cuando es 'gold' la card se pinta con dorado
+   * (border superior, icono y stat en tulipTree) en vez del turquesa por
+   * defecto. Pensado para destacar UNA card del trio sin romper la jerarquia
+   * cromatica del design-system.
+   */
+  accent?: 'gold';
 }
 
 function EvidenceCard({
@@ -671,14 +681,22 @@ function EvidenceCard({
   citation,
   doi,
   n,
+  accent,
 }: EvidenceCardProps): JSX.Element {
+  const isGold = accent === 'gold';
+  const borderClasses = isGold
+    ? 'border border-gris-200 border-t-4 border-t-tulipTree-400'
+    : 'border border-gris-200';
+  const iconColor = isGold ? 'text-tulipTree-600' : 'text-turquesa-600';
+  const statColor = isGold ? 'text-tulipTree-600' : 'text-turquesa-600';
+  const linkColor = isGold ? 'text-tulipTree-600' : 'text-turquesa-700';
   return (
-    <article className="bg-white border border-gris-200 rounded-xl p-6 shadow-sm">
+    <article className={`bg-white ${borderClasses} rounded-xl p-6 shadow-sm`}>
       <div className="flex items-center gap-3 mb-3">
-        <MaterialIcon name={icon} size="large" className="text-turquesa-600" />
+        <MaterialIcon name={icon} size="large" className={iconColor} />
         <h3 className="font-display text-gris-800 text-xl">{title}</h3>
       </div>
-      <p className="font-display text-turquesa-600 text-3xl mb-2">{stat}</p>
+      <p className={`font-display ${statColor} text-3xl mb-2`}>{stat}</p>
       <p className="text-gris-700 mb-4">{desc}</p>
       <p className="text-xs text-gris-500">
         Fuente:{' '}
@@ -686,7 +704,7 @@ function EvidenceCard({
           href={`https://doi.org/${doi}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-turquesa-700 hover:underline"
+          className={`${linkColor} hover:underline`}
         >
           {citation}
         </a>
@@ -698,39 +716,122 @@ function EvidenceCard({
 }
 
 function Privacy(): JSX.Element {
+  const PROOFS = [
+    {
+      num: '01',
+      icon: 'cloud_off',
+      title: 'Sin servidores ni base de datos',
+      body: 'El cálculo de potencia, la segmentación y el matching musical ocurren dentro de tu navegador.',
+    },
+    {
+      num: '02',
+      icon: 'no_accounts',
+      title: 'Sin registros ni inicio de sesión',
+      body: 'No pides correo, no creas cuenta, no recuperas contraseña. Abres la app y entrenas.',
+    },
+    {
+      num: '03',
+      icon: 'code',
+      title: 'Código fuente abierto y auditable',
+      body: 'Cualquiera puede leer cómo funciona Cadencia, verificarlo y proponer mejoras.',
+    },
+  ] as const;
+
   return (
-    <section aria-labelledby="privacy-title" className="bg-white">
-      <div className="mx-auto w-full max-w-3xl px-4 py-12 md:py-16">
-        <Card
-          variant="tip"
-          title="Tus datos no salen de tu dispositivo"
-          titleIcon="lock"
-        >
-          <p className="text-gris-700 mb-3">
-            No tenemos servidores. No tenemos cuentas. No tenemos cookies de
-            seguimiento. Todo el cálculo de potencia, segmentación y
-            emparejamiento musical ocurre dentro de tu navegador.
-          </p>
-          <p className="text-gris-700 mb-3">
-            Solo nos conectamos a Spotify cuando tú decides crear la playlist,
-            y únicamente con permiso para añadir canciones a tu cuenta. Tus
-            datos físicos, tu GPX y tu ruta nunca salen de aquí.
-          </p>
-          <ul className="space-y-2 text-gris-700">
-            <li className="flex items-center gap-2">
-              <MaterialIcon name="check_circle" className="text-turquesa-600" />
-              Sin registros ni inicio de sesión.
-            </li>
-            <li className="flex items-center gap-2">
-              <MaterialIcon name="check_circle" className="text-turquesa-600" />
-              Sin base de datos en la nube.
-            </li>
-            <li className="flex items-center gap-2">
-              <MaterialIcon name="check_circle" className="text-turquesa-600" />
-              Código fuente abierto y auditable.
-            </li>
+    <section aria-labelledby="privacy-title" className="relative bg-white overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-8 -left-8 h-48 w-48 opacity-[0.08]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #00bec8 1.2px, transparent 1.2px)',
+          backgroundSize: '14px 14px',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-8 -right-8 h-48 w-48 opacity-[0.06]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, #00bec8 1.2px, transparent 1.2px)',
+          backgroundSize: '14px 14px',
+        }}
+      />
+
+      <div className="relative mx-auto w-full max-w-5xl px-4 py-16 md:py-24">
+        <div className="grid items-start gap-10 lg:grid-cols-[1.2fr_1fr] lg:gap-16">
+          <div>
+            <p className="mb-5 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-turquesa-700">
+              <MaterialIcon name="lock" size="small" />
+              Privacidad
+            </p>
+
+            <h2
+              id="privacy-title"
+              className="mb-7 font-display text-4xl leading-[1.05] text-gris-800 md:text-5xl"
+            >
+              Tus datos
+              <br />
+              <span className="text-turquesa-600">no salen</span> de aquí.
+            </h2>
+
+            <ul className="mb-8 space-y-2.5 text-lg text-gris-700 max-w-md">
+              <li>
+                No tenemos{' '}
+                <span className="text-gris-400 line-through decoration-turquesa-600 decoration-[2px] underline-offset-2">
+                  servidores
+                </span>
+                .
+              </li>
+              <li>
+                No tenemos{' '}
+                <span className="text-gris-400 line-through decoration-turquesa-600 decoration-[2px] underline-offset-2">
+                  cuentas
+                </span>
+                .
+              </li>
+              <li>
+                No tenemos{' '}
+                <span className="text-gris-400 line-through decoration-turquesa-600 decoration-[2px] underline-offset-2">
+                  cookies de seguimiento
+                </span>
+                .
+              </li>
+            </ul>
+
+            <div className="border-t border-gris-200 pt-6 max-w-md">
+              <p className="flex gap-3 text-base leading-relaxed text-gris-600">
+                <MaterialIcon name="bolt" size="small" className="mt-1 shrink-0 text-tulipTree-500" />
+                <span>
+                  Solo nos conectamos a Spotify cuando{' '}
+                  <span className="font-semibold text-gris-800">tú</span> decides crear la playlist, y únicamente para añadir canciones a tu cuenta. Tus datos físicos, tu GPX y tu ruta nunca salen de tu navegador.
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <ul className="space-y-3.5">
+            {PROOFS.map(({ num, icon, title, body }) => (
+              <li
+                key={num}
+                className="group relative overflow-hidden rounded-xl border border-gris-200 bg-white p-5 pl-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-turquesa-400 hover:shadow-[0_8px_24px_-12px_rgba(0,190,200,0.45)]"
+              >
+                <span
+                  aria-hidden="true"
+                  className="absolute left-0 top-5 bottom-5 w-1 rounded-r-full bg-turquesa-600 transition-all duration-200 group-hover:top-3 group-hover:bottom-3"
+                />
+                <div className="flex items-start gap-4">
+                  <div className="flex shrink-0 flex-col items-center pt-0.5">
+                    <span className="font-display text-2xl leading-none text-turquesa-700">{num}</span>
+                    <MaterialIcon name={icon} size="medium" className="mt-2 text-turquesa-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="mb-1 text-base font-semibold text-gris-800">{title}</h3>
+                    <p className="text-sm leading-relaxed text-gris-600">{body}</p>
+                  </div>
+                </div>
+              </li>
+            ))}
           </ul>
-        </Card>
+        </div>
       </div>
     </section>
   );
@@ -767,7 +868,7 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   },
   {
     q: '¿Mis datos físicos se guardan en algún sitio?',
-    a: 'No. Los datos viven solo en la pestaña actual del navegador y se borran cuando la cierras. No tenemos servidores donde almacenarlos.',
+    a: 'Nunca en un servidor. Por defecto viven solo en la pestaña actual y se borran al cerrarla. Si marcas "Recordar mis datos en este dispositivo", se guardan en el almacenamiento local del navegador para no tener que volver a escribirlos — siguen estando solo en tu equipo, no salen a ningún servidor, y puedes borrarlos cuando quieras desde la propia app.',
   },
 ] as const;
 

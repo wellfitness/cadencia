@@ -19,4 +19,11 @@ export {
   loadUserInputsFromSession,
   saveUserInputsToSession,
   clearUserInputsFromSession,
+  loadUserInputsFromLocal,
+  saveUserInputsToLocal,
+  clearUserInputsFromLocal,
+  isPersistentStorageEnabled,
+  loadUserInputs,
+  saveUserInputs,
+  clearAllUserInputs,
 } from './storage';

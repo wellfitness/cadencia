@@ -90,7 +90,7 @@ function SocialLink({ href, icon, label }: SocialLinkProps): JSX.Element {
 
 export function SiteFooter(): JSX.Element {
   return (
-    <footer className="bg-gris-900 text-gris-300 px-4 pt-12 pb-6 mt-8">
+    <footer className="bg-gris-900 text-gris-300 px-4 pt-12 pb-6">
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[1fr_1.2fr_0.6fr] gap-6">
 
         {/* Columna 1: Tarjeta Elena */}

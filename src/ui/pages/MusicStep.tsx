@@ -188,12 +188,12 @@ export function MusicStep({
         <button
           type="button"
           onClick={() => navigateInApp('/catalogo')}
-          className="mt-4 w-full inline-flex items-start gap-3 px-3 py-3 rounded-lg border border-gris-300 bg-white text-left hover:border-turquesa-400 hover:bg-turquesa-50 transition-colors min-h-[44px]"
+          className="mt-4 w-full inline-flex items-start gap-3 px-3 py-3 rounded-lg border border-gris-300 bg-white text-left hover:border-tulipTree-400 hover:bg-tulipTree-50 transition-colors min-h-[44px]"
         >
           <MaterialIcon
             name="edit_note"
             size="small"
-            className="text-turquesa-600 mt-0.5 flex-shrink-0"
+            className="text-tulipTree-600 mt-0.5 flex-shrink-0"
           />
           <span className="flex-1 min-w-0">
             <span className="block text-sm font-semibold text-gris-800">

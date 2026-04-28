@@ -18,21 +18,27 @@ export interface LogoProps {
    *   pantallas de about, splash.
    */
   orientation?: LogoOrientation;
+  /**
+   * Si true, el simbolo se renderiza con CSS mask-image y se tiñe con el
+   * color primario de marca (turquesa-700) en vez de mostrar el PNG tal cual.
+   * Requiere que el PNG tenga fondo transparente (RGBA con alpha).
+   */
+  tinted?: boolean;
   className?: string;
 }
 
 const MARK_HEIGHT_BY_SIZE: Record<LogoSize, string> = {
   sm: 'h-8',
-  md: 'h-10',
+  md: 'h-12',
   lg: 'h-14',
-  xl: 'h-20 md:h-24',
+  xl: 'h-24 md:h-[7.2rem]',
 };
 
 const WORDMARK_SIZE_BY_SIZE: Record<LogoSize, string> = {
   sm: 'text-lg',
-  md: 'text-2xl md:text-3xl',
+  md: 'text-[1.8rem] md:text-[2.25rem]',
   lg: 'text-3xl md:text-4xl',
-  xl: 'text-4xl md:text-5xl',
+  xl: 'text-[2.7rem] md:text-[3.6rem]',
 };
 
 const TAGLINE_SIZE_BY_SIZE: Record<LogoSize, string> = {
@@ -46,6 +52,7 @@ export function Logo({
   variant = 'brand',
   size = 'md',
   orientation = 'horizontal',
+  tinted = false,
   className = '',
 }: LogoProps): JSX.Element {
   const markClass = MARK_HEIGHT_BY_SIZE[size];
@@ -65,13 +72,32 @@ export function Logo({
 
   return (
     <div className={`${containerClass} ${className}`}>
-      <img
-        src="/logo.png"
-        alt={isMarkOnly ? 'Cadencia' : ''}
-        aria-hidden={!isMarkOnly}
-        className={`${markClass} w-auto select-none`}
-        draggable={false}
-      />
+      {tinted ? (
+        <div
+          role={isMarkOnly ? 'img' : undefined}
+          aria-label={isMarkOnly ? 'Cadencia' : undefined}
+          aria-hidden={!isMarkOnly}
+          className={`${markClass} aspect-square select-none bg-turquesa-700`}
+          style={{
+            WebkitMaskImage: 'url(/logo.png)',
+            WebkitMaskRepeat: 'no-repeat',
+            WebkitMaskSize: 'contain',
+            WebkitMaskPosition: 'center',
+            maskImage: 'url(/logo.png)',
+            maskRepeat: 'no-repeat',
+            maskSize: 'contain',
+            maskPosition: 'center',
+          }}
+        />
+      ) : (
+        <img
+          src="/logo.png"
+          alt={isMarkOnly ? 'Cadencia' : ''}
+          aria-hidden={!isMarkOnly}
+          className={`${markClass} w-auto select-none`}
+          draggable={false}
+        />
+      )}
       {variant !== 'mark' && (
         <div className={textBlockClass}>
           <span

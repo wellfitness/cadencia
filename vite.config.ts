@@ -8,7 +8,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'robots.txt'],
+      includeAssets: [
+        'favicon-16x16.png',
+        'favicon-32x32.png',
+        'favicon-64x64.png',
+        'apple-touch-icon.png',
+        'og-image.png',
+        'robots.txt',
+      ],
       manifest: {
         name: 'Cadencia — para ciclistas con ritmo',
         short_name: 'Cadencia',

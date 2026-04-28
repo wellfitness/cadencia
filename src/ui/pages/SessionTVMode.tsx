@@ -80,7 +80,7 @@ const WARNING_BEEP_TIMES = new Set([10, 5, 3, 2, 1]);
  * playlist de Spotify en otra app (la app no controla audio externo).
  *
  * Atajos: Space (play/pause), Flechas (saltar fase), Esc (cerrar),
- *         S (sonido), R (reiniciar).
+ *         S (sonido), V (vibración, solo si el navegador la soporta), R (reiniciar).
  */
 export function SessionTVMode({
   plan,
@@ -100,6 +100,14 @@ export function SessionTVMode({
   const [isCompleted, setIsCompleted] = useState(false);
   const [totalElapsed, setTotalElapsed] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [vibrationEnabled, setVibrationEnabled] = useState(true);
+
+  // Detección estable: Safari iOS no implementa Vibration API, ni la mayoría
+  // de tablets tiene motor háptico aunque navegador la exponga.
+  const vibrationSupported = useMemo(
+    () => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function',
+    [],
+  );
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -156,9 +164,22 @@ export function SessionTVMode({
     [soundEnabled],
   );
 
+  const vibrate = useCallback(
+    (pattern: number | number[]): void => {
+      if (!vibrationEnabled || !vibrationSupported) return;
+      try {
+        navigator.vibrate(pattern);
+      } catch {
+        // No disponible: degradacion silenciosa
+      }
+    },
+    [vibrationEnabled, vibrationSupported],
+  );
+
   const playWarning = useCallback((): void => {
     playBeep(660, 100, 0.25);
-  }, [playBeep]);
+    vibrate(80);
+  }, [playBeep, vibrate]);
 
   const playPhaseChange = useCallback((): void => {
     playBeep(880, 150);
@@ -171,7 +192,8 @@ export function SessionTVMode({
     setTimeout(() => playBeep(659, 200), 250);
     setTimeout(() => playBeep(784, 200), 500);
     setTimeout(() => playBeep(1047, 400), 750);
-  }, [playBeep]);
+    vibrate([300, 100, 300, 100, 500]);
+  }, [playBeep, vibrate]);
 
   const goToNextPhase = useCallback((): void => {
     if (currentIndex < blocks.length - 1) {
@@ -180,12 +202,15 @@ export function SessionTVMode({
       setCurrentIndex(nextIndex);
       setTimeRemaining(nextBlock?.durationSec ?? 0);
       playPhaseChange();
+      // Sprint Z6 → patrón más largo y rotundo para que se note sobre el manillar.
+      const isZ6Sprint = nextBlock?.zone === 6;
+      vibrate(isZ6Sprint ? [400, 80, 400, 80, 400] : [200, 100, 200]);
     } else {
       setIsCompleted(true);
       setIsRunning(false);
       playCompletion();
     }
-  }, [currentIndex, blocks, playPhaseChange, playCompletion]);
+  }, [currentIndex, blocks, playPhaseChange, playCompletion, vibrate]);
 
   const goToPrevPhase = useCallback((): void => {
     if (currentIndex > 0) {
@@ -265,6 +290,12 @@ export function SessionTVMode({
           e.preventDefault();
           setSoundEnabled((prev) => !prev);
           break;
+        case 'v':
+        case 'V':
+          if (!vibrationSupported) break;
+          e.preventDefault();
+          setVibrationEnabled((prev) => !prev);
+          break;
         case 'r':
         case 'R':
           e.preventDefault();
@@ -274,7 +305,7 @@ export function SessionTVMode({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [toggleRunning, goToNextPhase, goToPrevPhase, onClose, restart]);
+  }, [toggleRunning, goToNextPhase, goToPrevPhase, onClose, restart, vibrationSupported]);
 
   if (blocks.length === 0 || currentBlock === undefined) {
     return (
@@ -336,6 +367,13 @@ export function SessionTVMode({
             icon={soundEnabled ? 'volume_up' : 'volume_off'}
             onClick={() => setSoundEnabled((prev) => !prev)}
           />
+          {vibrationSupported && (
+            <ControlButton
+              label={vibrationEnabled ? 'Desactivar vibración' : 'Activar vibración'}
+              icon={vibrationEnabled ? 'vibration' : 'phone_android'}
+              onClick={() => setVibrationEnabled((prev) => !prev)}
+            />
+          )}
           <ControlButton label="Reiniciar" icon="replay" onClick={restart} />
           <ControlButton label="Cerrar modo TV" icon="close" onClick={onClose} variant="danger" />
         </div>

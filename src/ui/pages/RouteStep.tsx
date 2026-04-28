@@ -283,14 +283,21 @@ function GpxRouteFlow({
       )}
 
       {phase === 'error' && (
-        <Card variant="info" title="No se pudo procesar el archivo" titleIcon="error_outline">
+        <div
+          role="alert"
+          className="rounded-xl border border-rosa-100 bg-rosa-100/40 border-l-4 border-l-rosa-500 p-3 md:p-5"
+        >
+          <h3 className="flex items-center gap-2 text-base md:text-lg font-semibold mb-2 md:mb-3 text-rosa-700">
+            <MaterialIcon name="error_outline" size="small" />
+            No se pudo procesar el archivo
+          </h3>
           <p className="text-gris-700 mb-4">
             {errorMessage ?? 'Ha ocurrido un error inesperado.'}
           </p>
           <Button variant="primary" iconLeft="refresh" onClick={handleReset}>
             Probar de nuevo
           </Button>
-        </Card>
+        </div>
       )}
 
       {phase === 'ready' && segments && meta && (

@@ -56,6 +56,7 @@ pnpm test:run             # Vitest unit, run-once
 pnpm test:coverage        # Cobertura sobre src/core/
 pnpm test:e2e             # Playwright E2E
 pnpm build:tracks         # Recompila src/data/tracks/all.csv desde sources/
+pnpm build:assets         # Regenera favicons, iconos PWA y og-image.png desde public/logo.png
 pnpm deploy               # Sube dist/ a Hostinger por FTP (requiere .env.local)
 pnpm deploy:full          # build + deploy en una sola tanda
 ```

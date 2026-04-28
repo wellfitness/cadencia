@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { MaterialIcon } from './MaterialIcon';
 
-export type ButtonVariant = 'primary' | 'critical' | 'secondary';
+export type ButtonVariant = 'primary' | 'critical' | 'secondary' | 'accent';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -11,6 +11,10 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
     'bg-rosa-600 text-white border-rosa-700 hover:bg-rosa-700 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(225,29,72,0.3)] active:translate-y-0',
   secondary:
     'bg-white text-gris-700 border-gris-300 hover:bg-gris-50 hover:border-gris-400',
+  // Acento dorado: para acciones secundarias distintivas (regenerar, exportar
+  // .zwo, features info-tipo). NO destructivo, NO primary — un escalon entre.
+  accent:
+    'bg-white text-tulipTree-600 border-tulipTree-400 hover:bg-tulipTree-50 hover:border-tulipTree-500 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(234,179,8,0.25)] active:translate-y-0',
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {

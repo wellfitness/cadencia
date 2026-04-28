@@ -62,6 +62,14 @@ function SourceCard({
   highlights,
   onSelect,
 }: SourceCardProps): JSX.Element {
+  // El pill del icono se pinta dorado para 'session' y turquesa para 'gpx',
+  // diferenciando las dos hermanas a primera vista sin desplazar la primary
+  // turquesa fuera de su rol (los hovers de borde, titulo y flecha siguen
+  // siendo turquesa: la accion principal sigue siendo "navegar al wizard").
+  const iconPillClasses =
+    choice === 'session'
+      ? 'bg-tulipTree-50 text-tulipTree-600 group-hover:bg-tulipTree-100'
+      : 'bg-turquesa-50 text-turquesa-600 group-hover:bg-turquesa-100';
   return (
     <button
       type="button"
@@ -69,7 +77,9 @@ function SourceCard({
       className="group text-left bg-white border-2 border-gris-200 rounded-xl p-4 md:p-5 hover:border-turquesa-500 hover:shadow-[0_4px_12px_rgba(0,190,200,0.15)] hover:-translate-y-0.5 transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-turquesa-500 focus-visible:ring-offset-2"
     >
       <div className="flex items-start gap-3 mb-2 md:mb-3">
-        <span className="flex items-center justify-center w-12 h-12 rounded-lg bg-turquesa-50 text-turquesa-600 group-hover:bg-turquesa-100 transition-colors">
+        <span
+          className={`flex items-center justify-center w-12 h-12 rounded-lg transition-colors ${iconPillClasses}`}
+        >
           <MaterialIcon name={icon} size="medium" decorative />
         </span>
         <div className="flex-1 min-w-0">
