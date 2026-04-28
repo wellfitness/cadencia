@@ -1,4 +1,4 @@
-import { calculateMaxHeartRateGulati } from '../physiology/maxHeartRate';
+import { calculateMaxHeartRate } from '../physiology/maxHeartRate';
 import {
   BIKE_TYPES,
   DEFAULTS,
@@ -17,6 +17,7 @@ export type ValidationError =
   | { code: 'MAX_HR_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'RESTING_HR_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'RESTING_GE_MAX_HR' }
+  | { code: 'SEX_REQUIRED' }
   | { code: 'BIKE_WEIGHT_OUT_OF_RANGE'; min: number; max: number }
   | { code: 'BIKE_TYPE_INVALID' };
 
@@ -99,6 +100,12 @@ export function validateUserInputs(
     errors.push({ code: 'NEED_FTP_OR_HR_DATA' });
   }
 
+  // 3b. Si vamos a estimar FC max desde edad (birthYear sin FC max medida),
+  // necesitamos sexo: las formulas Gulati/Tanaka divergen ~10 bpm.
+  if (hasBirthYear && !hasMaxHr && raw.sex === null) {
+    errors.push({ code: 'SEX_REQUIRED' });
+  }
+
   // 4. birthYear (si esta, debe ser valido)
   const birthYearMax = currentYear - limits.birthYear.maxOffsetFromCurrent;
   if (raw.birthYear !== null && !inRange(raw.birthYear, limits.birthYear.min, birthYearMax)) {
@@ -157,12 +164,13 @@ export function validateUserInputs(
   // weightKg garantizado por la validacion de arriba
   const weightKg = raw.weightKg as number;
 
-  // Calcular FC max efectiva
+  // Calcular FC max efectiva. En modo gpx, si llegamos aqui con birthYear y
+  // sin maxHeartRate, sex esta garantizado no-null por la regla SEX_REQUIRED.
   let effectiveMaxHr: number | null = null;
   if (raw.maxHeartRate !== null) {
     effectiveMaxHr = raw.maxHeartRate;
-  } else if (raw.birthYear !== null) {
-    effectiveMaxHr = calculateMaxHeartRateGulati(currentYear - raw.birthYear);
+  } else if (raw.birthYear !== null && raw.sex !== null) {
+    effectiveMaxHr = calculateMaxHeartRate(currentYear - raw.birthYear, raw.sex);
   }
 
   // Validacion cruzada: FC reposo < FC max
@@ -188,6 +196,7 @@ export function validateUserInputs(
       effectiveMaxHr,
       restingHeartRate: raw.restingHeartRate,
       birthYear: raw.birthYear,
+      sex: raw.sex,
       bikeWeightKg,
       bikeType,
       hasFtp,
@@ -264,12 +273,13 @@ function validateSession(raw: UserInputsRaw, currentYear: number): ValidationRes
     return { ok: false, errors };
   }
 
-  // Calcular FC max efectiva
+  // Calcular FC max efectiva. Si el usuario dio birthYear pero no sex, no
+  // podemos estimar desde edad (fail open: ya esta todo opcional en session).
   let effectiveMaxHr: number | null = null;
   if (raw.maxHeartRate !== null) {
     effectiveMaxHr = raw.maxHeartRate;
-  } else if (raw.birthYear !== null) {
-    effectiveMaxHr = calculateMaxHeartRateGulati(currentYear - raw.birthYear);
+  } else if (raw.birthYear !== null && raw.sex !== null) {
+    effectiveMaxHr = calculateMaxHeartRate(currentYear - raw.birthYear, raw.sex);
   }
 
   // Validacion cruzada: FC reposo < FC max
@@ -298,6 +308,7 @@ function validateSession(raw: UserInputsRaw, currentYear: number): ValidationRes
       effectiveMaxHr,
       restingHeartRate: raw.restingHeartRate,
       birthYear: raw.birthYear,
+      sex: raw.sex,
       bikeWeightKg,
       bikeType,
       hasFtp,
@@ -325,6 +336,8 @@ export function describeValidationError(err: ValidationError): string {
       return `La FC en reposo debe estar entre ${err.min} y ${err.max} bpm.`;
     case 'RESTING_GE_MAX_HR':
       return 'La FC en reposo no puede ser mayor o igual que la FC máxima.';
+    case 'SEX_REQUIRED':
+      return 'Indícanos si eres mujer u hombre para estimar tu FC máxima por edad.';
     case 'BIKE_WEIGHT_OUT_OF_RANGE':
       return `El peso de la bici debe estar entre ${err.min} y ${err.max} kg.`;
     case 'BIKE_TYPE_INVALID':

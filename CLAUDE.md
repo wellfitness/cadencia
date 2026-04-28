@@ -86,7 +86,7 @@ Separación estricta entre **lógica pura** y **UI**, para que los cálculos sea
 ```
 src/
   core/                       # TypeScript puro, SIN imports de React ni del DOM
-    physiology/               # FC máx (Gulati), zonas Karvonen y Coggan
+    physiology/               # FC máx (Gulati ♀ / Tanaka ♂), zonas Karvonen y Coggan
     gpx/                      # Parser GPX (DOMParser), haversine, pendiente
     power/                    # Ecuación de potencia (gravedad + rodadura + aero)
     segmentation/             # Bloques de 60 s, clasificación en zonas, plan de sesión, plantillas
@@ -138,6 +138,7 @@ FTP en vatios (W)                opcional
       FC máxima (bpm)            opcional
       FC en reposo (bpm)         opcional (necesaria para Karvonen)
       Año de nacimiento          obligatorio si no hay FC máx Y modo gpx
+      Sexo biológico             obligatorio si se estima FC máx por edad (gpx)
 ```
 
 **Validación bifurcada por modo** (`src/core/user/validation.ts`):
@@ -146,16 +147,20 @@ FTP en vatios (W)                opcional
 |---|---|---|
 | Peso | obligatorio (alimenta ecuación de potencia) | opcional, default 70 kg |
 | FTP / FC máx / FC reposo / año nac | uno mínimo (FTP, o FC máx, o birthYear) | todos opcionales (el usuario marca zonas a mano) |
+| Sexo biológico | obligatorio sii `birthYear && !maxHeartRate` (para elegir fórmula) | opcional; sin él, no se estima FC máx por edad |
 
 La pública objetivo prioritaria son **ciclistas con pulsómetro** (FC), no con potenciómetro (FTP). El UI prioriza inputs de FC; FTP es la excepción para usuarios avanzados.
 
-### FC máxima teórica (fórmula de Gulati)
+### FC máxima teórica (fórmulas por sexo biológico)
 
-Más precisa que Tanaka, especialmente en mujeres:
+Si el usuario no mide su FC máx con pulsómetro, se estima por edad usando la fórmula derivada para su sexo. Ofrecer ambas en lugar de una única fórmula mixta evita un sesgo sistemático de ~10 bpm en mujeres, suficiente para desplazar una banda Karvonen entera.
 
 ```
-FC_max = 211 - 0.64 × edad
+Mujer  → FC_max = 206 - 0.88 × edad     (Gulati et al., Circulation 2010, n = 5.437 mujeres)
+Hombre → FC_max = 208 - 0.7  × edad     (Tanaka et al., JACC 2001, meta-análisis n = 18.712)
 ```
+
+El código vive en `calculateMaxHeartRate(ageYears, sex)` en [src/core/physiology/maxHeartRate.ts](src/core/physiology/maxHeartRate.ts). Si el usuario mete su FC máx medida directamente, este cálculo no se invoca y `sex` es irrelevante.
 
 ### Zonas de FC (Karvonen, requiere FC reposo)
 

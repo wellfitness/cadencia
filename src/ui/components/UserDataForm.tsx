@@ -5,12 +5,13 @@ import {
   VALIDATION_LIMITS,
   describeValidationError,
   type BikeType,
+  type BiologicalSex,
   type UserInputsRaw,
   type ValidationError,
   type ValidationResult,
 } from '@core/user';
 import { BIKE_TYPE_ICONS, BIKE_TYPE_LABELS } from '@core/power';
-import { calculateMaxHeartRateGulati } from '@core/physiology';
+import { calculateMaxHeartRate } from '@core/physiology';
 import { Card } from './Card';
 import { Input } from './Input';
 import { MaterialIcon } from './MaterialIcon';
@@ -72,11 +73,12 @@ export function UserDataForm({
 
   const estimatedMaxHr: number | null = useMemo(() => {
     if (inputs.birthYear === null || inputs.maxHeartRate !== null) return null;
+    if (inputs.sex === null) return null;
     const limits = VALIDATION_LIMITS.birthYear;
     const max = currentYear - limits.maxOffsetFromCurrent;
     if (inputs.birthYear < limits.min || inputs.birthYear > max) return null;
-    return calculateMaxHeartRateGulati(currentYear - inputs.birthYear);
-  }, [inputs.birthYear, inputs.maxHeartRate, currentYear]);
+    return calculateMaxHeartRate(currentYear - inputs.birthYear, inputs.sex);
+  }, [inputs.birthYear, inputs.maxHeartRate, inputs.sex, currentYear]);
 
   const setField = (field: NumericFieldKey) => (e: ChangeEvent<HTMLInputElement>) => {
     dispatch({ type: 'SET_NUMBER', field, value: parseNumberInput(e.target.value) });
@@ -84,6 +86,10 @@ export function UserDataForm({
 
   const setBikeType = (value: BikeType): void => {
     dispatch({ type: 'SET_BIKE_TYPE', value });
+  };
+
+  const setSex = (value: BiologicalSex): void => {
+    dispatch({ type: 'SET_SEX', value });
   };
 
   const effectiveBikeType: BikeType = inputs.bikeType ?? DEFAULTS.bikeType;
@@ -99,6 +105,7 @@ export function UserDataForm({
 
   const globalNeedHrError = errors.find((e) => e.code === 'NEED_FTP_OR_HR_DATA');
   const globalRestingError = errors.find((e) => e.code === 'RESTING_GE_MAX_HR');
+  const globalSexError = errors.find((e) => e.code === 'SEX_REQUIRED');
 
   const fieldFeedback = (
     codes: ValidationError['code'][],
@@ -236,8 +243,17 @@ export function UserDataForm({
                 onChange={setField('birthYear')}
                 {...fieldFeedback(
                   ['BIRTH_YEAR_OUT_OF_RANGE'],
-                  'La estimamos con la fórmula de Gulati (más precisa que Tanaka).',
+                  'Usamos Gulati (mujeres) o Tanaka (hombres) según el sexo.',
                 )}
+              />
+              <SexSelector
+                value={inputs.sex}
+                onChange={setSex}
+                error={
+                  globalSexError && showVacios
+                    ? describeValidationError(globalSexError)
+                    : undefined
+                }
               />
               {estimatedMaxHr !== null && (
                 <div
@@ -304,6 +320,68 @@ export function UserDataForm({
             máxima o año de nacimiento.
           </p>
         </Card>
+      )}
+    </div>
+  );
+}
+
+interface SexSelectorProps {
+  value: BiologicalSex | null;
+  onChange: (value: BiologicalSex) => void;
+  error: string | undefined;
+}
+
+/**
+ * Selector binario mujer/hombre. Solo aparece cuando se va a estimar la FC max
+ * por edad: las formulas Gulati (mujeres) y Tanaka (hombres) divergen ~10 bpm,
+ * lo que mueve una banda Karvonen entera. Si el usuario mide su FC max con
+ * pulsometro, este selector no se usa.
+ */
+function SexSelector({ value, onChange, error }: SexSelectorProps): JSX.Element {
+  const options: ReadonlyArray<{ value: BiologicalSex; label: string; icon: string }> = [
+    { value: 'female', label: 'Mujer', icon: 'female' },
+    { value: 'male', label: 'Hombre', icon: 'male' },
+  ];
+  return (
+    <div className="space-y-1">
+      <span className="block text-sm font-semibold text-gris-700">
+        Sexo biológico <span className="text-gris-500 font-normal">(para la fórmula clínica)</span>
+      </span>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Sexo biológico">
+        {options.map((opt) => {
+          const selected = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(opt.value)}
+              className={`flex items-center justify-center gap-2 rounded-lg border-2 px-3 py-2 min-h-[44px] transition-colors duration-200 ${
+                selected
+                  ? 'border-turquesa-600 bg-turquesa-50 text-turquesa-800'
+                  : 'border-gris-200 bg-white text-gris-700 hover:border-turquesa-400 hover:bg-turquesa-50/40'
+              }`}
+            >
+              <MaterialIcon
+                name={opt.icon}
+                size="small"
+                className={selected ? 'text-turquesa-600' : 'text-gris-500'}
+              />
+              <span className="text-sm font-semibold">{opt.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {error !== undefined ? (
+        <p role="alert" className="text-sm text-error font-medium flex items-center gap-2">
+          <MaterialIcon name="error_outline" size="small" className="text-error" />
+          {error}
+        </p>
+      ) : (
+        <p className="text-xs text-gris-600">
+          Gulati para mujeres, Tanaka para hombres. Diferencia ≈10 bpm.
+        </p>
       )}
     </div>
   );

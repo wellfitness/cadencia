@@ -34,22 +34,36 @@ describe('validateUserInputs', () => {
       }
     });
 
-    it('valida user con peso + birthYear: calcula FC max via Gulati', () => {
+    it('valida user mujer + birthYear: calcula FC max via Gulati (206 - 0.88*edad)', () => {
       const result = validateUserInputs(
-        buildRaw({ weightKg: 65, birthYear: 1980 }),
+        buildRaw({ weightKg: 65, birthYear: 1980, sex: 'female' }),
         CURRENT_YEAR,
       );
       expect(result.ok).toBe(true);
       if (result.ok) {
-        // edad = 2026 - 1980 = 46 -> 211 - 0.64*46 = 181.56
-        expect(result.data.effectiveMaxHr).toBeCloseTo(181.56, 2);
+        // edad = 2026 - 1980 = 46 -> 206 - 0.88*46 = 165.52
+        expect(result.data.effectiveMaxHr).toBeCloseTo(165.52, 2);
         expect(result.data.hasHeartRateZones).toBe(false);
+        expect(result.data.sex).toBe('female');
       }
     });
 
-    it('valida user con peso + birthYear + FC reposo: hasHeartRateZones=true', () => {
+    it('valida user hombre + birthYear: calcula FC max via Tanaka (208 - 0.7*edad)', () => {
       const result = validateUserInputs(
-        buildRaw({ weightKg: 65, birthYear: 1980, restingHeartRate: 55 }),
+        buildRaw({ weightKg: 75, birthYear: 1980, sex: 'male' }),
+        CURRENT_YEAR,
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // edad = 2026 - 1980 = 46 -> 208 - 0.7*46 = 175.8
+        expect(result.data.effectiveMaxHr).toBeCloseTo(175.8, 2);
+        expect(result.data.sex).toBe('male');
+      }
+    });
+
+    it('valida user con peso + birthYear + sex + FC reposo: hasHeartRateZones=true', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 65, birthYear: 1980, sex: 'female', restingHeartRate: 55 }),
         CURRENT_YEAR,
       );
       expect(result.ok).toBe(true);
@@ -167,20 +181,48 @@ describe('validateUserInputs', () => {
       }
     });
 
-    it('FC reposo > FC max calculada Gulati -> RESTING_GE_MAX_HR', () => {
-      // Gulati(46) = 181.56, asi que 200 > 181.56
+    it('FC reposo vs FC max calculada por edad+sex', () => {
+      // Mujer 46 anos: Gulati(46) = 165.52. FC reposo 95 < 165 -> ok
       const result = validateUserInputs(
-        buildRaw({ weightKg: 70, birthYear: 1980, restingHeartRate: 95 }),
+        buildRaw({ weightKg: 70, birthYear: 1980, sex: 'female', restingHeartRate: 95 }),
         CURRENT_YEAR,
       );
-      // 95 < 181.56 -> deberia ser ok
       expect(result.ok).toBe(true);
+      // Hombre 46 anos: Tanaka(46) = 175.8. FC reposo 95 < 176 -> ok
       const result2 = validateUserInputs(
-        buildRaw({ weightKg: 70, birthYear: 1940, restingHeartRate: 95 }),
+        buildRaw({ weightKg: 70, birthYear: 1980, sex: 'male', restingHeartRate: 95 }),
         CURRENT_YEAR,
       );
-      // edad 86 -> Gulati = 211 - 0.64*86 = 155.96, FC reposo 95 valida (< 156)
       expect(result2.ok).toBe(true);
+    });
+
+    it('birthYear sin sex en modo gpx -> SEX_REQUIRED', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, birthYear: 1980 }),
+        CURRENT_YEAR,
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.map((e) => e.code)).toContain('SEX_REQUIRED');
+      }
+    });
+
+    it('FC max manual + birthYear sin sex no dispara SEX_REQUIRED', () => {
+      // Si el usuario mide su FC max, sex no se necesita aunque haya birthYear
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, birthYear: 1980, maxHeartRate: 188 }),
+        CURRENT_YEAR,
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.data.effectiveMaxHr).toBe(188);
+    });
+
+    it('FTP + sin FC ni birthYear no dispara SEX_REQUIRED', () => {
+      const result = validateUserInputs(
+        buildRaw({ weightKg: 70, ftpWatts: 220 }),
+        CURRENT_YEAR,
+      );
+      expect(result.ok).toBe(true);
     });
 
     it('acumula multiples errores en una sola pasada', () => {
@@ -252,19 +294,19 @@ describe('validateUserInputs', () => {
 
   describe('determinismo', () => {
     it('misma entrada produce misma salida (funcion pura)', () => {
-      const raw = buildRaw({ weightKg: 70, birthYear: 1980, restingHeartRate: 55 });
+      const raw = buildRaw({ weightKg: 70, birthYear: 1980, sex: 'female', restingHeartRate: 55 });
       const r1 = validateUserInputs(raw, CURRENT_YEAR);
       const r2 = validateUserInputs(raw, CURRENT_YEAR);
       expect(r1).toEqual(r2);
     });
 
-    it('cambio de currentYear afecta a Gulati pero no a inputs explicitos', () => {
+    it('cambio de currentYear afecta a la FC max por edad pero no a inputs explicitos', () => {
       const r2026 = validateUserInputs(
-        buildRaw({ weightKg: 70, birthYear: 1980 }),
+        buildRaw({ weightKg: 70, birthYear: 1980, sex: 'male' }),
         2026,
       );
       const r2030 = validateUserInputs(
-        buildRaw({ weightKg: 70, birthYear: 1980 }),
+        buildRaw({ weightKg: 70, birthYear: 1980, sex: 'male' }),
         2030,
       );
       if (r2026.ok && r2030.ok) {
@@ -340,7 +382,25 @@ describe('validateUserInputs', () => {
       expect(gpx.ok).toBe(false);
     });
 
-    it('birthYear sin FC max calcula effectiveMaxHr via Gulati', () => {
+    it('birthYear + sex calcula effectiveMaxHr (Gulati / Tanaka)', () => {
+      const female = validateUserInputs(
+        buildRaw({ birthYear: 1980, sex: 'female' }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(female.ok).toBe(true);
+      if (female.ok) expect(female.data.effectiveMaxHr).toBeCloseTo(165.52, 2);
+
+      const male = validateUserInputs(
+        buildRaw({ birthYear: 1980, sex: 'male' }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(male.ok).toBe(true);
+      if (male.ok) expect(male.data.effectiveMaxHr).toBeCloseTo(175.8, 2);
+    });
+
+    it('birthYear sin sex en session NO dispara SEX_REQUIRED (todo opcional)', () => {
       const result = validateUserInputs(
         buildRaw({ birthYear: 1980 }),
         CURRENT_YEAR,
@@ -348,7 +408,8 @@ describe('validateUserInputs', () => {
       );
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.data.effectiveMaxHr).toBeCloseTo(181.56, 2);
+        // Sin sex no podemos estimar; effectiveMaxHr queda null.
+        expect(result.data.effectiveMaxHr).toBeNull();
       }
     });
   });

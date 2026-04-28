@@ -325,7 +325,7 @@ function Privacy(): JSX.Element {
 const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   {
     q: '¿Necesito conocer mi FTP?',
-    a: 'No. Si no tienes potenciómetro, basta con tu peso y tu frecuencia cardíaca máxima (medida o estimada por edad mediante la fórmula de Gulati). Calculamos las zonas con la fórmula de Karvonen.',
+    a: 'No. Si no tienes potenciómetro, basta con tu peso y tu frecuencia cardíaca máxima (medida o estimada por edad y sexo: Gulati en mujeres, Tanaka en hombres). Calculamos las zonas con la fórmula de Karvonen.',
   },
   {
     q: '¿Sirve para entrenamiento indoor (rodillo o bici estática)?',

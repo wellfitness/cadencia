@@ -72,11 +72,14 @@ test.describe('Cadencia - shell + paso Datos', () => {
     await expect(submit).toBeEnabled();
   });
 
-  test('muestra FC max estimada (Gulati) al introducir ano de nacimiento', async ({ page }) => {
+  test('muestra FC max estimada al introducir ano de nacimiento + sexo', async ({ page }) => {
     await page.getByLabel(/tu peso/i).fill('65');
     // El bloque "¿No conoces tu FC máxima?" esta colapsado por defecto.
     await page.getByText(/no conoces tu fc máxima/i).click();
     await page.getByLabel(/año de nacimiento/i).fill('1980');
+    // Sin sexo elegido aun no hay estimacion (formula Gulati/Tanaka).
+    await expect(page.getByText(/FC máxima estimada/i)).not.toBeVisible();
+    await page.getByRole('radio', { name: /mujer/i }).click();
     await expect(page.getByText(/FC máxima estimada/i)).toBeVisible();
   });
 });

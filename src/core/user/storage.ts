@@ -16,15 +16,23 @@ function isNumberOrNull(value: unknown): value is number | null {
   return value === null || (typeof value === 'number' && Number.isFinite(value));
 }
 
+function isSexOrNull(value: unknown): value is 'female' | 'male' | null {
+  return value === null || value === 'female' || value === 'male';
+}
+
 function isUserInputsRaw(value: unknown): value is UserInputsRaw {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
+  // sex es opcional en el shape persistido (puede faltar en datos antiguos):
+  // si esta lo validamos, si no, defaulteara a null al cargar.
+  const sexValue = 'sex' in v ? v['sex'] : null;
   return (
     isNumberOrNull(v['weightKg']) &&
     isNumberOrNull(v['ftpWatts']) &&
     isNumberOrNull(v['maxHeartRate']) &&
     isNumberOrNull(v['restingHeartRate']) &&
-    isNumberOrNull(v['birthYear'])
+    isNumberOrNull(v['birthYear']) &&
+    isSexOrNull(sexValue)
   );
 }
 
@@ -35,7 +43,9 @@ export function loadUserInputsFromSession(): UserInputsRaw | null {
     if (raw === null) return null;
     const parsed: unknown = JSON.parse(raw);
     if (!isUserInputsRaw(parsed)) return null;
-    return parsed;
+    // Merge sobre EMPTY para garantizar que campos nuevos (p.ej. sex) caen en
+    // null cuando el JSON viene de una version anterior del shape.
+    return { ...EMPTY_USER_INPUTS, ...parsed };
   } catch {
     return null;
   }

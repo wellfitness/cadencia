@@ -1,4 +1,4 @@
-import { EMPTY_USER_INPUTS, type BikeType, type UserInputsRaw } from '@core/user';
+import { EMPTY_USER_INPUTS, type BikeType, type BiologicalSex, type UserInputsRaw } from '@core/user';
 
 /**
  * Reducer del state del usuario, sacado a fichero compartido para que tanto
@@ -16,6 +16,7 @@ type NumericField =
 export type UserInputsAction =
   | { type: 'SET_NUMBER'; field: NumericField; value: number | null }
   | { type: 'SET_BIKE_TYPE'; value: BikeType | null }
+  | { type: 'SET_SEX'; value: BiologicalSex | null }
   | { type: 'RESET' };
 
 export function userInputsReducer(
@@ -27,6 +28,8 @@ export function userInputsReducer(
       return { ...state, [action.field]: action.value };
     case 'SET_BIKE_TYPE':
       return { ...state, bikeType: action.value };
+    case 'SET_SEX':
+      return { ...state, sex: action.value };
     case 'RESET':
       return EMPTY_USER_INPUTS;
   }

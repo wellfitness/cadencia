@@ -8,6 +8,7 @@ const withFtp: ValidatedUserInputs = {
   effectiveMaxHr: null,
   restingHeartRate: null,
   birthYear: null,
+  sex: null,
   bikeWeightKg: 10,
   bikeType: 'gravel',
   hasFtp: true,
