@@ -4,6 +4,7 @@ import {
   calculateTotalDurationSec,
   classifySessionPlan,
   expandSessionPlan,
+  findTemplate,
   validateSessionPlan,
   type ClassifiedSegment,
   type EditableSessionPlan,
@@ -241,7 +242,15 @@ export function SessionBuilder({
           </Button>
         </div>
 
-        <BlockList items={state.plan.items} onItemsChange={handleItemsChange} />
+        <BlockList
+          items={state.plan.items}
+          onItemsChange={handleItemsChange}
+          onLoadSitTemplate={() => {
+            const sit = findTemplate('sit');
+            if (sit !== undefined) handleLoadTemplate(sit);
+          }}
+          onStartFromScratch={handleAddBlock}
+        />
 
         {error !== null && (
           <p

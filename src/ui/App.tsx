@@ -55,6 +55,16 @@ export function App(): JSX.Element {
     hasPersistedProgress ? 'wizard' : 'landing',
   );
 
+  // Banner de "datos restaurados" tras un refresh / vuelta de OAuth: solo se
+  // muestra si el usuario llega al wizard con progreso ya hecho. Auto-oculta
+  // a los 4s para no interrumpir.
+  const [showRestoredToast, setShowRestoredToast] = useState<boolean>(hasPersistedProgress);
+  useEffect(() => {
+    if (!showRestoredToast) return;
+    const id = setTimeout(() => setShowRestoredToast(false), 4000);
+    return () => clearTimeout(id);
+  }, [showRestoredToast]);
+
   const [currentStep, setCurrentStep] = useState<number>(persisted?.currentStep ?? STEP_TYPE);
   const [completedSteps, setCompletedSteps] = useState<readonly number[]>(
     persisted?.completedSteps ?? [],
@@ -254,6 +264,26 @@ export function App(): JSX.Element {
         <h1 className="sr-only">
           Asistente de Cadencia, paso {currentStep + 1} de {STEPS.length}: {currentStepLabel}
         </h1>
+        {showRestoredToast && (
+          <div
+            role="status"
+            className="mx-auto w-full max-w-4xl px-4 pt-3"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-2 rounded-lg border border-turquesa-200 bg-turquesa-50 px-3 py-2 text-sm text-turquesa-800 shadow-sm animate-fade-up">
+              <MaterialIcon name="task_alt" size="small" className="text-turquesa-600" />
+              <span>Hemos recuperado tus datos de la última sesión.</span>
+              <button
+                type="button"
+                onClick={() => setShowRestoredToast(false)}
+                aria-label="Cerrar aviso"
+                className="ml-auto text-turquesa-700 hover:text-turquesa-800 min-h-[28px] min-w-[28px] flex items-center justify-center"
+              >
+                <MaterialIcon name="close" size="small" />
+              </button>
+            </div>
+          </div>
+        )}
         {currentStep === STEP_TYPE && (
           <SourceTypeStep onSelect={handleSourceTypeSelect} />
         )}
@@ -308,11 +338,8 @@ export function App(): JSX.Element {
           routeMeta !== null &&
           matchedList !== null && (
             <ResultStep
-              inputs={inputs}
-              dispatch={dispatch}
               validation={validation}
               validatedInputs={validation.data}
-              currentYear={currentYear}
               routeSegments={routeSegments}
               routeMeta={routeMeta}
               matched={matchedList}
@@ -321,9 +348,10 @@ export function App(): JSX.Element {
               onMatchedChange={handleMatchedChange}
               onBack={handleBack}
               onResetWizard={handleResetWizard}
+              onGoToDataStep={() => setCurrentStep(STEP_DATA)}
+              onGoToMusicStep={() => setCurrentStep(STEP_MUSIC)}
               {...(sourceType === 'session'
                 ? {
-                    mode: 'session' as const,
                     crossZoneMode: 'discrete' as const,
                     onEnterTVMode: () => setTvModeActive(true),
                   }
@@ -438,10 +466,15 @@ function Footer(): JSX.Element {
   return (
     <footer className="border-t border-gris-200 bg-gris-50">
       <div className="mx-auto w-full max-w-4xl px-4 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs md:text-sm text-gris-500">
-        <p className="flex items-center gap-1.5">
-          <MaterialIcon name="lock" size="small" className="text-gris-400" />
-          Sin cuentas, sin cookies, sin servidores. Todo corre en tu dispositivo.
-        </p>
+        <div className="flex flex-col gap-0.5">
+          <p className="flex items-center gap-1.5">
+            <MaterialIcon name="lock" size="small" className="text-gris-400" />
+            Sin cuentas, sin cookies, sin servidores. Todo corre en tu dispositivo.
+          </p>
+          <p className="text-xs text-gris-400 pl-5">
+            Tus datos se guardan en el navegador hasta que cierres la pestaña.
+          </p>
+        </div>
         <nav className="flex items-center gap-3">
           <a
             href="/privacy.html"

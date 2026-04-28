@@ -4,6 +4,7 @@ import {
   type ValidationResult,
 } from '@core/user';
 import { Button } from '@ui/components/Button';
+import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { UserDataForm } from '@ui/components/UserDataForm';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
@@ -33,6 +34,10 @@ export function UserDataStep({
   const [showAllErrors, setShowAllErrors] = useState(false);
 
   const handleCancel = (): void => {
+    const confirmed = window.confirm(
+      '¿Seguro que quieres borrar todos tus datos? Esta acción no se puede deshacer.',
+    );
+    if (!confirmed) return;
     dispatch({ type: 'RESET' });
     setShowAllErrors(false);
   };
@@ -64,6 +69,17 @@ export function UserDataStep({
         showAllErrors={showAllErrors}
         mode={mode}
       />
+
+      <div className="flex justify-center md:hidden pt-1">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="text-sm text-gris-500 hover:text-rosa-600 underline-offset-2 hover:underline transition-colors min-h-[36px] inline-flex items-center gap-1"
+        >
+          <MaterialIcon name="restart_alt" size="small" />
+          Borrar todos mis datos
+        </button>
+      </div>
 
       <FooterActions
         submitDisabled={submitDisabled}
@@ -97,9 +113,6 @@ function FooterActions({
         <>
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
-          </Button>
-          <Button variant="secondary" onClick={onCancel} aria-label="Limpiar datos">
-            Limpiar
           </Button>
           <Button
             variant="primary"

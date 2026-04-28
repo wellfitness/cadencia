@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type DragEvent } from 'react';
 import type { CadenceProfile, SessionBlock, SessionItem } from '@core/segmentation';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
@@ -8,6 +8,10 @@ import { RepeatGroup } from './RepeatGroup';
 export interface BlockListProps {
   items: readonly SessionItem[];
   onItemsChange: (next: SessionItem[]) => void;
+  /** CTA del empty state: cargar plantilla SIT (rapida y representativa). */
+  onLoadSitTemplate?: () => void;
+  /** CTA del empty state: empezar desde cero (anyade un bloque vacio). */
+  onStartFromScratch?: () => void;
 }
 
 const PHASE_ICONS: Record<string, string> = {
@@ -42,8 +46,17 @@ const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
  * El editor en linea identifica el bloque a editar por una clave compuesta
  * `${itemIndex}-${blockId}` para distinguir bloques dentro de grupos.
  */
-export function BlockList({ items, onItemsChange }: BlockListProps): JSX.Element {
+export function BlockList({
+  items,
+  onItemsChange,
+  onLoadSitTemplate,
+  onStartFromScratch,
+}: BlockListProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
+  // Drag&drop nativo: el indice arrastrado vive en estado para poder hacer
+  // un swap simple al soltar. En mobile las flechas siguen siendo el camino
+  // principal (drag nativo en touch es inconsistente entre navegadores).
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   const editKey = (itemIndex: number, blockId: string): string => `${itemIndex}-${blockId}`;
 
@@ -65,6 +78,17 @@ export function BlockList({ items, onItemsChange }: BlockListProps): JSX.Element
     if (a === undefined || b === undefined) return;
     next[index] = b;
     next[target] = a;
+    onItemsChange(next);
+  };
+
+  /** Reordena moviendo el item de `from` justo antes de `to` (o al final). */
+  const reorderItem = (from: number, to: number): void => {
+    if (from === to || from < 0 || from >= items.length) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    if (moved === undefined) return;
+    const target = to > from ? to - 1 : to;
+    next.splice(target, 0, moved);
     onItemsChange(next);
   };
 
@@ -111,17 +135,73 @@ export function BlockList({ items, onItemsChange }: BlockListProps): JSX.Element
 
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border-2 border-dashed border-gris-300 bg-gris-50 p-6 text-center text-sm text-gris-500">
-        Aún no hay bloques. Carga una plantilla o pulsa "Añadir bloque".
+      <div className="rounded-lg border-2 border-dashed border-gris-300 bg-gris-50 p-6 md:p-8 text-center">
+        <SessionDiagram />
+        <p className="mt-3 text-sm text-gris-700 font-medium">
+          Tu sesión está vacía
+        </p>
+        <p className="text-xs text-gris-500 mt-1 max-w-sm mx-auto">
+          Empieza con una plantilla científica probada o construye tu propia
+          secuencia desde cero.
+        </p>
+        {(onLoadSitTemplate !== undefined || onStartFromScratch !== undefined) && (
+          <div className="mt-4 flex flex-col sm:flex-row gap-2 justify-center">
+            {onLoadSitTemplate !== undefined && (
+              <button
+                type="button"
+                onClick={onLoadSitTemplate}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-turquesa-600 text-white border-2 border-turquesa-700 hover:bg-turquesa-700 px-4 py-2 text-sm font-semibold min-h-[40px] transition-colors"
+              >
+                <MaterialIcon name="bolt" size="small" />
+                Cargar plantilla SIT
+              </button>
+            )}
+            {onStartFromScratch !== undefined && (
+              <button
+                type="button"
+                onClick={onStartFromScratch}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white text-gris-700 border-2 border-gris-300 hover:border-gris-400 px-4 py-2 text-sm font-semibold min-h-[40px] transition-colors"
+              >
+                <MaterialIcon name="add" size="small" />
+                Empezar desde cero
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
+
+  const dragProps = (itemIndex: number) => ({
+    draggable: true,
+    onDragStart: (e: DragEvent<HTMLLIElement>) => {
+      setDraggingIndex(itemIndex);
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    onDragOver: (e: DragEvent<HTMLLIElement>) => {
+      if (draggingIndex === null || draggingIndex === itemIndex) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    },
+    onDrop: (e: DragEvent<HTMLLIElement>) => {
+      if (draggingIndex === null || draggingIndex === itemIndex) {
+        setDraggingIndex(null);
+        return;
+      }
+      e.preventDefault();
+      reorderItem(draggingIndex, itemIndex);
+      setDraggingIndex(null);
+    },
+    onDragEnd: () => setDraggingIndex(null),
+  });
 
   return (
     <ul className="space-y-2 md:space-y-2.5">
       {items.map((item, itemIndex) => {
         const canMoveUp = itemIndex > 0;
         const canMoveDown = itemIndex < items.length - 1;
+        const isDragSource = draggingIndex === itemIndex;
+        const dragVisual = isDragSource ? 'opacity-40' : 'group';
 
         if (item.type === 'block') {
           const block = item.block;
@@ -138,13 +218,14 @@ export function BlockList({ items, onItemsChange }: BlockListProps): JSX.Element
             );
           }
           return (
-            <li key={block.id}>
+            <li key={block.id} className={dragVisual} {...dragProps(itemIndex)}>
               <BlockRow
                 block={block}
                 onEdit={() => setEditingKey(editKey(itemIndex, block.id))}
                 onRemove={() => removeItem(itemIndex)}
                 {...(canMoveUp ? { onMoveUp: () => moveItem(itemIndex, -1) } : {})}
                 {...(canMoveDown ? { onMoveDown: () => moveItem(itemIndex, 1) } : {})}
+                showDragHandle
               />
             </li>
           );
@@ -154,7 +235,7 @@ export function BlockList({ items, onItemsChange }: BlockListProps): JSX.Element
         const groupExpandedSec =
           item.blocks.reduce((acc, b) => acc + b.durationSec, 0) * Math.max(1, item.repeat);
         return (
-          <li key={item.id}>
+          <li key={item.id} className={dragVisual} {...dragProps(itemIndex)}>
             <div className="flex items-stretch gap-2">
               <div className="flex flex-col items-center gap-1 pt-2">
                 <button
@@ -222,6 +303,8 @@ interface BlockRowProps {
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   compact?: boolean;
+  /** Muestra el handle de drag (solo desktop, hover-visible). */
+  showDragHandle?: boolean;
 }
 
 function BlockRow({
@@ -231,6 +314,7 @@ function BlockRow({
   onMoveUp,
   onMoveDown,
   compact = false,
+  showDragHandle = false,
 }: BlockRowProps): JSX.Element {
   return (
     <div
@@ -238,6 +322,15 @@ function BlockRow({
         compact ? 'border-gris-200' : 'border-gris-300 shadow-sm'
       }`}
     >
+      {showDragHandle && (
+        <span
+          aria-hidden
+          title="Arrastra para reordenar"
+          className="hidden md:flex items-center text-gris-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        >
+          <MaterialIcon name="drag_indicator" size="small" />
+        </span>
+      )}
       {!compact && (
         <div className="flex flex-col items-center gap-0.5">
           <button
@@ -312,4 +405,43 @@ function formatDuration(seconds: number): string {
   const sec = seconds % 60;
   if (sec === 0) return `${min}'`;
   return `${min}'${sec.toString().padStart(2, '0')}"`;
+}
+
+/**
+ * Mini diagrama SVG de una sesion tipo HIIT: warmup, 4 series work-recovery
+ * y cooldown. Solo decorativo — usa colores de zona para ilustrar la idea.
+ */
+function SessionDiagram(): JSX.Element {
+  return (
+    <svg
+      viewBox="0 0 240 40"
+      preserveAspectRatio="none"
+      className="mx-auto w-full max-w-xs h-10 rounded"
+      role="img"
+      aria-label="Diagrama de una sesión: calentamiento, intervalos work y recovery, vuelta a la calma"
+    >
+      <rect x="0" y="0" width="36" height="40" className="fill-zone-2" rx="2" />
+      {[0, 1, 2, 3].map((i) => (
+        <g key={i}>
+          <rect
+            x={42 + i * 38}
+            y="0"
+            width="22"
+            height="40"
+            className="fill-zone-5"
+            rx="2"
+          />
+          <rect
+            x={66 + i * 38}
+            y="0"
+            width="14"
+            height="40"
+            className="fill-zone-2"
+            rx="2"
+          />
+        </g>
+      ))}
+      <rect x="200" y="0" width="40" height="40" className="fill-zone-1" rx="2" />
+    </svg>
+  );
 }

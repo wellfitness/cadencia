@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type Dispatch } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getAlternativesForSegment,
   matchTracksToSegments,
@@ -13,8 +13,8 @@ import {
   extractUris,
 } from '@core/playlist';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import { getTopGenres, loadNativeTracks, type Track } from '@core/tracks';
-import type { UserInputsRaw, ValidatedUserInputs, ValidationResult } from '@core/user';
+import { loadNativeTracks, type Track } from '@core/tracks';
+import type { ValidatedUserInputs, ValidationResult } from '@core/user';
 import {
   clearAuthFlow,
   clearTokens,
@@ -38,21 +38,15 @@ import {
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
-import { EditDataPanel } from '@ui/components/EditDataPanel';
 import { Input } from '@ui/components/Input';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
-import { MusicPreferencesPanel } from '@ui/components/MusicPreferencesPanel';
 import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
-import type { UserInputsAction } from '@ui/state/userInputsReducer';
 
 export interface ResultStepProps {
-  inputs: UserInputsRaw;
-  dispatch: Dispatch<UserInputsAction>;
   validation: ValidationResult;
   validatedInputs: ValidatedUserInputs;
-  currentYear: number;
   routeSegments: readonly ClassifiedSegment[];
   routeMeta: RouteMeta;
   matched: readonly MatchedSegment[];
@@ -74,8 +68,10 @@ export interface ResultStepProps {
    * Solo se ofrece desde el DonePanel; opcional para no romper compatibilidad.
    */
   onResetWizard?: () => void;
-  /** Modo del formulario de "Ajustar mis datos": gpx (default) o session. */
-  mode?: 'gpx' | 'session';
+  /** Vuelve al paso «Datos» para que el usuario ajuste sus inputs fisiologicos. */
+  onGoToDataStep?: () => void;
+  /** Vuelve al paso «Música» para subir mas listas o ajustar preferencias. */
+  onGoToMusicStep?: () => void;
   /** Modo de matching: overlap (GPX, default) o discrete (sesion indoor). */
   crossZoneMode?: CrossZoneMode;
 }
@@ -83,11 +79,8 @@ export interface ResultStepProps {
 type Phase = 'idle' | 'authorizing' | 'exchanging' | 'creating' | 'done' | 'error';
 
 export function ResultStep({
-  inputs,
-  dispatch,
   validation,
   validatedInputs,
-  currentYear,
   routeSegments,
   routeMeta,
   matched,
@@ -97,7 +90,8 @@ export function ResultStep({
   onBack,
   onEnterTVMode,
   onResetWizard,
-  mode = 'gpx',
+  onGoToDataStep,
+  onGoToMusicStep,
   crossZoneMode = 'overlap',
 }: ResultStepProps): JSX.Element {
   const clientId = getSpotifyClientId();
@@ -108,7 +102,6 @@ export function ResultStep({
     () => (providedTracks && providedTracks.length > 0 ? providedTracks : loadNativeTracks()),
     [providedTracks],
   );
-  const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -179,12 +172,6 @@ export function ResultStep({
       next.add(index);
       return next;
     });
-  };
-
-  const handlePreferencesChange = (next: MatchPreferences): void => {
-    const fresh = matchTracksToSegments(routeSegments, tracks, next, { crossZoneMode });
-    onMatchedChange(fresh, next);
-    setReplacedIndices(new Set());
   };
 
   const handleCreatePlaylist = async (): Promise<void> => {
@@ -355,6 +342,7 @@ export function ResultStep({
                   alternatives={alternativesByIndex[i] ?? []}
                   onReplaceWith={(uri) => handleReplaceWith(i, uri)}
                   replaced={replacedIndices.has(i)}
+                  {...(onGoToMusicStep !== undefined ? { onGoToMusicStep } : {})}
                 />
               </li>
             ))}
@@ -362,19 +350,25 @@ export function ResultStep({
         )}
       </Card>
 
-      <EditDataPanel
-        inputs={inputs}
-        dispatch={dispatch}
-        validation={validation}
-        currentYear={currentYear}
-        mode={mode}
-      />
-
-      <MusicPreferencesPanel
-        topGenres={topGenres}
-        preferences={preferences}
-        onChange={handlePreferencesChange}
-      />
+      {(onGoToDataStep !== undefined || onGoToMusicStep !== undefined) && (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {onGoToDataStep !== undefined && (
+            <Button variant="secondary" size="sm" iconLeft="tune" onClick={onGoToDataStep}>
+              Ajustar mis datos
+            </Button>
+          )}
+          {onGoToMusicStep !== undefined && (
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="library_music"
+              onClick={onGoToMusicStep}
+            >
+              Ajustar música
+            </Button>
+          )}
+        </div>
+      )}
 
       <Card title="Crear en Spotify" titleIcon="playlist_add">
         <div className="space-y-3">
@@ -394,16 +388,18 @@ export function ResultStep({
               {error}
             </p>
           )}
-          <p className="text-xs text-gris-500">
-            Se creará una lista en tu cuenta de Spotify. Si la quieres privada, márcala
-            como tal desde la propia app de Spotify (Spotify exige permiso de listas
-            públicas para añadir canciones, aunque solo las usemos para tu ruta).
-          </p>
+          {!hasSpotifySession && (
+            <p className="text-xs text-gris-500">
+              Se creará una lista en tu cuenta de Spotify. Si la quieres privada, márcala
+              como tal desde la propia app de Spotify (Spotify exige permiso de listas
+              públicas para añadir canciones, aunque solo las usemos para tu ruta).
+            </p>
+          )}
           {hasSpotifySession && (
             <div className="pt-3 mt-1 border-t border-gris-100 flex items-center justify-between gap-2">
-              <span className="text-xs text-gris-500 flex items-center gap-1">
+              <span className="text-xs text-gris-700 flex items-center gap-1.5 font-medium">
                 <MaterialIcon name="check_circle" size="small" className="text-success" />
-                Sesión activa con Spotify
+                Cuenta de Spotify conectada
               </span>
               <button
                 type="button"
@@ -424,6 +420,7 @@ export function ResultStep({
         canCreate={
           validUriCount > 0 && playlistName.trim() !== '' && insufficientCount === 0
         }
+        hasSpotifySession={hasSpotifySession}
       />
     </div>
   );
@@ -448,10 +445,18 @@ interface FooterActionsProps {
   onCreate: () => void;
   creating: boolean;
   canCreate: boolean;
+  hasSpotifySession: boolean;
 }
 
-function FooterActions({ onBack, onCreate, creating, canCreate }: FooterActionsProps): JSX.Element {
-  const label = creating ? 'Creando…' : 'Crear en Spotify';
+function FooterActions({
+  onBack,
+  onCreate,
+  creating,
+  canCreate,
+  hasSpotifySession,
+}: FooterActionsProps): JSX.Element {
+  const idleLabel = hasSpotifySession ? 'Crear lista' : 'Crear en Spotify';
+  const label = creating ? 'Creando…' : idleLabel;
   return (
     <WizardStepFooter
       mobile={

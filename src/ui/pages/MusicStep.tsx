@@ -1,8 +1,10 @@
-import { useMemo, useReducer, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useReducer, useState, type ChangeEvent } from 'react';
 import {
   analyzePoolCoverage,
   EMPTY_PREFERENCES,
+  getAlternativesForSegment,
   matchTracksToSegments,
+  replaceTrackInSegment,
   type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
@@ -22,7 +24,7 @@ import { Card } from '@ui/components/Card';
 import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
-import { TrackCard } from '@ui/components/TrackCard';
+import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 
@@ -54,8 +56,6 @@ function preferencesReducer(
       return EMPTY_PREFERENCES;
   }
 }
-
-const MAX_PREVIEW = 8;
 
 export interface MusicStepProps {
   segments: readonly ClassifiedSegment[];
@@ -122,11 +122,39 @@ export function MusicStep({
   );
 
   // Matching en vivo: cada cambio de preferencias o fuente recalcula. <50ms
-  // para catalogos pequenos, no necesita debounce.
-  const matched = useMemo(
-    () => matchTracksToSegments(segments, tracks, preferences, { crossZoneMode }),
-    [segments, tracks, preferences, crossZoneMode],
+  // para catalogos pequenos, no necesita debounce. Se mantiene como estado
+  // (no useMemo) para que los cambios manuales del usuario via "Otro tema"
+  // persistan hasta que toque algo que invalide el matching base.
+  const [matched, setMatched] = useState<MatchedSegment[]>(() =>
+    matchTracksToSegments(segments, tracks, preferences, { crossZoneMode }),
   );
+  // Indices reemplazados manualmente (para marca visual "edited"). Se reinicia
+  // cuando el matching base cambia (preferences, tracks, crossZoneMode).
+  const [replacedIndices, setReplacedIndices] = useState<ReadonlySet<number>>(new Set());
+
+  useEffect(() => {
+    const fresh = matchTracksToSegments(segments, tracks, preferences, { crossZoneMode });
+    setMatched(fresh);
+    setReplacedIndices(new Set());
+  }, [segments, tracks, preferences, crossZoneMode]);
+
+  // Alternativas validas por fila (excluye URIs ya en la playlist). Mismo
+  // criterio que en Result para que el dropdown sea consistente entre pasos.
+  const alternativesByIndex = useMemo(
+    () => matched.map((_, i) => getAlternativesForSegment(matched, i, tracks, preferences)),
+    [matched, tracks, preferences],
+  );
+
+  const handleReplaceWith = (index: number, uri: string): void => {
+    const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
+    if (!result.replaced) return;
+    setMatched(result.matched);
+    setReplacedIndices((prev) => {
+      const next = new Set(prev);
+      next.add(index);
+      return next;
+    });
+  };
 
   const handleCsvUpload = async (file: File): Promise<void> => {
     setUploadError(null);
@@ -186,9 +214,8 @@ export function MusicStep({
   };
 
   const totalMinutes = Math.round(meta.totalDurationSec / 60);
-  const previewItems = matched.slice(0, MAX_PREVIEW);
-  const remaining = Math.max(0, matched.length - MAX_PREVIEW);
   const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
+  const replacedCount = replacedIndices.size;
 
   const validUploads = uploadedCsvs.filter((c) => c.error === undefined);
   const hasUserTracks = validUploads.length > 0;
@@ -359,24 +386,30 @@ export function MusicStep({
             para <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de
             ruta
           </p>
+          {replacedCount > 0 && (
+            <span className="text-xs text-turquesa-700 flex items-center gap-1">
+              <MaterialIcon name="edit" size="small" className="text-turquesa-600" />
+              {replacedCount} cambio{replacedCount !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
-        {previewItems.length === 0 ? (
+        {matched.length === 0 ? (
           <p className="text-sm text-gris-500 italic">
             Sin temas que mostrar. Vuelve a Ruta para procesar un GPX.
           </p>
         ) : (
-          <ul className="space-y-2">
-            {previewItems.map((m, i) => (
-              <li key={`${m.startSec}-${m.track?.uri ?? 'empty'}`}>
-                <TrackCard matched={m} index={i + 1} />
+          <ul className="space-y-2 md:max-h-[55vh] md:overflow-y-auto md:pr-1">
+            {matched.map((m, i) => (
+              <li key={`${m.startSec}-${i}`}>
+                <PlaylistTrackRow
+                  matched={m}
+                  index={i + 1}
+                  alternatives={alternativesByIndex[i] ?? []}
+                  onReplaceWith={(uri) => handleReplaceWith(i, uri)}
+                  replaced={replacedIndices.has(i)}
+                />
               </li>
             ))}
-            {remaining > 0 && (
-              <li className="pt-2 text-center text-sm text-gris-500">
-                + {remaining} {remaining === 1 ? 'tema más' : 'temas más'} en el resultado
-                final
-              </li>
-            )}
           </ul>
         )}
       </Card>

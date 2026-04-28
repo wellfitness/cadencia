@@ -34,6 +34,12 @@ export interface RouteStepProps {
 
 type GpxPhase = 'idle' | 'parsing' | 'ready' | 'error';
 
+const PARSING_STEPS: readonly string[] = [
+  'Leyendo archivo…',
+  'Calculando potencia…',
+  'Segmentando…',
+];
+
 export function RouteStep({
   validatedInputs,
   sourceType,
@@ -83,6 +89,7 @@ function GpxRouteFlow({
   onNext,
 }: GpxRouteFlowProps): JSX.Element {
   const [phase, setPhase] = useState<GpxPhase>('idle');
+  const [parsingStep, setParsingStep] = useState<number>(0);
   const [segments, setSegments] = useState<ClassifiedSegment[] | null>(null);
   const [meta, setMeta] = useState<RouteMeta | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -104,10 +111,19 @@ function GpxRouteFlow({
   const processFile = useCallback(
     async (file: File): Promise<void> => {
       setPhase('parsing');
+      setParsingStep(0);
       setErrorMessage(null);
       try {
+        // Paso 0: leyendo archivo
         const text = await file.text();
+        // Paso 1: calculando potencia (parseGpx incluye haversine + power)
+        setParsingStep(1);
+        // Microyield para que el render del paso 1 entre antes del trabajo CPU.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const track = parseGpx(text);
+        // Paso 2: segmentacion en bloques de 60s
+        setParsingStep(2);
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const result = segmentInto60SecondBlocks(track, validatedInputs);
         if (result.segments.length === 0) {
           throw new Error('No se pudo procesar la ruta: GPX demasiado corto.');
@@ -147,6 +163,42 @@ function GpxRouteFlow({
               setPhase('error');
             }}
           />
+          <details className="group rounded-lg border border-gris-200 bg-white px-4 py-3 [&_summary::-webkit-details-marker]:hidden">
+            <summary className="flex items-center justify-between cursor-pointer list-none gap-3 text-sm font-semibold text-gris-700 min-h-[36px]">
+              <span className="inline-flex items-center gap-2">
+                <MaterialIcon name="help_outline" size="small" className="text-turquesa-600" />
+                ¿Cómo exporto un GPX desde Strava, Komoot o Garmin?
+              </span>
+              <MaterialIcon
+                name="expand_more"
+                size="small"
+                className="text-gris-500 transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <div className="mt-2 pt-2 border-t border-gris-100 text-sm text-gris-700 space-y-2">
+              <div>
+                <p className="font-semibold text-gris-800">Strava</p>
+                <p>
+                  Abre la actividad → menú con tres puntos → «Exportar GPX». También
+                  funciona desde una ruta planificada en «Mis Rutas».
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-gris-800">Komoot</p>
+                <p>
+                  Abre la ruta planificada → «Más» → «Exportar como GPX». La app
+                  móvil también lo permite desde el menú compartir.
+                </p>
+              </div>
+              <div>
+                <p className="font-semibold text-gris-800">Garmin Connect</p>
+                <p>
+                  Abre la actividad en la web → engranaje arriba a la derecha →
+                  «Exportar archivo original» o «Exportar a GPX».
+                </p>
+              </div>
+            </div>
+          </details>
           <Card variant="tip" title="¿Qué pasa con tu archivo?" titleIcon="lock">
             <ul className="text-gris-700 space-y-1 list-disc pl-5">
               <li>Tu GPX no sale de tu dispositivo. Todo se procesa en tu navegador.</li>
@@ -165,13 +217,34 @@ function GpxRouteFlow({
 
       {phase === 'parsing' && (
         <Card>
-          <div className="flex items-center gap-3 py-6 justify-center text-gris-700">
+          <div className="flex flex-col items-center gap-3 py-6 text-gris-700">
             <MaterialIcon
               name="progress_activity"
-              size="medium"
+              size="large"
               className="text-turquesa-600 animate-spin-slow"
             />
-            <span className="font-medium">Procesando tu ruta…</span>
+            <ol
+              className="space-y-1 text-sm text-gris-700 min-w-[220px]"
+              aria-live="polite"
+            >
+              {PARSING_STEPS.map((label, idx) => {
+                const done = idx < parsingStep;
+                const active = idx === parsingStep;
+                return (
+                  <li
+                    key={label}
+                    className={`flex items-center gap-2 transition-opacity ${active ? 'font-semibold text-gris-800' : done ? 'opacity-70' : 'opacity-40'}`}
+                  >
+                    <MaterialIcon
+                      name={done ? 'check_circle' : active ? 'radio_button_checked' : 'radio_button_unchecked'}
+                      size="small"
+                      className={done ? 'text-turquesa-600' : active ? 'text-turquesa-600' : 'text-gris-400'}
+                    />
+                    {label}
+                  </li>
+                );
+              })}
+            </ol>
           </div>
         </Card>
       )}
@@ -251,7 +324,7 @@ function FooterActions({
           </Button>
           {canReset && (
             <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
-              Otra
+              Otro archivo
             </Button>
           )}
           <Button
