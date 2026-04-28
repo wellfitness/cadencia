@@ -13,6 +13,7 @@ import { getTopGenres, parseTrackCsv, type Track } from '@core/tracks';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
+import { ExportifyHowto } from '@ui/components/ExportifyHowto';
 import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -181,6 +182,9 @@ export function MusicStep({
         subtitle="Elige de dónde sale el catálogo y marca los géneros que te van."
       />
       <Card title="De dónde sale tu música" titleIcon="library_music">
+        <div className="mb-4">
+          <ExportifyHowto />
+        </div>
         <fieldset className="space-y-2">
           <legend className="sr-only">Fuente del catálogo de música</legend>
           <SourceRadio
@@ -208,23 +212,10 @@ export function MusicStep({
 
         {showDropzone && (
           <div className="mt-4 space-y-3">
-            <p className="text-xs text-gris-600 leading-relaxed">
-              ¿No tienes un CSV de tus listas? Genéralo gratis en{' '}
-              <a
-                href="https://exportify.net"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-turquesa-700 font-semibold underline-offset-2 hover:underline"
-              >
-                exportify.net
-              </a>
-              . Es código abierto, autoriza Spotify en tu navegador y descarga
-              cualquier lista como CSV con BPM, energía y géneros (las columnas
-              que necesitamos).
-            </p>
             <FileDropzone
               acceptedLabel="CSV"
               accept=".csv,text/csv"
+              idlePrompt="Mueve aquí tus listas de música (.csv) o pulsa para cargarlas desde tu dispositivo"
               onFile={(f) => void handleCsvUpload(f)}
               onError={(msg) => setUploadError(msg)}
             />

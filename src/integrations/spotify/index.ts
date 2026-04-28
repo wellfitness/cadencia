@@ -13,5 +13,6 @@ export {
 } from './storage';
 export { getAuthorizationUrl, exchangeCodeForTokens, refreshAccessToken } from './auth';
 export { createPlaylist, addTracksToPlaylist, createPlaylistWithTracks } from './api';
+export { playPreview, pausePreview, subscribePreview } from './embedController';
 export { getSpotifyClientId } from './clientId';
 export { getRedirectUri } from './redirectUri';

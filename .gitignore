@@ -59,3 +59,10 @@ scripts/fonts/
 
 # Backups locales (logo original antes de optimizar, etc.)
 scripts/.backup/
+
+# Material local del mantenedor en la raiz: notas, exports puntuales de
+# Spotify, PDFs de curso, etc. Se ignoran por nombre exacto a proposito
+# para no esconder con un glob *.pdf / *.csv archivos que algun dia si
+# deban entrar al repo.
+/CICLO INDOOR Y PROGRESIONES - CICLO INDOOR.pdf
+/Julio_3.csv

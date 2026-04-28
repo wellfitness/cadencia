@@ -303,17 +303,6 @@ export function ResultStep({
         </div>
       )}
       {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
-      {onEnterTVMode !== undefined && (
-        <Card variant="tip" title="Modo sesión" titleIcon="cast">
-          <p className="text-sm text-gris-700 mb-3">
-            Tu sesión tiene fases con duración programada. Activa el modo sesión para
-            seguirla con cronómetro y avisos sonoros mientras suena la lista en Spotify.
-          </p>
-          <Button variant="primary" iconLeft="play_circle" onClick={onEnterTVMode}>
-            Iniciar modo sesión
-          </Button>
-        </Card>
-      )}
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex items-baseline justify-between gap-2 mb-3">
           <p className="text-sm text-gris-600">
@@ -419,6 +408,7 @@ export function ResultStep({
           validUriCount > 0 && effectivePlaylistName.trim() !== '' && insufficientCount === 0
         }
         hasSpotifySession={hasSpotifySession}
+        {...(onEnterTVMode !== undefined ? { onEnterTVMode } : {})}
       />
     </WizardStep>
   );
@@ -444,6 +434,13 @@ interface FooterActionsProps {
   creating: boolean;
   canCreate: boolean;
   hasSpotifySession: boolean;
+  /**
+   * Solo presente en sesiones indoor. Si esta, renderizamos un segundo boton
+   * primario "Abrir Modo TV" en paralelo a "Crear en Spotify". El boton es
+   * visualmente igual de prominente — son dos acciones complementarias, no
+   * jerarquicas: la usuaria suele hacer ambas.
+   */
+  onEnterTVMode?: () => void;
 }
 
 function FooterActions({
@@ -452,16 +449,29 @@ function FooterActions({
   creating,
   canCreate,
   hasSpotifySession,
+  onEnterTVMode,
 }: FooterActionsProps): JSX.Element {
   const idleLabel = hasSpotifySession ? 'Crear lista' : 'Crear en Spotify';
-  const label = creating ? 'Creando…' : idleLabel;
+  const createLabel = creating ? 'Creando…' : idleLabel;
+  const tvAriaLabel = 'Abrir Modo TV (se abrirá en una pestaña nueva)';
   return (
     <WizardStepFooter
       mobile={
-        <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+        <div className="flex flex-col gap-2 w-full">
+          {/* En movil: TV arriba (acción "ahora"), Crear debajo, Atrás al pie. */}
+          {onEnterTVMode !== undefined && (
+            <Button
+              variant="primary"
+              iconLeft="cast"
+              iconRight="open_in_new"
+              onClick={onEnterTVMode}
+              fullWidth
+              aria-label={tvAriaLabel}
+              title={tvAriaLabel}
+            >
+              Abrir Modo TV
+            </Button>
+          )}
           <Button
             variant="primary"
             iconRight="open_in_new"
@@ -470,15 +480,30 @@ function FooterActions({
             onClick={onCreate}
             fullWidth
           >
-            {label}
+            {createLabel}
           </Button>
-        </>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack} fullWidth>
+            Atrás
+          </Button>
+        </div>
       }
       desktop={
         <>
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {onEnterTVMode !== undefined && (
+            <Button
+              variant="primary"
+              iconLeft="cast"
+              iconRight="open_in_new"
+              onClick={onEnterTVMode}
+              aria-label={tvAriaLabel}
+              title={tvAriaLabel}
+            >
+              Abrir Modo TV
+            </Button>
+          )}
           <Button
             variant="primary"
             iconRight="open_in_new"
@@ -486,7 +511,7 @@ function FooterActions({
             loading={creating}
             onClick={onCreate}
           >
-            {label}
+            {createLabel}
           </Button>
         </>
       }
@@ -565,10 +590,15 @@ function DonePanel({
         <Card variant="info" title="Sigue tu sesión a pantalla completa" titleIcon="cast">
           <p className="text-gris-700 mb-3">
             Activa el modo sesión para ver el cronómetro y avisos sonoros mientras suena
-            la lista en Spotify.
+            la lista en Spotify. Se abrirá en una pestaña nueva.
           </p>
-          <Button variant="primary" iconLeft="play_circle" onClick={onEnterTVMode}>
-            Iniciar Modo TV
+          <Button
+            variant="primary"
+            iconLeft="cast"
+            iconRight="open_in_new"
+            onClick={onEnterTVMode}
+          >
+            Abrir Modo TV
           </Button>
         </Card>
       )}

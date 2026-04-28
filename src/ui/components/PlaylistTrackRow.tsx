@@ -4,6 +4,7 @@ import type { AlternativeCandidate, MatchedSegment } from '@core/matching';
 import { Button } from './Button';
 import { MaterialIcon } from './MaterialIcon';
 import { SlopePill } from './SlopePill';
+import { TrackPreviewButton } from './TrackPreviewButton';
 import { ZoneBadge } from './ZoneBadge';
 
 export interface PlaylistTrackRowProps {
@@ -85,6 +86,7 @@ export function PlaylistTrackRow({
     <article className="rounded-lg border border-gris-200 bg-white p-3 hover:border-turquesa-300 transition-colors duration-200">
       <div className="flex items-center gap-3">
         <PlaceholderCover zone={zone} />
+        <TrackPreviewButton uri={track.uri} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="text-xs font-semibold text-gris-400 tabular-nums shrink-0">
@@ -114,6 +116,18 @@ export function PlaylistTrackRow({
       </div>
       {showPicker && (
         <div className="mt-2 pt-2 border-t border-gris-100 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <RandomPickButton
+              alternatives={alternatives ?? []}
+              onSelect={onReplaceWith}
+              rowIndex={index}
+            />
+            <AlternativesPicker
+              alternatives={alternatives ?? []}
+              onSelect={onReplaceWith}
+              rowIndex={index}
+            />
+          </div>
           {qualityLabel && (
             <span
               className="text-xs text-tulipTree-600 flex items-center gap-1"
@@ -123,14 +137,48 @@ export function PlaylistTrackRow({
               {qualityLabel}
             </span>
           )}
-          <AlternativesPicker
-            alternatives={alternatives ?? []}
-            onSelect={onReplaceWith}
-            rowIndex={index}
-          />
         </div>
       )}
     </article>
+  );
+}
+
+interface RandomPickButtonProps {
+  alternatives: readonly AlternativeCandidate[];
+  onSelect: (uri: string) => void;
+  rowIndex: number;
+}
+
+/**
+ * Sustituye el track actual por una alternativa elegida al azar entre las
+ * disponibles para este slot. Aleatoriedad iniciada por el usuario (click
+ * explicito), no por el motor — el matching del nucleo sigue siendo
+ * determinista.
+ */
+function RandomPickButton({
+  alternatives,
+  onSelect,
+  rowIndex,
+}: RandomPickButtonProps): JSX.Element {
+  const isEmpty = alternatives.length === 0;
+  const handleClick = (): void => {
+    if (isEmpty) return;
+    const idx = Math.floor(Math.random() * alternatives.length);
+    const pick = alternatives[idx];
+    if (pick) onSelect(pick.track.uri);
+  };
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      iconLeft="shuffle"
+      onClick={handleClick}
+      disabled={isEmpty}
+      aria-label={`Elegir un tema al azar para el tramo ${rowIndex}`}
+      title="Sustituir por un tema aleatorio de las alternativas"
+    >
+      Aleatorio
+    </Button>
   );
 }
 
@@ -142,7 +190,7 @@ interface AlternativesPickerProps {
 
 interface PopoverPosition {
   top: number;
-  right: number;
+  left: number;
 }
 
 function AlternativesPicker({
@@ -171,7 +219,7 @@ function AlternativesPicker({
       const rect = anchor.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
+        left: rect.left,
       });
     }
     update();
@@ -226,9 +274,9 @@ function AlternativesPicker({
             style={{
               position: 'fixed',
               top: position.top,
-              right: position.right,
+              left: position.left,
             }}
-            className="z-50 w-72 max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto rounded-lg border border-gris-200 bg-white shadow-lg ring-1 ring-black/5"
+            className="z-50 w-[28rem] max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto rounded-lg border border-gris-200 bg-white shadow-lg ring-1 ring-black/5"
           >
             {isEmpty ? (
               <div className="px-3 py-3 flex items-start gap-2">
@@ -259,25 +307,28 @@ function AlternativesPicker({
                 <ul className="py-1">
                   {alternatives.map((alt) => (
                     <li key={alt.track.uri}>
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={false}
-                        onClick={() => handleSelect(alt.track.uri)}
-                        className="w-full text-left px-3 py-2 min-h-[44px] flex items-center gap-3 hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gris-800 truncate">
-                            {alt.track.name}
-                          </p>
-                          <p className="text-xs text-gris-500 truncate">
-                            {alt.track.artists.join(', ')}
-                          </p>
-                        </div>
-                        <span className="text-xs text-gris-500 tabular-nums shrink-0">
-                          {Math.round(alt.track.tempoBpm)} bpm
-                        </span>
-                      </button>
+                      <div className="flex items-center gap-2 px-2">
+                        <TrackPreviewButton uri={alt.track.uri} />
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={false}
+                          onClick={() => handleSelect(alt.track.uri)}
+                          className="flex-1 text-left px-1 py-2 min-h-[44px] flex items-center gap-3 rounded hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gris-800 truncate">
+                              {alt.track.name}
+                            </p>
+                            <p className="text-xs text-gris-500 truncate">
+                              {alt.track.artists.join(', ')}
+                            </p>
+                          </div>
+                          <span className="text-xs text-gris-500 tabular-nums shrink-0">
+                            {Math.round(alt.track.tempoBpm)} bpm
+                          </span>
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -289,7 +340,7 @@ function AlternativesPicker({
       : null;
 
   return (
-    <div ref={anchorRef} className="ml-auto">
+    <div ref={anchorRef}>
       <Button
         variant="secondary"
         size="sm"

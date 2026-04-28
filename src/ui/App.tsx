@@ -26,7 +26,8 @@ import { UserDataStep } from '@ui/pages/UserDataStep';
 import { RouteStep } from '@ui/pages/RouteStep';
 import { MusicStep } from '@ui/pages/MusicStep';
 import { ResultStep } from '@ui/pages/ResultStep';
-import { SessionTVMode } from '@ui/pages/SessionTVMode';
+import { TVModeRoute } from '@ui/pages/TVModeRoute';
+import { writeHandoff } from '@core/tv/tvHandoff';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
 import {
@@ -51,6 +52,18 @@ const STEP_MUSIC = 3;
 const STEP_RESULT = 4;
 
 export function App(): JSX.Element {
+  // Ruta /tv: pestaña independiente del wizard que ejecuta SessionTVMode con
+  // el plan que la pestaña origen escribio en localStorage. Bifurcamos al
+  // componente TVModeRoute para no montar el wizard ni leer su sessionStorage.
+  // Extraido fuera del wizard para no romper rules-of-hooks (cada rama es un
+  // componente distinto, asi cada uno tiene su propio orden de hooks estable).
+  if (typeof window !== 'undefined' && window.location.pathname === '/tv') {
+    return <TVModeRoute />;
+  }
+  return <WizardApp />;
+}
+
+function WizardApp(): JSX.Element {
   // Carga lazy del state del wizard desde sessionStorage. Necesario para
   // sobrevivir al redirect de Spotify en /callback (full page navigation).
   const persisted = useState(() => loadWizardState())[0];
@@ -128,9 +141,6 @@ export function App(): JSX.Element {
     persisted?.routeSegments ?? null,
   );
   const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(persisted?.routeMeta ?? null);
-
-  // Modo TV: overlay activable solo cuando hay sessionPlan
-  const [tvModeActive, setTvModeActive] = useState(false);
 
   // Estado de la lista de musica generada (preferencias + segmentos casados).
   const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(
@@ -345,16 +355,16 @@ export function App(): JSX.Element {
     setCurrentStep(STEP_TYPE);
   };
 
-  // Modo TV pantalla completa: solo accesible si hay sessionPlan.
-  if (tvModeActive && sessionPlan !== null && validation.ok) {
-    return (
-      <SessionTVMode
-        plan={sessionPlan}
-        validatedInputs={validation.data}
-        onClose={() => setTvModeActive(false)}
-      />
-    );
-  }
+  // Modo TV en pestaña nueva: serializa plan+inputs a localStorage y abre /tv.
+  // Guard defensivo: si por alguna razon validation.ok cambio entre el render
+  // del boton (donde se monta este callback) y su ejecucion, no abrimos la
+  // pestaña — la otra alternativa seria abrir y mostrar el placeholder, peor
+  // experiencia. El boton del UI tambien se desactiva si !validation.ok.
+  const handleEnterTVMode = (): void => {
+    if (sessionPlan === null || !validation.ok) return;
+    writeHandoff({ plan: sessionPlan, validatedInputs: validation.data });
+    window.open('/tv', '_blank', 'noopener');
+  };
 
   // Landing: pantalla de inicio. Al pulsar "Empezar" entramos al wizard
   // por el paso Tipo (STEP_TYPE = 0).
@@ -487,9 +497,7 @@ export function App(): JSX.Element {
               onGoToDataStep={handleGoToDataStep}
               onGoToMusicStep={handleGoToMusicStep}
               crossZoneMode={crossZoneMode}
-              {...(sourceType === 'session'
-                ? { onEnterTVMode: () => setTvModeActive(true) }
-                : {})}
+              {...(sourceType === 'session' ? { onEnterTVMode: handleEnterTVMode } : {})}
             />
           )}
         {currentStep === STEP_RESULT &&

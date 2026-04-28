@@ -12,6 +12,8 @@ export interface FileDropzoneProps {
   acceptedLabel?: string;
   /** Disable interactions (during processing, etc). */
   disabled?: boolean;
+  /** Override the default idle title ("Arrastra tu {label} o pulsa para elegir"). */
+  idlePrompt?: string;
 }
 
 const DEFAULT_ACCEPT = '.gpx,application/gpx+xml,application/xml,text/xml';
@@ -28,6 +30,7 @@ export function FileDropzone({
   accept = DEFAULT_ACCEPT,
   acceptedLabel = 'GPX',
   disabled = false,
+  idlePrompt,
 }: FileDropzoneProps): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -106,7 +109,7 @@ export function FileDropzone({
           <p className="text-base md:text-lg font-semibold text-gris-800">
             {isDragOver
               ? 'Suelta tu archivo aquí'
-              : `Arrastra tu ${acceptedLabel} o pulsa para elegir`}
+              : (idlePrompt ?? `Arrastra tu ${acceptedLabel} o pulsa para elegir`)}
           </p>
           <p className="text-sm text-gris-500">
             Solo {acceptedLabel}. Tu archivo no sale de tu dispositivo.
