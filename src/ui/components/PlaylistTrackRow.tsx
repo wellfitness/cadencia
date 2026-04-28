@@ -115,8 +115,8 @@ export function PlaylistTrackRow({
         </div>
       </div>
       {showPicker && (
-        <div className="mt-2 pt-2 border-t border-gris-100 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="mt-2 pt-2 border-t border-gris-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <RandomPickButton
               alternatives={alternatives ?? []}
               onSelect={onReplaceWith}
@@ -208,6 +208,8 @@ function AlternativesPicker({
   // Calcula y mantiene la posicion del popover anclada al boton. El popover
   // vive en un portal a document.body para no ser recortado por ancestros
   // con overflow:auto (la lista del Resultado tiene md:overflow-y-auto).
+  // En mobile (<640px) lo centramos horizontalmente con un margen lateral
+  // de 16px para que no se salga del viewport.
   useEffect(() => {
     if (!open) {
       setPosition(null);
@@ -217,9 +219,18 @@ function AlternativesPicker({
       const anchor = anchorRef.current;
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const margin = 16;
+      const popoverWidth = Math.min(448, viewportWidth - margin * 2);
+      // Si el ancho disponible no llega para que el popover quepa anclado al
+      // anchor sin rebasar el viewport, lo centramos horizontalmente.
+      let left = rect.left;
+      if (left + popoverWidth + margin > viewportWidth) {
+        left = Math.max(margin, viewportWidth - popoverWidth - margin);
+      }
       setPosition({
         top: rect.bottom + 4,
-        left: rect.left,
+        left,
       });
     }
     update();

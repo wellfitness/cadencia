@@ -201,14 +201,14 @@ export function BlockEditor({ block, onSave, onCancel }: BlockEditorProps): JSX.
         />
       </label>
 
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2 text-xs text-gris-600">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-1">
+        <div className="flex items-center gap-2 text-xs text-gris-600 flex-wrap">
           <MaterialIcon name={PHASE_ICONS[phase]} size="small" className="text-gris-500" />
           <span>{PHASE_LABELS[phase]}</span>
           <ZoneBadge zone={zone} size="sm" />
           <span className="text-gris-500">· {PROFILE_LABELS[cadenceProfile]}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto">
           <Button variant="secondary" size="sm" onClick={onCancel}>
             Cancelar
           </Button>

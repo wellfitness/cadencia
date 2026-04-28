@@ -324,7 +324,7 @@ export function MusicStep({
       {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
 
       <Card title="Tu lista" titleIcon="queue_music">
-        <div className="flex items-baseline justify-between gap-2 mb-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 mb-3">
           <p className="text-sm text-gris-600">
             <strong className="text-gris-800 tabular-nums">{list.length}</strong> temas
             para <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de

@@ -348,28 +348,48 @@ function FooterActions({
   canGoNext,
   canReset,
 }: FooterActionsProps): JSX.Element {
+  // En mobile envolvemos en un sub-flex para que cuando hay 3 acciones el
+  // `Siguiente` (fullWidth) tenga su propia fila debajo de Atras + Otro
+  // archivo. Asi los tres botones respiran y ninguno queda apretado en 375px.
   return (
     <WizardStepFooter
       mobile={
-        <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
-          {canReset && (
-            <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
-              Otro archivo
+        canReset ? (
+          <div className="flex flex-col gap-2 w-full">
+            <div className="flex items-center justify-between gap-2">
+              <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+                Atrás
+              </Button>
+              <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
+                Otro archivo
+              </Button>
+            </div>
+            <Button
+              variant="primary"
+              iconRight="arrow_forward"
+              disabled={!canGoNext}
+              onClick={onNext}
+              fullWidth
+            >
+              Siguiente: Música
             </Button>
-          )}
-          <Button
-            variant="primary"
-            iconRight="arrow_forward"
-            disabled={!canGoNext}
-            onClick={onNext}
-            fullWidth
-          >
-            Siguiente: Música
-          </Button>
-        </>
+          </div>
+        ) : (
+          <>
+            <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+              Atrás
+            </Button>
+            <Button
+              variant="primary"
+              iconRight="arrow_forward"
+              disabled={!canGoNext}
+              onClick={onNext}
+              fullWidth
+            >
+              Siguiente: Música
+            </Button>
+          </>
+        )
       }
       desktop={
         <>

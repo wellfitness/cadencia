@@ -103,11 +103,15 @@ export function ConfirmDialog({
         <div id="confirm-dialog-message" className="text-sm text-gris-700">
           {message}
         </div>
-        <div className="flex items-center justify-end gap-3 pt-2">
+        {/* Mobile: stack vertical con accion principal arriba (orden visual
+            de prioridad). Desktop: inline justify-end. */}
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sm:gap-3 pt-2">
           <Button
             variant="secondary"
             onClick={onCancel}
             data-testid="confirm-dialog-cancel"
+            fullWidth
+            className="sm:w-auto"
           >
             {cancelLabel}
           </Button>
@@ -115,6 +119,8 @@ export function ConfirmDialog({
             variant={confirmVariant}
             onClick={onConfirm}
             data-testid="confirm-dialog-confirm"
+            fullWidth
+            className="sm:w-auto"
           >
             {confirmLabel}
           </Button>

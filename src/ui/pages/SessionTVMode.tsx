@@ -305,8 +305,8 @@ export function SessionTVMode({
 
   return (
     <div className="min-h-[100dvh] bg-gris-900 text-white flex flex-col">
-      <header className="bg-black/50 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      <header className="bg-black/50 px-3 sm:px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1 basis-full sm:basis-auto">
           <h1 className="text-base md:text-xl font-bold truncate">{plan.name}</h1>
           <p className="text-xs md:text-sm opacity-70">
             Bloque {currentIndex + 1} de {blocks.length}
@@ -362,7 +362,7 @@ export function SessionTVMode({
           className={`w-full max-w-4xl rounded-2xl md:rounded-3xl border-4 overflow-hidden shadow-2xl bg-black/50 ${zoneToBorder(currentBlock.zone)}`}
         >
           <div className={`${ZONE_BG_DARK[currentBlock.zone]} ${zoneTextColor(currentBlock.zone)} px-4 md:px-8 py-4 md:py-6`}>
-            <div className="flex items-center justify-between gap-3 md:gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-3 md:gap-6">
               <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 <span className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-xl bg-white/30 flex-shrink-0">
                   <MaterialIcon
@@ -372,16 +372,16 @@ export function SessionTVMode({
                   />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-2xl md:text-4xl font-bold leading-tight">
+                  <h2 className="text-xl sm:text-2xl md:text-4xl font-bold leading-tight">
                     {PHASE_LABELS[currentBlock.phase] ?? currentBlock.phase.toUpperCase()}
                   </h2>
-                  <p className="font-display text-3xl md:text-5xl leading-tight mt-1">
+                  <p className="font-display text-2xl sm:text-3xl md:text-5xl leading-tight mt-1">
                     Zona {currentBlock.zone} · {CADENCE_PROFILE_LABELS[currentBlock.cadenceProfile]}
                   </p>
                   {(() => {
                     const c = getZoneCriteria(currentBlock.zone, currentBlock.cadenceProfile);
                     return (
-                      <p className="text-base md:text-xl opacity-90 mt-1 flex items-center gap-1.5">
+                      <p className="text-sm sm:text-base md:text-xl opacity-90 mt-1 flex items-center gap-1.5">
                         <MaterialIcon name="speed" size="small" />
                         Cadencia: {c.cadenceMin}-{c.cadenceMax} rpm
                       </p>
@@ -390,8 +390,8 @@ export function SessionTVMode({
                 </div>
               </div>
               {currentZoneFc !== null && (
-                <div className="text-right flex-shrink-0">
-                  <div className="flex items-center justify-end gap-1.5 md:gap-2 text-2xl md:text-4xl font-bold">
+                <div className="text-left sm:text-right flex-shrink-0">
+                  <div className="flex items-center sm:justify-end gap-1.5 md:gap-2 text-xl sm:text-2xl md:text-4xl font-bold">
                     <MaterialIcon
                       name="favorite"
                       size="medium"
@@ -400,9 +400,9 @@ export function SessionTVMode({
                     <span className="tabular-nums">
                       {Math.round(currentZoneFc.minBpm)}-{Math.round(currentZoneFc.maxBpm)}
                     </span>
-                    <span className="text-base md:text-2xl opacity-70">bpm</span>
+                    <span className="text-sm sm:text-base md:text-2xl opacity-70">bpm</span>
                   </div>
-                  <p className="text-base md:text-xl font-semibold mt-0.5 opacity-90">
+                  <p className="text-sm sm:text-base md:text-xl font-semibold mt-0.5 opacity-90">
                     {ZONE_PERCENT_FCR[currentBlock.zone]}
                   </p>
                 </div>
@@ -412,7 +412,7 @@ export function SessionTVMode({
 
           <div className="p-4 md:p-8">
             <div className="text-center mb-4 md:mb-8">
-              <p className="text-7xl md:text-9xl font-bold tabular-nums tracking-wider font-mono">
+              <p className="text-6xl sm:text-7xl md:text-9xl font-bold tabular-nums tracking-wider font-mono">
                 {formatTime(timeRemaining)}
               </p>
               <p className="text-sm md:text-xl opacity-70 mt-1 md:mt-2">

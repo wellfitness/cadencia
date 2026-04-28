@@ -244,8 +244,8 @@ export function SessionBuilder({
       </Card>
 
       <Card title="Bloques de la sesión" titleIcon="view_list">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm text-gris-600">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <p className="text-sm text-gris-600 min-w-0">
             <strong className="text-gris-800 tabular-nums">{totalMinutes}</strong> min totales,{' '}
             <strong className="text-gris-800 tabular-nums">{expandedBlocks.length}</strong>{' '}
             {expandedBlocks.length === 1 ? 'bloque' : 'bloques'} expandidos

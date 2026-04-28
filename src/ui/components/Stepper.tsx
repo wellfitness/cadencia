@@ -36,9 +36,9 @@ export function Stepper({
   return (
     <nav
       aria-label="Progreso del flujo"
-      className={`w-full overflow-x-auto ${className}`.trim()}
+      className={`w-full ${className}`.trim()}
     >
-      <ol className="flex items-center justify-between gap-2 min-w-max md:min-w-0">
+      <ol className="flex items-center justify-between gap-1 sm:gap-2">
         {steps.map((step, idx) => {
           const isCompleted = completedSteps.includes(idx);
           const isCurrent = idx === currentStep;
@@ -46,7 +46,7 @@ export function Stepper({
           // Pasos futuros NO son navegables (rompen el flow del wizard).
           const isNavigable = isCompleted || isCurrent;
           return (
-            <li key={step.label} className="flex items-center gap-2 flex-1">
+            <li key={step.label} className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
               <StepIndicator
                 index={idx}
                 step={step}
@@ -68,18 +68,23 @@ export function Stepper({
           );
         })}
       </ol>
+      {/* Indicador textual del paso actual visible solo en mobile, donde
+          los labels de cada step se ocultan para que las 5 burbujas quepan
+          en 375px sin overflow horizontal. */}
       <div
         className="sm:hidden mt-2 flex items-center gap-2"
-        aria-hidden
       >
-        <div className="flex-1 h-1 rounded-full bg-gris-200 overflow-hidden">
+        <div
+          className="flex-1 h-1 rounded-full bg-gris-200 overflow-hidden"
+          aria-hidden
+        >
           <div
             className="h-full bg-turquesa-600 transition-[width] duration-300"
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <span className="text-xs text-gris-600 tabular-nums whitespace-nowrap">
-          {currentStep + 1}/{totalSteps}
+        <span className="text-xs text-gris-700 tabular-nums whitespace-nowrap font-semibold">
+          {currentStep + 1}/{totalSteps} · {currentLabel}
         </span>
       </div>
       <p className="sr-only" aria-live="polite">
@@ -105,8 +110,11 @@ function StepIndicator({
   isCurrent,
   onClick,
 }: StepIndicatorProps): JSX.Element {
+  // Mobile: circulos compactos (40px) sin label inline para que los 5 pasos
+  // quepan en 375px sin overflow horizontal. El label visible vive en la
+  // tira de progreso textual debajo (ver Stepper).
   const circleBase =
-    'flex items-center justify-center rounded-full w-10 h-10 md:w-12 md:h-12 border-2 transition-colors duration-200';
+    'flex items-center justify-center rounded-full w-9 h-9 md:w-12 md:h-12 border-2 transition-colors duration-200 shrink-0';
   const circleState = isCompleted
     ? 'bg-turquesa-600 border-turquesa-700 text-white'
     : isCurrent
@@ -118,20 +126,6 @@ function StepIndicator({
     : isCompleted
       ? 'text-gris-700 font-medium'
       : 'text-gris-400 font-medium';
-
-  const innerContent = (
-    <>
-      <span className={`${circleBase} ${circleState}`}>
-        {isCompleted ? (
-          <MaterialIcon name="check" size="medium" />
-        ) : (
-          <MaterialIcon name={step.icon} size="medium" />
-        )}
-        <span className="sr-only">Paso {index + 1}</span>
-      </span>
-      <span className={`text-sm md:text-base whitespace-nowrap ${labelState}`}>{step.label}</span>
-    </>
-  );
 
   if (onClick) {
     return (
@@ -150,7 +144,7 @@ function StepIndicator({
           <span className="sr-only">Paso {index + 1}</span>
         </span>
         <span
-          className={`text-sm md:text-base whitespace-nowrap ${labelState} group-hover:underline underline-offset-4`}
+          className={`hidden sm:inline text-sm md:text-base whitespace-nowrap ${labelState} group-hover:underline underline-offset-4`}
         >
           {step.label}
         </span>
@@ -160,10 +154,22 @@ function StepIndicator({
 
   return (
     <div
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 min-h-[44px]"
       {...(isCurrent ? { 'aria-current': 'step' as const } : {})}
     >
-      {innerContent}
+      <span className={`${circleBase} ${circleState}`}>
+        {isCompleted ? (
+          <MaterialIcon name="check" size="medium" />
+        ) : (
+          <MaterialIcon name={step.icon} size="medium" />
+        )}
+        <span className="sr-only">Paso {index + 1}</span>
+      </span>
+      <span
+        className={`hidden sm:inline text-sm md:text-base whitespace-nowrap ${labelState}`}
+      >
+        {step.label}
+      </span>
     </div>
   );
 }
