@@ -427,7 +427,7 @@ export function SessionTVMode({
                   })()}
                 </div>
               </div>
-              {currentZoneFc !== null && (
+              {currentZoneFc !== null ? (
                 <div className="text-left sm:text-right flex-shrink-0">
                   <div className="flex items-center sm:justify-end gap-1.5 md:gap-2 text-xl sm:text-2xl md:text-4xl font-bold">
                     <MaterialIcon
@@ -442,6 +442,22 @@ export function SessionTVMode({
                   </div>
                   <p className="text-sm sm:text-base md:text-xl font-semibold mt-0.5 opacity-90">
                     {ZONE_PERCENT_FCR[currentBlock.zone]}
+                  </p>
+                </div>
+              ) : (
+                // Sin Karvonen: el modo TV se queda mudo respecto a "qué pulso buscar".
+                // El flujo normal exige FC en sesion, pero defensive-by-default por si
+                // se entra al modo TV con datos parciales (FC max sin reposo, FTP solo).
+                <div
+                  className="text-left sm:text-right flex-shrink-0 text-xs md:text-sm opacity-70 max-w-[16rem]"
+                  title="Añade FC máxima y FC en reposo en «Datos» para ver pulsaciones objetivo."
+                >
+                  <p className="flex items-center sm:justify-end gap-1.5">
+                    <MaterialIcon name="info" size="small" />
+                    Sin pulsaciones objetivo
+                  </p>
+                  <p className="opacity-80">
+                    Completa FC máx y reposo en «Datos».
                   </p>
                 </div>
               )}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateUserInputs } from './validation';
+import { describeValidationError, validateUserInputs, type ValidationError } from './validation';
 import { EMPTY_USER_INPUTS, VALIDATION_LIMITS, type UserInputsRaw } from './userInputs';
 
 const CURRENT_YEAR = 2026;
@@ -449,5 +449,97 @@ describe('validateUserInputs', () => {
         expect(result.errors.some((e) => e.code === 'NEED_HR_DATA')).toBe(true);
       }
     });
+
+    it('FC reposo fuera de rango en session -> RESTING_HR_OUT_OF_RANGE', () => {
+      const result = validateUserInputs(
+        buildRaw({ maxHeartRate: 185, restingHeartRate: 200 }),
+        CURRENT_YEAR,
+        'session',
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors).toContainEqual({
+          code: 'RESTING_HR_OUT_OF_RANGE',
+          min: VALIDATION_LIMITS.restingHeartRate.min,
+          max: VALIDATION_LIMITS.restingHeartRate.max,
+        });
+      }
+    });
+  });
+});
+
+describe('describeValidationError', () => {
+  // Cobertura exhaustiva del switch: cada code debe producir un mensaje no
+  // vacio, en castellano, e incorporar los limites cuando aplica. Si se anade
+  // un nuevo code de error, este test fuerza a documentarlo aqui.
+  const cases: { name: string; err: ValidationError; mustInclude: string[] }[] = [
+    {
+      name: 'WEIGHT_REQUIRED',
+      err: { code: 'WEIGHT_REQUIRED' },
+      mustInclude: ['peso'],
+    },
+    {
+      name: 'WEIGHT_OUT_OF_RANGE',
+      err: { code: 'WEIGHT_OUT_OF_RANGE', min: 30, max: 200 },
+      mustInclude: ['peso', '30', '200'],
+    },
+    {
+      name: 'FTP_OUT_OF_RANGE',
+      err: { code: 'FTP_OUT_OF_RANGE', min: 50, max: 600 },
+      mustInclude: ['FTP', '50', '600'],
+    },
+    {
+      name: 'NEED_FTP_OR_HR_DATA',
+      err: { code: 'NEED_FTP_OR_HR_DATA' },
+      mustInclude: ['FTP'],
+    },
+    {
+      name: 'NEED_HR_DATA',
+      err: { code: 'NEED_HR_DATA' },
+      mustInclude: ['FC'],
+    },
+    {
+      name: 'BIRTH_YEAR_OUT_OF_RANGE',
+      err: { code: 'BIRTH_YEAR_OUT_OF_RANGE', min: 1920, max: 2010 },
+      mustInclude: ['1920', '2010'],
+    },
+    {
+      name: 'MAX_HR_OUT_OF_RANGE',
+      err: { code: 'MAX_HR_OUT_OF_RANGE', min: 100, max: 230 },
+      mustInclude: ['FC', '100', '230'],
+    },
+    {
+      name: 'RESTING_HR_OUT_OF_RANGE',
+      err: { code: 'RESTING_HR_OUT_OF_RANGE', min: 30, max: 100 },
+      mustInclude: ['reposo', '30', '100'],
+    },
+    {
+      name: 'RESTING_GE_MAX_HR',
+      err: { code: 'RESTING_GE_MAX_HR' },
+      mustInclude: ['reposo'],
+    },
+    {
+      name: 'SEX_REQUIRED',
+      err: { code: 'SEX_REQUIRED' },
+      mustInclude: ['mujer', 'hombre'],
+    },
+    {
+      name: 'BIKE_WEIGHT_OUT_OF_RANGE',
+      err: { code: 'BIKE_WEIGHT_OUT_OF_RANGE', min: 5, max: 25 },
+      mustInclude: ['bici', '5', '25'],
+    },
+    {
+      name: 'BIKE_TYPE_INVALID',
+      err: { code: 'BIKE_TYPE_INVALID' },
+      mustInclude: ['bici'],
+    },
+  ];
+
+  it.each(cases)('describe $name', ({ err, mustInclude }) => {
+    const msg = describeValidationError(err);
+    expect(msg.length).toBeGreaterThan(0);
+    for (const fragment of mustInclude) {
+      expect(msg).toContain(fragment);
+    }
   });
 });

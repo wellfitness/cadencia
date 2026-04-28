@@ -67,12 +67,21 @@ export function computeSegments(track: GpxTrack): DistanceSegment[] {
     let speed: number;
     if (track.hasTimestamps && a.time !== null && b.time !== null) {
       duration = (b.time.getTime() - a.time.getTime()) / 1000;
-      if (duration <= 0) {
-        // GPX corrupto / puntos en el mismo instante: caer al fallback heuristico
+      if (duration < 0) {
+        // Timestamps decrecientes entre puntos consecutivos: GPX corrupto o
+        // re-grabado al revés. Fallar explícitamente — silenciar este caso
+        // produciría rutas con duraciones aberrantes y NP imposible de calcular.
+        throw new Error(
+          `Timestamps GPX fuera de orden entre los puntos ${i} y ${i + 1}: el segundo punto va ${Math.abs(duration).toFixed(1)} s antes del primero.`,
+        );
+      }
+      if (duration === 0) {
+        // Puntos exactamente en el mismo instante (jitter de GPS lento, dispositivo
+        // muestreando demasiado fino): aceptable, caemos al fallback heurístico.
         speed = estimateSpeedMps(slope);
         duration = speed > 0 ? distance / speed : 0;
       } else {
-        speed = duration > 0 ? distance / duration : 0;
+        speed = distance / duration;
       }
     } else {
       speed = estimateSpeedMps(slope);

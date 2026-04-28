@@ -162,11 +162,13 @@ export function ResultStep({
     const code = params.get('code');
     const state = params.get('state');
     if (code === null || state === null || clientId === null) return;
+    // Limpia los params del URL bar ANTES de intentar el intercambio: si
+    // completeAuth falla (token consumido, red caída, etc.) no queremos que un
+    // futuro mount vuelva a reintentar con un `code` ya gastado.
+    window.history.replaceState({}, '', window.location.pathname);
     setPhase('exchanging');
     void completeAuth(clientId, code, state)
       .then(() => {
-        // Limpia los params del URL bar
-        window.history.replaceState({}, '', window.location.pathname);
         setPhase('idle');
       })
       .catch((err: unknown) => {

@@ -273,10 +273,21 @@ export function MusicStep({
         )}
 
         {needsUserUpload && (
-          <p className="text-sm text-tulipTree-600 mt-3 flex items-center gap-1.5">
-            <MaterialIcon name="info" size="small" className="text-tulipTree-500" />
-            Sube al menos un CSV válido para continuar con esta fuente.
-          </p>
+          <div
+            role="alert"
+            className="mt-3 rounded-lg border-2 border-rosa-600 bg-rosa-100/40 p-3 flex items-start gap-2"
+          >
+            <MaterialIcon
+              name="error_outline"
+              size="small"
+              className="text-rosa-600 flex-shrink-0 mt-0.5"
+            />
+            <p className="text-sm text-gris-800">
+              <strong>No puedes continuar con esta fuente sin CSV cargados.</strong>{' '}
+              Sube al menos un CSV válido o cambia la fuente a «Combinar ambas» o
+              «Solo predefinida».
+            </p>
+          </div>
         )}
       </Card>
 
@@ -336,7 +347,11 @@ export function MusicStep({
         </div>
         {list.length === 0 ? (
           <p className="text-sm text-gris-500 italic">
-            Sin temas que mostrar. Vuelve a Plan para procesar un GPX.
+            {needsUserUpload
+              ? 'Sin temas que mostrar — sube al menos un CSV válido o cambia la fuente del catálogo.'
+              : tracks.length === 0
+                ? 'Sin temas en el catálogo activo. Sube un CSV o cambia la fuente.'
+                : 'Sin temas que mostrar. Vuelve a Plan para procesar un GPX.'}
           </p>
         ) : (
           <ul className="space-y-1.5 md:max-h-[55vh] md:overflow-y-auto md:pr-1">

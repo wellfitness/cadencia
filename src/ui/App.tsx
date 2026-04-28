@@ -198,7 +198,13 @@ function WizardApp(): JSX.Element {
   });
 
   const handleRegenerateSeed = useCallback((): void => {
+    // Cambiar la semilla regenera la playlist completa con elecciones nuevas:
+    // los índices reemplazados manualmente por el usuario en la lista anterior
+    // dejan de ser aplicables (la lista nueva es otra). Limpiar evita un
+    // estado fantasma donde el badge "Sustituido" se queda colgado en filas
+    // que el usuario nunca tocó en la lista regenerada.
     setMusicPreferences((prev) => ({ ...prev, seed: makeRandomSeed() }));
+    setReplacedIndices(new Set());
   }, []);
 
   // Indices del matching reemplazados manualmente por el usuario via "Otro tema".

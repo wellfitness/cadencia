@@ -4,7 +4,7 @@ import { MaterialIcon } from './MaterialIcon';
 export interface FileDropzoneProps {
   /** Called when the user drops or selects a single file. */
   onFile: (file: File) => void;
-  /** Called when the user drops something invalid (multiple files, wrong extension). */
+  /** Called when the user drops something invalid (multiple files, wrong extension, oversize). */
   onError?: (message: string) => void;
   /** Comma-separated MIME types and extensions accepted. */
   accept?: string;
@@ -14,9 +14,16 @@ export interface FileDropzoneProps {
   disabled?: boolean;
   /** Override the default idle title ("Arrastra tu {label} o pulsa para elegir"). */
   idlePrompt?: string;
+  /** Tamaño máximo aceptado en bytes. Default 10 MB — protege al navegador de DoS por archivos enormes (DOMParser/CSV parser bloquean el hilo principal). */
+  maxSizeBytes?: number;
 }
 
 const DEFAULT_ACCEPT = '.gpx,application/gpx+xml,application/xml,text/xml';
+const DEFAULT_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
+function formatMb(bytes: number): string {
+  return (bytes / (1024 * 1024)).toFixed(bytes < 1024 * 1024 ? 2 : 0);
+}
 
 /**
  * Drag & drop con fallback de input file. Mobile-first y accesible:
@@ -31,6 +38,7 @@ export function FileDropzone({
   acceptedLabel = 'GPX',
   disabled = false,
   idlePrompt,
+  maxSizeBytes = DEFAULT_MAX_SIZE_BYTES,
 }: FileDropzoneProps): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -49,6 +57,12 @@ export function FileDropzone({
     const expectedExt = `.${acceptedLabel.toLowerCase()}`;
     if (!file.name.toLowerCase().endsWith(expectedExt)) {
       onError?.(`El archivo debe tener extensión ${expectedExt}`);
+      return;
+    }
+    if (file.size > maxSizeBytes) {
+      onError?.(
+        `El archivo pesa ${formatMb(file.size)} MB y supera el máximo de ${formatMb(maxSizeBytes)} MB.`,
+      );
       return;
     }
     onFile(file);

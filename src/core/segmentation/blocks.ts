@@ -47,6 +47,15 @@ export function segmentInto60SecondBlocks(
   constants: PowerConstants = buildPowerConstants(validated.bikeWeightKg, validated.bikeType),
 ): SegmentationResult {
   const distSegments = computeSegments(track);
+  // Un track GPX con un solo trackpoint (o todos los puntos en exactamente la
+  // misma coordenada) no produce segmentos consumibles. Falla explícitamente
+  // en lugar de devolver bloques vacíos que silenciosamente romperían el
+  // wizard ("0 min de ruta", playlist vacía).
+  if (distSegments.length === 0) {
+    throw new Error(
+      'El GPX no contiene segmentos consumibles (¿tiene un único trackpoint o coordenadas idénticas?).',
+    );
+  }
   const blocks: ClassifiedSegment[] = [];
   const powerSamples: PowerSample[] = [];
 

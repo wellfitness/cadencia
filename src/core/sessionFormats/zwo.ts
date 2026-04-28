@@ -283,7 +283,11 @@ function intervalsToGroup(el: Element, baseId: string): SessionItem | null {
     offPower === null
   )
     return null;
-  if (repeat < 1 || onDur <= 0 || offDur <= 0) return null;
+  // `readNumberAttr` ya descarta NaN/Inf, así que aquí basta la cota inferior.
+  // Si el ZWO trae Repeat fraccional (p.ej. "0.5"), `Math.floor` lo plancharía
+  // a 0 — descartamos en lugar de auto-elevar a 1, que cambiaría la duración
+  // total del workout sin avisar al usuario.
+  if (Math.floor(repeat) < 1 || onDur <= 0 || offDur <= 0) return null;
 
   const onCadence = readNumberAttr(el, 'Cadence');
   const offCadence = readNumberAttr(el, 'CadenceResting');
