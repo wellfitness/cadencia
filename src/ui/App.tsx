@@ -548,6 +548,7 @@ function WizardApp(): JSX.Element {
               onGoToMusicStep={handleGoToMusicStep}
               onRegenerateSeed={handleRegenerateSeed}
               crossZoneMode={crossZoneMode}
+              sourceType={sourceType ?? 'gpx'}
               {...(sourceType === 'session' ? { onEnterTVMode: handleEnterTVMode } : {})}
             />
           )}

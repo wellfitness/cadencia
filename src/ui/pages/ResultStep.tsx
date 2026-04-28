@@ -12,6 +12,7 @@ import {
   extractUris,
 } from '@core/playlist';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
+import { exportZwo, gpxToEditableSessionPlan, sanitizeFilename } from '@core/sessionFormats';
 import { loadNativeTracks, type Track } from '@core/tracks';
 import type { ValidatedUserInputs, ValidationResult } from '@core/user';
 import {
@@ -86,6 +87,15 @@ export interface ResultStepProps {
   onRegenerateSeed?: () => void;
   /** Modo de matching: overlap (GPX, default) o discrete (sesion indoor). */
   crossZoneMode?: CrossZoneMode;
+  /**
+   * Origen de la ruta: 'gpx' (outdoor) o 'session' (indoor).
+   *
+   * En modo 'gpx' habilitamos el botón "Descargar .zwo" que serializa los
+   * segmentos clasificados como workout estructurado para Zwift, TrainerRoad,
+   * Wahoo SYSTM, etc. En modo 'session' el botón ya existe en SessionBuilder
+   * y no se duplica aquí.
+   */
+  sourceType: 'gpx' | 'session';
 }
 
 type Phase = 'idle' | 'authorizing' | 'exchanging' | 'creating' | 'done' | 'error';
@@ -93,7 +103,7 @@ type Phase = 'idle' | 'authorizing' | 'exchanging' | 'creating' | 'done' | 'erro
 export function ResultStep({
   validation,
   validatedInputs,
-  routeSegments: _routeSegments,
+  routeSegments,
   routeMeta,
   matched,
   preferences,
@@ -110,10 +120,10 @@ export function ResultStep({
   onGoToMusicStep,
   onRegenerateSeed,
   crossZoneMode = 'overlap',
+  sourceType,
 }: ResultStepProps): JSX.Element {
   void validation;
   void validatedInputs;
-  void _routeSegments;
   const clientId = getSpotifyClientId();
   // Catalogo activo: el que viene del paso Musica (incluye uploads del
   // usuario). Si no hay (refresh de pestaña, callback OAuth), fallback a
@@ -235,6 +245,25 @@ export function ResultStep({
     setHasSpotifySession(false);
     setError(null);
     setPhase('idle');
+  };
+
+  // Descarga la ruta GPX como workout .zwo (Zwift, TrainerRoad, Wahoo SYSTM,
+  // MyWhoosh, TrainingPeaks Virtual). Solo se ofrece en modo gpx — en modo
+  // session el botón ya vive en el SessionBuilder.
+  const handleDownloadZwo = (): void => {
+    if (sourceType !== 'gpx' || routeSegments.length === 0) return;
+    const baseName = routeMeta.name.trim().length > 0 ? routeMeta.name : 'cadencia-ruta';
+    const plan = gpxToEditableSessionPlan(routeSegments, baseName);
+    const xml = exportZwo(plan);
+    const blob = new Blob([xml], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = sanitizeFilename(baseName) + '.zwo';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const totalMinutes = Math.round(routeMeta.totalDurationSec / 60);
@@ -429,6 +458,9 @@ export function ResultStep({
         }
         hasSpotifySession={hasSpotifySession}
         {...(onEnterTVMode !== undefined ? { onEnterTVMode } : {})}
+        {...(sourceType === 'gpx' && routeSegments.length > 0
+          ? { onDownloadZwo: handleDownloadZwo }
+          : {})}
       />
     </WizardStep>
   );
@@ -461,6 +493,14 @@ interface FooterActionsProps {
    * jerarquicas: la usuaria suele hacer ambas.
    */
   onEnterTVMode?: () => void;
+  /**
+   * Solo presente en modo GPX. Si está, renderizamos un botón secundario
+   * "Descargar .zwo" que serializa la ruta como workout estructurado para
+   * Zwift / TrainerRoad / Wahoo SYSTM. Acción complementaria a "Crear en
+   * Spotify": muchos usuarios querrán ambas (la playlist para fuera y el
+   * .zwo para días de mal tiempo en el rodillo).
+   */
+  onDownloadZwo?: () => void;
 }
 
 function FooterActions({
@@ -470,6 +510,7 @@ function FooterActions({
   canCreate,
   hasSpotifySession,
   onEnterTVMode,
+  onDownloadZwo,
 }: FooterActionsProps): JSX.Element {
   const idleLabel = hasSpotifySession ? 'Crear lista' : 'Crear en Spotify';
   const createLabel = creating ? 'Creando…' : idleLabel;
@@ -502,6 +543,18 @@ function FooterActions({
           >
             {createLabel}
           </Button>
+          {onDownloadZwo !== undefined && (
+            <Button
+              variant="secondary"
+              iconLeft="download"
+              onClick={onDownloadZwo}
+              fullWidth
+              aria-label="Descargar la ruta como workout .zwo para Zwift, TrainerRoad o similares"
+              title="Descargar .zwo (Zwift, TrainerRoad, Wahoo SYSTM…)"
+            >
+              Descargar .zwo
+            </Button>
+          )}
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack} fullWidth>
             Atrás
           </Button>
@@ -512,6 +565,17 @@ function FooterActions({
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {onDownloadZwo !== undefined && (
+            <Button
+              variant="secondary"
+              iconLeft="download"
+              onClick={onDownloadZwo}
+              aria-label="Descargar la ruta como workout .zwo para Zwift, TrainerRoad o similares"
+              title="Descargar .zwo (Zwift, TrainerRoad, Wahoo SYSTM…)"
+            >
+              Descargar .zwo
+            </Button>
+          )}
           {onEnterTVMode !== undefined && (
             <Button
               variant="primary"

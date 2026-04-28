@@ -14,7 +14,7 @@ import {
   type SessionItem,
   type SessionTemplate,
 } from '@core/segmentation';
-import { exportZwo, importZwo } from '@core/sessionFormats';
+import { exportZwo, importZwo, sanitizeFilename } from '@core/sessionFormats';
 import type { ValidatedUserInputs } from '@core/user/userInputs';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
@@ -135,16 +135,6 @@ function defaultName(): string {
   const month = now.toLocaleString('es-ES', { month: 'short' });
   const time = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
   return `Sesión indoor — ${day} ${month}, ${time}`;
-}
-
-/**
- * Limpia caracteres problematicos para nombres de archivo (Windows/macOS).
- * Espacios y acentos sí se aceptan; lo que se quita son separadores de ruta
- * y caracteres reservados.
- */
-function sanitizeFilename(name: string): string {
-  const trimmed = name.trim().replace(/[\\/:*?"<>|]/g, '');
-  return trimmed.length > 0 ? trimmed : 'workout';
 }
 
 /**
