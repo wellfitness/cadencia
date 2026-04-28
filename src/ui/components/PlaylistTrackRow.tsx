@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { AlternativeCandidate, MatchedSegment } from '@core/matching';
 import { Button } from './Button';
 import { MaterialIcon } from './MaterialIcon';
+import { SlopePill } from './SlopePill';
 import { ZoneBadge } from './ZoneBadge';
 
 export interface PlaylistTrackRowProps {
@@ -22,6 +23,11 @@ export interface PlaylistTrackRowProps {
    * temas. Se renderiza como CTA dentro del null state (sin tema disponible).
    */
   onGoToMusicStep?: () => void;
+  /**
+   * Pinta la pendiente media del segmento al lado del ZoneBadge. Solo activar
+   * en modo GPX; en sesión indoor los datos de elevación son 0.
+   */
+  showSlope?: boolean;
 }
 
 const QUALITY_LABEL: Record<MatchedSegment['matchQuality'], string | null> = {
@@ -43,6 +49,7 @@ export function PlaylistTrackRow({
   onReplaceWith,
   replaced = false,
   onGoToMusicStep,
+  showSlope = false,
 }: PlaylistTrackRowProps): JSX.Element {
   const { track, zone, matchQuality } = matched;
   const qualityLabel = QUALITY_LABEL[matchQuality];
@@ -96,7 +103,10 @@ export function PlaylistTrackRow({
           <p className="text-xs text-gris-500 truncate">{track.artists.join(', ')}</p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <ZoneBadge zone={zone} size="sm" />
+          <div className="flex items-center gap-1.5">
+            {showSlope && <SlopePill segment={matched} />}
+            <ZoneBadge zone={zone} size="sm" />
+          </div>
           <span className="text-xs text-gris-500 tabular-nums">
             {Math.round(track.tempoBpm)} bpm
           </span>

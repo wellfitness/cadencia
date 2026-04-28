@@ -59,6 +59,20 @@ describe('loadNativeTracks (catalogo unificado bundled)', () => {
     }
   });
 
+  it('todos los tracks tienen durationMs > 0 (regresion: bug del compilador que dejaba la columna vacia)', () => {
+    // Si un track tiene durationMs=0, el motor de matching crea un slot nuevo
+    // por segundo y la playlist explota a miles de entradas. Un par de tracks
+    // del catalogo real deberian estar entre 60s y 15min.
+    const tracks = loadNativeTracks();
+    for (const t of tracks) {
+      expect(t.durationMs, `${t.name} tiene durationMs invalido`).toBeGreaterThan(0);
+    }
+    // Sanity: media de duracion entre 1 y 10 minutos.
+    const avgMs = tracks.reduce((sum, t) => sum + t.durationMs, 0) / tracks.length;
+    expect(avgMs).toBeGreaterThan(60_000); // > 1 min
+    expect(avgMs).toBeLessThan(600_000);   // < 10 min
+  });
+
   it('source de cada track refleja su CSV de origen (no vacio)', () => {
     const tracks = loadNativeTracks();
     const sources = new Set(tracks.map((t) => t.source));

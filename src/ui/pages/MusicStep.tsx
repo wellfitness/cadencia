@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useReducer, useState, type ChangeEvent } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import {
   analyzePoolCoverage,
-  EMPTY_PREFERENCES,
   getAlternativesForSegment,
-  matchTracksToSegments,
   replaceTrackInSegment,
   type CrossZoneMode,
   type MatchPreferences,
@@ -11,13 +9,7 @@ import {
   type PoolCoverage,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import {
-  dedupeByUri,
-  getTopGenres,
-  loadNativeTracks,
-  parseTrackCsv,
-  type Track,
-} from '@core/tracks';
+import { getTopGenres, parseTrackCsv, type Track } from '@core/tracks';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
@@ -25,56 +17,35 @@ import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
+import type { UploadedCsv } from '@ui/state/uploadedCsv';
+import type { MusicSourceMode } from '@ui/state/wizardStorage';
 import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 
-type SourceMode = 'predefined' | 'mine' | 'both';
-
-interface UploadedCsv {
-  id: string;
-  name: string;
-  trackCount: number;
-  tracks: readonly Track[];
-  error?: string;
-}
-
-type PreferencesAction =
-  | { type: 'TOGGLE_GENRES'; genres: string[] }
-  | { type: 'SET_ALL_ENERGETIC'; value: boolean }
-  | { type: 'RESET' };
-
-function preferencesReducer(
-  state: MatchPreferences,
-  action: PreferencesAction,
-): MatchPreferences {
-  switch (action.type) {
-    case 'TOGGLE_GENRES':
-      return { ...state, preferredGenres: action.genres };
-    case 'SET_ALL_ENERGETIC':
-      return { ...state, allEnergetic: action.value };
-    case 'RESET':
-      return EMPTY_PREFERENCES;
-  }
-}
-
 export interface MusicStepProps {
   segments: readonly ClassifiedSegment[];
   meta: RouteMeta;
-  /**
-   * Llamado al pulsar Siguiente con la lista final asignada, las preferencias
-   * usadas y el catalogo activo en este paso (predefinido, propio o ambos).
-   * El catalogo viaja al Resultado para que el dropdown "Otro tema" busque
-   * alternativas en el mismo pool con el que se generó el matching.
-   */
-  onMatched: (
-    matched: MatchedSegment[],
-    preferences: MatchPreferences,
-    tracks: readonly Track[],
-  ) => void;
+  /** Catalogo activo combinado (predefinido + uploads del usuario) calculado en App. */
+  tracks: readonly Track[];
+  /** Preferencias controladas: el reducer vive en App para sobrevivir remountajes. */
+  preferences: MatchPreferences;
+  onPreferencesChange: (next: MatchPreferences) => void;
+  /** Fuente del catalogo (predefined / mine / both). Controlada desde App. */
+  sourceMode: MusicSourceMode;
+  onSourceModeChange: (next: MusicSourceMode) => void;
+  /** CSVs subidos por el usuario. Viven en App (in-memory) para que persistan al ir y volver. */
+  uploadedCsvs: readonly UploadedCsv[];
+  onUploadedCsvsChange: (next: readonly UploadedCsv[]) => void;
+  /** Matching base calculado en App. null antes del primer calculo. */
+  matched: readonly MatchedSegment[] | null;
+  onMatchedChange: (next: MatchedSegment[]) => void;
+  /** Indices reemplazados manualmente con "Otro tema". Viven en App. */
+  replacedIndices: ReadonlySet<number>;
+  onReplacedIndicesChange: (next: ReadonlySet<number>) => void;
+  /** Avanza al siguiente paso. El matching ya esta sincronizado en App. */
+  onAdvance: () => void;
   onBack: () => void;
-  /** Estado inicial de preferencias (si el usuario vuelve atrás y entra otra vez). */
-  initialPreferences?: MatchPreferences;
   /**
    * Modo de matching frente a las zonas:
    * - 'overlap' (default): un track cubre los siguientes segmentos aunque
@@ -88,30 +59,24 @@ export interface MusicStepProps {
 export function MusicStep({
   segments,
   meta,
-  onMatched,
+  tracks,
+  preferences,
+  onPreferencesChange,
+  sourceMode,
+  onSourceModeChange,
+  uploadedCsvs,
+  onUploadedCsvsChange,
+  matched,
+  onMatchedChange,
+  replacedIndices,
+  onReplacedIndicesChange,
+  onAdvance,
   onBack,
-  initialPreferences,
   crossZoneMode = 'overlap',
 }: MusicStepProps): JSX.Element {
-  const [preferences, dispatch] = useReducer(
-    preferencesReducer,
-    initialPreferences ?? EMPTY_PREFERENCES,
-  );
-
-  // Fuente del catalogo: predefinido (CSVs embebidos), solo lo subido por el
-  // usuario, o ambos combinados. Default 'both' para no romper el flow actual.
-  const [sourceMode, setSourceMode] = useState<SourceMode>('both');
-  const [uploadedCsvs, setUploadedCsvs] = useState<readonly UploadedCsv[]>([]);
+  // Unico state local que sobrevive: errores transitorios de subida de CSV.
+  // Todo lo demas viene controlado desde App.
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-  // Catalogo combinado segun la fuente elegida. Los nativos se cachean a nivel
-  // de modulo en loadNativeTracks(); los user tracks se mergean dedup por URI.
-  const tracks = useMemo(() => {
-    const userTracks = uploadedCsvs.flatMap((c) => [...c.tracks]);
-    if (sourceMode === 'predefined') return loadNativeTracks();
-    if (sourceMode === 'mine') return dedupeByUri(userTracks);
-    return dedupeByUri([...loadNativeTracks(), ...userTracks]);
-  }, [sourceMode, uploadedCsvs]);
 
   const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
 
@@ -122,39 +87,26 @@ export function MusicStep({
     [segments, tracks, preferences],
   );
 
-  // Matching en vivo: cada cambio de preferencias o fuente recalcula. <50ms
-  // para catalogos pequenos, no necesita debounce. Se mantiene como estado
-  // (no useMemo) para que los cambios manuales del usuario via "Otro tema"
-  // persistan hasta que toque algo que invalide el matching base.
-  const [matched, setMatched] = useState<MatchedSegment[]>(() =>
-    matchTracksToSegments(segments, tracks, preferences, { crossZoneMode }),
-  );
-  // Indices reemplazados manualmente (para marca visual "edited"). Se reinicia
-  // cuando el matching base cambia (preferences, tracks, crossZoneMode).
-  const [replacedIndices, setReplacedIndices] = useState<ReadonlySet<number>>(new Set());
-
-  useEffect(() => {
-    const fresh = matchTracksToSegments(segments, tracks, preferences, { crossZoneMode });
-    setMatched(fresh);
-    setReplacedIndices(new Set());
-  }, [segments, tracks, preferences, crossZoneMode]);
+  // Lista efectiva renderizada: si App aun no ha calculado el matching base
+  // (matched === null en el primer mount tras procesar la ruta), mostramos
+  // lista vacia hasta que el effect de App dispare. Es un caso fugaz.
+  // Memoizado para no romper la igualdad referencial de los useMemo derivados.
+  const list = useMemo<readonly MatchedSegment[]>(() => matched ?? [], [matched]);
 
   // Alternativas validas por fila (excluye URIs ya en la playlist). Mismo
   // criterio que en Result para que el dropdown sea consistente entre pasos.
   const alternativesByIndex = useMemo(
-    () => matched.map((_, i) => getAlternativesForSegment(matched, i, tracks, preferences)),
-    [matched, tracks, preferences],
+    () => list.map((_, i) => getAlternativesForSegment(list, i, tracks, preferences)),
+    [list, tracks, preferences],
   );
 
   const handleReplaceWith = (index: number, uri: string): void => {
-    const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
+    const result = replaceTrackInSegment(list, index, tracks, preferences, uri);
     if (!result.replaced) return;
-    setMatched(result.matched);
-    setReplacedIndices((prev) => {
-      const next = new Set(prev);
-      next.add(index);
-      return next;
-    });
+    onMatchedChange(result.matched);
+    const next = new Set(replacedIndices);
+    next.add(index);
+    onReplacedIndicesChange(next);
   };
 
   const handleCsvUpload = async (file: File): Promise<void> => {
@@ -163,8 +115,8 @@ export function MusicStep({
       const text = await file.text();
       const parsed = parseTrackCsv(text, 'user');
       if (parsed.length === 0) {
-        setUploadedCsvs((prev) => [
-          ...prev,
+        onUploadedCsvsChange([
+          ...uploadedCsvs,
           {
             id: crypto.randomUUID(),
             name: file.name,
@@ -175,8 +127,8 @@ export function MusicStep({
         ]);
         return;
       }
-      setUploadedCsvs((prev) => [
-        ...prev,
+      onUploadedCsvsChange([
+        ...uploadedCsvs,
         {
           id: crypto.randomUUID(),
           name: file.name,
@@ -186,8 +138,8 @@ export function MusicStep({
       ]);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Error al leer el CSV';
-      setUploadedCsvs((prev) => [
-        ...prev,
+      onUploadedCsvsChange([
+        ...uploadedCsvs,
         {
           id: crypto.randomUUID(),
           name: file.name,
@@ -200,28 +152,27 @@ export function MusicStep({
   };
 
   const handleRemoveCsv = (id: string): void => {
-    setUploadedCsvs((prev) => prev.filter((c) => c.id !== id));
+    onUploadedCsvsChange(uploadedCsvs.filter((c) => c.id !== id));
   };
 
   const setGenres = (genres: string[]): void => {
-    dispatch({ type: 'TOGGLE_GENRES', genres });
+    onPreferencesChange({ ...preferences, preferredGenres: genres });
   };
   const setAllEnergetic = (e: ChangeEvent<HTMLInputElement>): void => {
-    dispatch({ type: 'SET_ALL_ENERGETIC', value: e.target.checked });
-  };
-
-  const handleNext = (): void => {
-    onMatched(matched, preferences, tracks);
+    onPreferencesChange({ ...preferences, allEnergetic: e.target.checked });
   };
 
   const totalMinutes = Math.round(meta.totalDurationSec / 60);
-  const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
+  const bestEffortCount = list.filter((m) => m.matchQuality === 'best-effort').length;
   const replacedCount = replacedIndices.size;
 
   const validUploads = uploadedCsvs.filter((c) => c.error === undefined);
   const hasUserTracks = validUploads.length > 0;
   const showDropzone = sourceMode === 'mine' || sourceMode === 'both';
   const needsUserUpload = sourceMode === 'mine' && !hasUserTracks;
+
+  // Aviso visible (no excluyente) sobre crossZoneMode para depuracion futura.
+  void crossZoneMode;
 
   return (
     <WizardStep>
@@ -235,21 +186,21 @@ export function MusicStep({
           <SourceRadio
             value="both"
             current={sourceMode}
-            onChange={setSourceMode}
+            onChange={onSourceModeChange}
             title="Combinar ambas"
             desc="La biblioteca predefinida más tus CSV. Más variedad y siempre hay tracks disponibles."
           />
           <SourceRadio
             value="mine"
             current={sourceMode}
-            onChange={setSourceMode}
+            onChange={onSourceModeChange}
             title="Solo mis CSV"
             desc="Solo canciones que tú subas. Máxima personalización; necesitas subir al menos un CSV."
           />
           <SourceRadio
             value="predefined"
             current={sourceMode}
-            onChange={setSourceMode}
+            onChange={onSourceModeChange}
             title="Solo predefinida"
             desc="La biblioteca embebida en la app, sin tus CSV."
           />
@@ -374,7 +325,7 @@ export function MusicStep({
         <PoolCoverageWarning
           coverage={coverage}
           sourceMode={sourceMode}
-          onSwitchToBoth={() => setSourceMode('both')}
+          onSwitchToBoth={() => onSourceModeChange('both')}
         />
       )}
 
@@ -383,7 +334,7 @@ export function MusicStep({
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex items-baseline justify-between gap-2 mb-3">
           <p className="text-sm text-gris-600">
-            <strong className="text-gris-800 tabular-nums">{matched.length}</strong> temas
+            <strong className="text-gris-800 tabular-nums">{list.length}</strong> temas
             para <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de
             ruta
           </p>
@@ -394,13 +345,13 @@ export function MusicStep({
             </span>
           )}
         </div>
-        {matched.length === 0 ? (
+        {list.length === 0 ? (
           <p className="text-sm text-gris-500 italic">
             Sin temas que mostrar. Vuelve a Ruta para procesar un GPX.
           </p>
         ) : (
           <ul className="space-y-2 md:max-h-[55vh] md:overflow-y-auto md:pr-1">
-            {matched.map((m, i) => (
+            {list.map((m, i) => (
               <li key={`${m.startSec}-${i}`}>
                 <PlaylistTrackRow
                   matched={m}
@@ -408,6 +359,7 @@ export function MusicStep({
                   alternatives={alternativesByIndex[i] ?? []}
                   onReplaceWith={(uri) => handleReplaceWith(i, uri)}
                   replaced={replacedIndices.has(i)}
+                  showSlope={crossZoneMode === 'overlap'}
                 />
               </li>
             ))}
@@ -417,17 +369,17 @@ export function MusicStep({
 
       <FooterActions
         onBack={onBack}
-        onNext={handleNext}
-        canGoNext={matched.length > 0 && tracks.length > 0 && !needsUserUpload}
+        onNext={onAdvance}
+        canGoNext={list.length > 0 && tracks.length > 0 && !needsUserUpload}
       />
     </WizardStep>
   );
 }
 
 interface SourceRadioProps {
-  value: SourceMode;
-  current: SourceMode;
-  onChange: (next: SourceMode) => void;
+  value: MusicSourceMode;
+  current: MusicSourceMode;
+  onChange: (next: MusicSourceMode) => void;
   title: string;
   desc: string;
 }
@@ -466,7 +418,7 @@ function SourceRadio({
 
 interface PoolCoverageWarningProps {
   coverage: PoolCoverage;
-  sourceMode: SourceMode;
+  sourceMode: MusicSourceMode;
   onSwitchToBoth: () => void;
 }
 

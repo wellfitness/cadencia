@@ -26,9 +26,21 @@ export interface RouteStepProps {
   sourceType: RouteSourceChoice;
   /** Plan de sesion previamente guardado (restaurado de sessionStorage). */
   initialSessionPlan?: EditableSessionPlan | undefined;
+  /**
+   * Segmentos GPX ya procesados (cuando el usuario vuelve al paso tras un
+   * detour). Si vienen, el GpxRouteFlow arranca en fase 'ready' en vez de
+   * mostrar la dropzone vacia, evitando que el usuario tenga que volver a
+   * subir el archivo.
+   */
+  initialSegments?: readonly ClassifiedSegment[] | undefined;
+  initialMeta?: RouteMeta | undefined;
+  /** Plantilla activa de la SessionBuilder (null si edita desde cero). */
+  initialActiveTemplateId?: string | null;
   onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
   /** Callback cuando el plan de sesion editable cambia. */
   onSessionPlanChange: (plan: EditableSessionPlan | null) => void;
+  /** Callback cuando el usuario carga otra plantilla o empieza de cero. */
+  onActiveTemplateIdChange?: (id: string | null) => void;
   onBack: () => void;
   onNext: () => void;
 }
@@ -45,8 +57,12 @@ export function RouteStep({
   validatedInputs,
   sourceType,
   initialSessionPlan,
+  initialSegments,
+  initialMeta,
+  initialActiveTemplateId = null,
   onProcessed,
   onSessionPlanChange,
+  onActiveTemplateIdChange,
   onBack,
   onNext,
 }: RouteStepProps): JSX.Element {
@@ -55,11 +71,15 @@ export function RouteStep({
       <SessionBuilder
         validatedInputs={validatedInputs}
         initialPlan={initialSessionPlan}
+        initialActiveTemplateId={initialActiveTemplateId}
         onProcessed={(segments, meta, plan) => {
           onSessionPlanChange(plan);
           onProcessed(segments, meta);
         }}
         onChange={onSessionPlanChange}
+        {...(onActiveTemplateIdChange !== undefined
+          ? { onActiveTemplateIdChange }
+          : {})}
         onBack={onBack}
         onNext={onNext}
       />
@@ -69,6 +89,8 @@ export function RouteStep({
   return (
     <GpxRouteFlow
       validatedInputs={validatedInputs}
+      initialSegments={initialSegments ?? null}
+      initialMeta={initialMeta ?? null}
       onProcessed={onProcessed}
       onBack={onBack}
       onNext={onNext}
@@ -78,6 +100,8 @@ export function RouteStep({
 
 interface GpxRouteFlowProps {
   validatedInputs: ValidatedUserInputs;
+  initialSegments: readonly ClassifiedSegment[] | null;
+  initialMeta: RouteMeta | null;
   onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
   onBack: () => void;
   onNext: () => void;
@@ -85,14 +109,22 @@ interface GpxRouteFlowProps {
 
 function GpxRouteFlow({
   validatedInputs,
+  initialSegments,
+  initialMeta,
   onProcessed,
   onBack,
   onNext,
 }: GpxRouteFlowProps): JSX.Element {
-  const [phase, setPhase] = useState<GpxPhase>('idle');
+  // Si vienen segmentos ya procesados (vuelta atras desde un paso posterior),
+  // arrancamos en 'ready' con el perfil ya pintado. Evita que el usuario tenga
+  // que reabrir el archivo cada vez que retrocede a este paso.
+  const hasInitial = initialSegments !== null && initialMeta !== null;
+  const [phase, setPhase] = useState<GpxPhase>(hasInitial ? 'ready' : 'idle');
   const [parsingStep, setParsingStep] = useState<number>(0);
-  const [segments, setSegments] = useState<ClassifiedSegment[] | null>(null);
-  const [meta, setMeta] = useState<RouteMeta | null>(null);
+  const [segments, setSegments] = useState<ClassifiedSegment[] | null>(
+    initialSegments !== null ? [...initialSegments] : null,
+  );
+  const [meta, setMeta] = useState<RouteMeta | null>(initialMeta);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const karvonenZones = useMemo<KarvonenZoneRange[] | undefined>(() => {

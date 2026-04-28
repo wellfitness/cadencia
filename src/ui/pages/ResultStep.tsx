@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   getAlternativesForSegment,
-  matchTracksToSegments,
   replaceTrackInSegment,
   type CrossZoneMode,
   type MatchPreferences,
@@ -59,8 +58,14 @@ export interface ResultStepProps {
    * el matching original.
    */
   tracks?: readonly Track[] | null;
-  /** Callback al cambiar matched o preferences (App.tsx persiste). */
-  onMatchedChange: (matched: MatchedSegment[], preferences: MatchPreferences) => void;
+  /** Indices reemplazados manualmente. Controlled desde App para sobrevivir remountajes. */
+  replacedIndices: ReadonlySet<number>;
+  onReplacedIndicesChange: (next: ReadonlySet<number>) => void;
+  /** Nombre de la playlist tecleado por el usuario. Controlled desde App. */
+  playlistName: string;
+  onPlaylistNameChange: (next: string) => void;
+  /** Callback al cambiar matched (App.tsx persiste y propaga). */
+  onMatchedChange: (matched: MatchedSegment[]) => void;
   onBack: () => void;
   /** Si la ruta vino de una sesion indoor, callback para abrir el modo TV. */
   onEnterTVMode?: () => void;
@@ -82,11 +87,15 @@ type Phase = 'idle' | 'authorizing' | 'exchanging' | 'creating' | 'done' | 'erro
 export function ResultStep({
   validation,
   validatedInputs,
-  routeSegments,
+  routeSegments: _routeSegments,
   routeMeta,
   matched,
   preferences,
   tracks: providedTracks,
+  replacedIndices,
+  onReplacedIndicesChange,
+  playlistName,
+  onPlaylistNameChange,
   onMatchedChange,
   onBack,
   onEnterTVMode,
@@ -95,6 +104,9 @@ export function ResultStep({
   onGoToMusicStep,
   crossZoneMode = 'overlap',
 }: ResultStepProps): JSX.Element {
+  void validation;
+  void validatedInputs;
+  void _routeSegments;
   const clientId = getSpotifyClientId();
   // Catalogo activo: el que viene del paso Musica (incluye uploads del
   // usuario). Si no hay (refresh de pestaña, callback OAuth), fallback a
@@ -107,11 +119,14 @@ export function ResultStep({
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedPlaylist | null>(null);
-  const [playlistName, setPlaylistName] = useState(() =>
-    buildPlaylistName(routeMeta.name, new Date()),
-  );
-  const [replacedIndices, setReplacedIndices] = useState<ReadonlySet<number>>(new Set());
   const [hasSpotifySession, setHasSpotifySession] = useState<boolean>(() => loadTokens() !== null);
+
+  // Si el usuario aun no ha tecleado un nombre custom para la playlist,
+  // sugerimos uno basado en la ruta y la fecha actual. Esto solo se aplica
+  // cuando el playlistName de App esta vacio (primer mount despues de
+  // procesar la ruta) — si el usuario edito y borro a propio, lo respetamos.
+  const effectivePlaylistName =
+    playlistName.length > 0 ? playlistName : buildPlaylistName(routeMeta.name, new Date());
 
   // Alternativas validas por fila (excluye URIs ya en la playlist). Se
   // recalculan al cambiar la lista o las preferencias para que el dropdown
@@ -123,23 +138,6 @@ export function ResultStep({
       ),
     [matched, tracks, preferences],
   );
-
-  // Si los inputs cambian (edit-in-place), recalculamos matching desde cero.
-  // El indice de "reemplazados manualmente" se reinicia.
-  useEffect(() => {
-    if (!validation.ok) return;
-    const fresh = matchTracksToSegments(routeSegments, tracks, preferences, {
-      crossZoneMode,
-    });
-    if (
-      fresh.length !== matched.length ||
-      fresh.some((m, i) => m.track?.uri !== matched[i]?.track?.uri)
-    ) {
-      onMatchedChange(fresh, preferences);
-      setReplacedIndices(new Set());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: recalculamos solo al cambiar inputs validados o ruta
-  }, [validatedInputs, routeSegments, preferences, crossZoneMode]);
 
   // Detecta `?code=...&state=...` en URL al volver del callback web.
   useEffect(() => {
@@ -167,12 +165,10 @@ export function ResultStep({
   const handleReplaceWith = (index: number, uri: string): void => {
     const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
     if (!result.replaced) return;
-    onMatchedChange(result.matched, preferences);
-    setReplacedIndices((prev) => {
-      const next = new Set(prev);
-      next.add(index);
-      return next;
-    });
+    onMatchedChange(result.matched);
+    const next = new Set(replacedIndices);
+    next.add(index);
+    onReplacedIndicesChange(next);
   };
 
   const handleCreatePlaylist = async (): Promise<void> => {
@@ -214,7 +210,7 @@ export function ResultStep({
       const description = buildPlaylistDescription(routeMeta);
       const playlist = await createPlaylistWithTracks({
         accessToken: tokens.accessToken,
-        name: playlistName.trim() || buildPlaylistName(routeMeta.name, new Date()),
+        name: effectivePlaylistName.trim() || buildPlaylistName(routeMeta.name, new Date()),
         description,
         uris,
       });
@@ -343,6 +339,7 @@ export function ResultStep({
                   alternatives={alternativesByIndex[i] ?? []}
                   onReplaceWith={(uri) => handleReplaceWith(i, uri)}
                   replaced={replacedIndices.has(i)}
+                  showSlope={crossZoneMode === 'overlap'}
                   {...(onGoToMusicStep !== undefined ? { onGoToMusicStep } : {})}
                 />
               </li>
@@ -376,8 +373,8 @@ export function ResultStep({
           <Input
             label="Nombre de la lista"
             type="text"
-            value={playlistName}
-            onChange={(e) => setPlaylistName(e.target.value)}
+            value={effectivePlaylistName}
+            onChange={(e) => onPlaylistNameChange(e.target.value)}
             helper="Aparecerá tal cual en tu Spotify (puedes cambiarlo después)."
           />
           {error !== null && (
@@ -419,7 +416,7 @@ export function ResultStep({
         onCreate={() => void handleCreatePlaylist()}
         creating={phase === 'authorizing' || phase === 'exchanging' || phase === 'creating'}
         canCreate={
-          validUriCount > 0 && playlistName.trim() !== '' && insufficientCount === 0
+          validUriCount > 0 && effectivePlaylistName.trim() !== '' && insufficientCount === 0
         }
         hasSpotifySession={hasSpotifySession}
       />

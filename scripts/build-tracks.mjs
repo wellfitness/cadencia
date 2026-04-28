@@ -105,7 +105,7 @@ function main() {
       energy: idx('Energy'),
       valence: idx('Valence'),
       danceability: idx('Danceability'),
-      duration: idx('Track Duration (ms)'),
+      duration: idx('Duration (ms)'),
     };
     if (cols.uri < 0 || cols.tempo < 0) {
       console.error(`[${file}] sin columnas Track URI o Tempo, salto`);

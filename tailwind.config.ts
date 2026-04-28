@@ -96,6 +96,18 @@ export default {
       transitionTimingFunction: {
         DEFAULT: 'cubic-bezier(0, 0, 0.2, 1)', // ease-out
       },
+      keyframes: {
+        // Fade-in suave para revelados (disclosure paneles, banners de
+        // confirmacion). Todas las clases que lo usan deben envolverse en
+        // motion-safe: para respetar prefers-reduced-motion.
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(-2px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade-in 200ms cubic-bezier(0, 0, 0.2, 1) both',
+      },
     },
   },
   plugins: [],

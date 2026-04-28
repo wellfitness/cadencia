@@ -28,12 +28,16 @@ export interface SessionBuilderProps {
   validatedInputs: ValidatedUserInputs;
   /** Plan inicial restaurado de sessionStorage si existia. */
   initialPlan?: EditableSessionPlan | undefined;
+  /** Plantilla activa restaurada (null si edita desde cero o no hay plan). */
+  initialActiveTemplateId?: string | null;
   onProcessed: (
     segments: ClassifiedSegment[],
     meta: RouteMeta,
     plan: EditableSessionPlan,
   ) => void;
   onChange: (plan: EditableSessionPlan) => void;
+  /** Notifica al padre cada vez que cambia la plantilla activa para persistirla. */
+  onActiveTemplateIdChange?: (id: string | null) => void;
   onBack: () => void;
   onNext: () => void;
 }
@@ -128,17 +132,19 @@ function defaultName(): string {
 export function SessionBuilder({
   validatedInputs,
   initialPlan,
+  initialActiveTemplateId = null,
   onProcessed,
   onChange,
+  onActiveTemplateIdChange,
   onBack,
   onNext,
 }: SessionBuilderProps): JSX.Element {
   const [state, dispatch] = useReducer(
     reducer,
-    initialPlan,
+    { plan: initialPlan, templateId: initialActiveTemplateId },
     (init): BuilderState => ({
-      plan: init ?? { name: defaultName(), items: [] },
-      activeTemplateId: null,
+      plan: init.plan ?? { name: defaultName(), items: [] },
+      activeTemplateId: init.templateId,
       nextId: 1,
     }),
   );
@@ -150,8 +156,10 @@ export function SessionBuilder({
       const nextPlan = { ...state.plan, items };
       dispatch({ type: 'setItems', items });
       onChange(nextPlan);
+      // Editar manualmente borra el highlight de la plantilla original.
+      if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
     },
-    [state.plan, onChange],
+    [state.plan, onChange, onActiveTemplateIdChange],
   );
 
   const handleLoadTemplate = useCallback(
@@ -161,21 +169,25 @@ export function SessionBuilder({
         name: template.name,
         items: template.items.map((it) => cloneItem(it)),
       });
+      if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(template.id);
       setError(null);
     },
-    [onChange],
+    [onChange, onActiveTemplateIdChange],
   );
 
   const handleStartFromScratch = useCallback((): void => {
     dispatch({ type: 'startFromScratch' });
     onChange({ name: defaultName(), items: [] });
+    if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
     setError(null);
-  }, [onChange]);
+  }, [onChange, onActiveTemplateIdChange]);
 
   const handleAddBlock = useCallback((): void => {
     dispatch({ type: 'addBlock' });
+    // addBlock se considera edicion manual: limpia el highlight de plantilla.
+    if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
     setError(null);
-  }, []);
+  }, [onActiveTemplateIdChange]);
 
   const handleNameChange = useCallback(
     (name: string): void => {

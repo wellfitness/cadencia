@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   EMPTY_USER_INPUTS,
   loadUserInputsFromSession,
@@ -7,8 +7,14 @@ import {
   type UserInputsRaw,
 } from '@core/user';
 import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/segmentation';
-import { EMPTY_PREFERENCES, type MatchPreferences, type MatchedSegment } from '@core/matching';
-import type { Track } from '@core/tracks';
+import {
+  EMPTY_PREFERENCES,
+  matchTracksToSegments,
+  type CrossZoneMode,
+  type MatchPreferences,
+  type MatchedSegment,
+} from '@core/matching';
+import { dedupeByUri, loadNativeTracks, type Track } from '@core/tracks';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
@@ -22,7 +28,13 @@ import { MusicStep } from '@ui/pages/MusicStep';
 import { ResultStep } from '@ui/pages/ResultStep';
 import { SessionTVMode } from '@ui/pages/SessionTVMode';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
-import { loadWizardState, saveWizardState, type RouteSourceType } from '@ui/state/wizardStorage';
+import type { UploadedCsv } from '@ui/state/uploadedCsv';
+import {
+  loadWizardState,
+  saveWizardState,
+  type MusicSourceMode,
+  type RouteSourceType,
+} from '@ui/state/wizardStorage';
 
 const STEPS: readonly StepperStep[] = [
   { label: 'Tipo', icon: 'tune' },
@@ -96,6 +108,10 @@ export function App(): JSX.Element {
   const [sessionPlan, setSessionPlan] = useState<EditableSessionPlan | null>(
     persisted?.sessionPlan ?? null,
   );
+  // Plantilla activa de la SessionBuilder (null si edita desde cero).
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(
+    persisted?.activeTemplateId ?? null,
+  );
 
   // La validacion depende del sourceType: en modo 'session' relajamos las
   // reglas (peso/bici opcionales, sin requisito de FTP/FC/birthYear).
@@ -124,10 +140,70 @@ export function App(): JSX.Element {
     persisted?.musicPreferences ?? EMPTY_PREFERENCES,
   );
 
-  // Catalogo activo del paso Musica (puede incluir uploads del usuario). Vive
-  // solo en memoria — no se persiste en sessionStorage para no inflarlo con
-  // CSVs grandes. Si es null, ResultStep cae al subset de nativos.
-  const [livePool, setLivePool] = useState<readonly Track[] | null>(null);
+  // Indices del matching reemplazados manualmente por el usuario via "Otro tema".
+  // Se levanta a App para sobrevivir a remountajes de Music/Result al volver atras.
+  const [replacedIndices, setReplacedIndices] = useState<ReadonlySet<number>>(
+    () => new Set(persisted?.replacedIndices ?? []),
+  );
+
+  // Fuente del catalogo en MusicStep: predefinido (CSVs embebidos), solo lo
+  // subido por el usuario, o ambos combinados. Default 'both'.
+  const [musicSourceMode, setMusicSourceMode] = useState<MusicSourceMode>(
+    persisted?.musicSourceMode ?? 'both',
+  );
+
+  // CSVs subidos por el usuario en runtime. Vive solo en memoria — no se
+  // persiste en sessionStorage para no inflarlo con tracks parseados (varios
+  // MB). Sobrevive a remountajes del paso Musica pero no a un refresh.
+  const [uploadedCsvs, setUploadedCsvs] = useState<readonly UploadedCsv[]>([]);
+
+  // Nombre custom de la playlist tecleado en ResultStep. Persistido para que
+  // el usuario no tenga que reescribirlo si vuelve a Datos/Musica y vuelve.
+  const [playlistName, setPlaylistName] = useState<string>(persisted?.playlistName ?? '');
+
+  // Catalogo activo del paso Musica (predefinido, propio o ambos combinados).
+  // Memoizado a partir del modo y los CSVs subidos: una sola fuente de verdad
+  // que alimenta tanto el matching como el dropdown de "Otro tema" en Result.
+  const livePool = useMemo<readonly Track[]>(() => {
+    const userTracks: Track[] = uploadedCsvs.flatMap((c) => [...c.tracks]);
+    if (musicSourceMode === 'predefined') return loadNativeTracks();
+    if (musicSourceMode === 'mine') return dedupeByUri(userTracks);
+    return dedupeByUri([...loadNativeTracks(), ...userTracks]);
+  }, [musicSourceMode, uploadedCsvs]);
+
+  // crossZoneMode derivado del sourceType: GPX usa solapamiento (un track
+  // cubre tramos consecutivos de la misma zona), sesion indoor usa discreto
+  // (un track por bloque). Se calcula aqui porque tanto el matching como
+  // los dropdowns de "Otro tema" necesitan el mismo modo coherente.
+  const crossZoneMode: CrossZoneMode = sourceType === 'session' ? 'discrete' : 'overlap';
+
+  // Matching base: se calcula cuando cambian inputs reales del matching
+  // (ruta, pool, preferencias, sourceType). Se omite en el primer render
+  // para preservar matchedList persistido en sessionStorage tras un refresh.
+  // Cuando se recalcula, los cambios manuales (replacedIndices) se pierden
+  // porque la base cambio — el usuario debera reaplicarlos si los queria.
+  const isFirstMatchEffectRef = useRef(true);
+  useEffect(() => {
+    if (isFirstMatchEffectRef.current) {
+      isFirstMatchEffectRef.current = false;
+      return;
+    }
+    if (routeSegments === null) {
+      setMatchedList(null);
+      setReplacedIndices(new Set());
+      return;
+    }
+    const fresh = matchTracksToSegments(routeSegments, livePool, musicPreferences, {
+      crossZoneMode,
+    });
+    setMatchedList(fresh);
+    setReplacedIndices(new Set());
+  }, [routeSegments, livePool, musicPreferences, crossZoneMode]);
+
+  // Paso al que volver tras "Ajustar mis datos" / "Ajustar musica" desde el
+  // Resultado. Solo en memoria — semantica efimera de "estoy haciendo un
+  // detour, devuelveme a donde estaba". Se limpia al usar handleBack/Next.
+  const [returnTarget, setReturnTarget] = useState<number | null>(null);
 
   // Persistir el wizard state en sessionStorage en cada cambio.
   useEffect(() => {
@@ -138,6 +214,10 @@ export function App(): JSX.Element {
       routeMeta,
       matchedList,
       musicPreferences,
+      replacedIndices: Array.from(replacedIndices),
+      musicSourceMode,
+      playlistName,
+      activeTemplateId,
       ...(sourceType !== null ? { sourceType } : {}),
       ...(sessionPlan !== null ? { sessionPlan } : {}),
     });
@@ -148,21 +228,45 @@ export function App(): JSX.Element {
     routeMeta,
     matchedList,
     musicPreferences,
+    replacedIndices,
+    musicSourceMode,
+    playlistName,
+    activeTemplateId,
     sourceType,
     sessionPlan,
   ]);
 
-  const handleNext = (): void => {
+  const handleNext = useCallback((): void => {
     setCompletedSteps((prev) => (prev.includes(currentStep) ? prev : [...prev, currentStep]));
+    // Si veniamos de un detour ("Ajustar mis datos / musica" desde Resultado)
+    // y el usuario avanza, le devolvemos al paso de origen en vez de seguir
+    // el flujo lineal — evita que tenga que pulsar Siguiente varias veces.
+    if (returnTarget !== null) {
+      const target = returnTarget;
+      setReturnTarget(null);
+      setCurrentStep(target);
+      return;
+    }
     setCurrentStep((prev) => Math.min(prev + 1, STEPS.length - 1));
-  };
+  }, [currentStep, returnTarget]);
 
-  const handleBack = (): void => {
+  const handleBack = useCallback((): void => {
+    // Mismo retorno inteligente para "Atras": si tenemos un detour activo,
+    // volvemos al paso origen en vez de retroceder un paso linealmente.
+    if (returnTarget !== null) {
+      const target = returnTarget;
+      setReturnTarget(null);
+      setCurrentStep(target);
+      return;
+    }
     setCurrentStep((prev) => Math.max(prev - 1, 0));
-  };
+  }, [returnTarget]);
 
   const handleStepClick = (index: number): void => {
     if (completedSteps.includes(index) && index !== currentStep) {
+      // Click directo en el stepper cancela cualquier detour activo: el
+      // usuario decide explicitamente a donde ir.
+      setReturnTarget(null);
       setCurrentStep(index);
     }
   };
@@ -178,9 +282,13 @@ export function App(): JSX.Element {
       setRouteSegments(null);
       setRouteMeta(null);
       setMatchedList(null);
-      // Si dejamos la rama indoor, limpiamos el plan
+      setReplacedIndices(new Set());
+      setUploadedCsvs([]);
+      setPlaylistName('');
+      // Si dejamos la rama indoor, limpiamos el plan y la plantilla activa
       if (next !== 'session') {
         setSessionPlan(null);
+        setActiveTemplateId(null);
       }
     }
     setSourceType(next);
@@ -193,24 +301,29 @@ export function App(): JSX.Element {
     setSessionPlan(plan);
   };
 
-  const handleMatched = (
-    matched: MatchedSegment[],
-    preferences: MatchPreferences,
-    tracks: readonly Track[],
-  ): void => {
-    setMatchedList(matched);
-    setMusicPreferences(preferences);
-    setLivePool(tracks);
+  // Avance de Music a Result: el matching ya esta sincronizado en App via el
+  // useEffect base, y replacedIndices viaja por su propio canal. Aqui solo
+  // gestionamos la transicion de paso.
+  const handleMatchedAdvance = (): void => {
     handleNext();
   };
 
-  const handleMatchedChange = (
-    matched: MatchedSegment[],
-    preferences: MatchPreferences,
-  ): void => {
+  const handleMatchedChange = (matched: MatchedSegment[]): void => {
     setMatchedList(matched);
-    setMusicPreferences(preferences);
   };
+
+  // Salto desde Resultado para "Ajustar mis datos / musica". Recordamos el
+  // origen para que el usuario pueda volver con un solo clic en Siguiente o
+  // Atras en vez de re-recorrer el wizard entero.
+  const handleGoToDataStep = useCallback((): void => {
+    setReturnTarget(STEP_RESULT);
+    setCurrentStep(STEP_DATA);
+  }, []);
+
+  const handleGoToMusicStep = useCallback((): void => {
+    setReturnTarget(STEP_RESULT);
+    setCurrentStep(STEP_MUSIC);
+  }, []);
 
   // "Crear otra playlist" desde el DonePanel: vuelve al inicio del wizard
   // limpiando todos los datos derivados, pero conserva los inputs fisiologicos
@@ -220,9 +333,14 @@ export function App(): JSX.Element {
     setRouteMeta(null);
     setMatchedList(null);
     setMusicPreferences(EMPTY_PREFERENCES);
+    setReplacedIndices(new Set());
+    setUploadedCsvs([]);
+    setPlaylistName('');
+    setMusicSourceMode('both');
     setSessionPlan(null);
+    setActiveTemplateId(null);
     setSourceType(null);
-    setLivePool(null);
+    setReturnTarget(null);
     setCompletedSteps([]);
     setCurrentStep(STEP_TYPE);
   };
@@ -308,8 +426,12 @@ export function App(): JSX.Element {
             validatedInputs={validation.data}
             sourceType={sourceType}
             initialSessionPlan={sessionPlan ?? undefined}
+            initialSegments={routeSegments ?? undefined}
+            initialMeta={routeMeta ?? undefined}
+            initialActiveTemplateId={activeTemplateId}
             onProcessed={handleRouteProcessed}
             onSessionPlanChange={handleSessionPlanChange}
+            onActiveTemplateIdChange={setActiveTemplateId}
             onBack={handleBack}
             onNext={handleNext}
           />
@@ -322,10 +444,20 @@ export function App(): JSX.Element {
           <MusicStep
             segments={routeSegments}
             meta={routeMeta}
-            onMatched={handleMatched}
+            tracks={livePool}
+            preferences={musicPreferences}
+            onPreferencesChange={setMusicPreferences}
+            sourceMode={musicSourceMode}
+            onSourceModeChange={setMusicSourceMode}
+            uploadedCsvs={uploadedCsvs}
+            onUploadedCsvsChange={setUploadedCsvs}
+            matched={matchedList}
+            onMatchedChange={setMatchedList}
+            replacedIndices={replacedIndices}
+            onReplacedIndicesChange={setReplacedIndices}
+            onAdvance={handleMatchedAdvance}
             onBack={handleBack}
-            initialPreferences={musicPreferences}
-            crossZoneMode={sourceType === 'session' ? 'discrete' : 'overlap'}
+            crossZoneMode={crossZoneMode}
           />
         )}
         {currentStep === STEP_MUSIC && (routeSegments === null || routeMeta === null) && (
@@ -345,16 +477,18 @@ export function App(): JSX.Element {
               matched={matchedList}
               preferences={musicPreferences}
               tracks={livePool}
+              replacedIndices={replacedIndices}
+              onReplacedIndicesChange={setReplacedIndices}
+              playlistName={playlistName}
+              onPlaylistNameChange={setPlaylistName}
               onMatchedChange={handleMatchedChange}
               onBack={handleBack}
               onResetWizard={handleResetWizard}
-              onGoToDataStep={() => setCurrentStep(STEP_DATA)}
-              onGoToMusicStep={() => setCurrentStep(STEP_MUSIC)}
+              onGoToDataStep={handleGoToDataStep}
+              onGoToMusicStep={handleGoToMusicStep}
+              crossZoneMode={crossZoneMode}
               {...(sourceType === 'session'
-                ? {
-                    crossZoneMode: 'discrete' as const,
-                    onEnterTVMode: () => setTvModeActive(true),
-                  }
+                ? { onEnterTVMode: () => setTvModeActive(true) }
                 : {})}
             />
           )}
