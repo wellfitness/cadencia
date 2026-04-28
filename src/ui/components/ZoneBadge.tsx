@@ -1,4 +1,5 @@
 import type { HeartRateZone } from '@core/physiology/karvonen';
+import { zoneTextColor } from './zoneColors';
 
 export interface ZoneBadgeProps {
   zone: HeartRateZone;
@@ -15,10 +16,11 @@ export interface ZoneBadgeProps {
  */
 export function ZoneBadge({ zone, label, size = 'md', className = '' }: ZoneBadgeProps): JSX.Element {
   const colorClass = ZONE_BG[zone];
+  const textClass = zoneTextColor(zone);
   const sizeClass = size === 'sm' ? 'text-xs px-2 py-0.5' : 'text-sm px-2.5 py-1';
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-bold text-white ${colorClass} ${sizeClass} ${className}`.trim()}
+      className={`inline-flex items-center gap-1.5 rounded-full font-bold ${textClass} ${colorClass} ${sizeClass} ${className}`.trim()}
       aria-label={label ? `Zona ${zone}: ${label}` : `Zona ${zone}`}
     >
       <span>Z{zone}</span>

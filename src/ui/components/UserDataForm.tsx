@@ -273,8 +273,8 @@ export function UserDataForm({
             </div>
           </details>
           {globalRestingError && (
-            <p role="alert" className="text-sm text-error font-medium flex items-center gap-2">
-              <MaterialIcon name="error_outline" size="small" className="text-error" />
+            <p role="alert" className="text-sm text-rosa-600 font-medium flex items-center gap-2">
+              <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
               {describeValidationError(globalRestingError)}
             </p>
           )}
@@ -374,8 +374,8 @@ function SexSelector({ value, onChange, error }: SexSelectorProps): JSX.Element 
         })}
       </div>
       {error !== undefined ? (
-        <p role="alert" className="text-sm text-error font-medium flex items-center gap-2">
-          <MaterialIcon name="error_outline" size="small" className="text-error" />
+        <p role="alert" className="text-sm text-rosa-600 font-medium flex items-center gap-2">
+          <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
           {error}
         </p>
       ) : (

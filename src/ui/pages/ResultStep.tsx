@@ -35,6 +35,7 @@ import {
   SPOTIFY_SCOPES,
   type CreatedPlaylist,
 } from '@integrations/spotify';
+import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { EditDataPanel } from '@ui/components/EditDataPanel';
@@ -42,6 +43,8 @@ import { Input } from '@ui/components/Input';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { MusicPreferencesPanel } from '@ui/components/MusicPreferencesPanel';
 import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
+import { WizardStepFooter } from '@ui/components/WizardStepFooter';
+import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import type { UserInputsAction } from '@ui/state/userInputsReducer';
 
 export interface ResultStepProps {
@@ -244,6 +247,7 @@ export function ResultStep({
   const insufficientCount = matched.filter(
     (m) => m.track === null && m.matchQuality === 'insufficient',
   ).length;
+  const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
 
   if (phase === 'done' && created !== null) {
     return <DonePanel playlist={created} />;
@@ -251,6 +255,10 @@ export function ResultStep({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      <WizardStepHeading
+        title="Tu playlist"
+        subtitle="Revisa la lista, ajusta lo que quieras y créala en tu cuenta de Spotify."
+      />
       {repeatedCount > 0 && (
         <div
           role="status"
@@ -297,6 +305,7 @@ export function ResultStep({
           </div>
         </div>
       )}
+      {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
       {onEnterTVMode !== undefined && (
         <Card variant="tip" title="Modo sesión" titleIcon="cast">
           <p className="text-sm text-gris-700 mb-3">
@@ -366,9 +375,9 @@ export function ResultStep({
           {error !== null && (
             <p
               role="alert"
-              className="text-sm text-error font-medium flex items-center gap-2"
+              className="text-sm text-rosa-600 font-medium flex items-center gap-2"
             >
-              <MaterialIcon name="error_outline" size="small" className="text-error" />
+              <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
               {error}
             </p>
           )}
@@ -431,37 +440,41 @@ interface FooterActionsProps {
 function FooterActions({ onBack, onCreate, creating, canCreate }: FooterActionsProps): JSX.Element {
   const label = creating ? 'Creando…' : 'Crear en Spotify';
   return (
-    <>
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gris-200 px-4 py-3 flex items-center justify-between gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="open_in_new"
-          disabled={!canCreate || creating}
-          loading={creating}
-          onClick={onCreate}
-          fullWidth
-        >
-          {label}
-        </Button>
-      </div>
-      <div className="hidden md:flex items-center justify-end gap-3 pt-2">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="open_in_new"
-          disabled={!canCreate || creating}
-          loading={creating}
-          onClick={onCreate}
-        >
-          {label}
-        </Button>
-      </div>
-    </>
+    <WizardStepFooter
+      mobile={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button
+            variant="primary"
+            iconRight="open_in_new"
+            disabled={!canCreate || creating}
+            loading={creating}
+            onClick={onCreate}
+            fullWidth
+          >
+            {label}
+          </Button>
+        </>
+      }
+      desktop={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button
+            variant="primary"
+            iconRight="open_in_new"
+            disabled={!canCreate || creating}
+            loading={creating}
+            onClick={onCreate}
+          >
+            {label}
+          </Button>
+        </>
+      }
+    />
   );
 }
 

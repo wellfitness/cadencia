@@ -16,12 +16,15 @@ import {
   parseTrackCsv,
   type Track,
 } from '@core/tracks';
+import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TrackCard } from '@ui/components/TrackCard';
+import { WizardStepFooter } from '@ui/components/WizardStepFooter';
+import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 
 type SourceMode = 'predefined' | 'mine' | 'both';
 
@@ -194,6 +197,10 @@ export function MusicStep({
 
   return (
     <div className="mx-auto w-full max-w-2xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      <WizardStepHeading
+        title="Tu música"
+        subtitle="Elige de dónde sale el catálogo y marca los géneros que te van."
+      />
       <Card title="De dónde sale tu música" titleIcon="library_music">
         <fieldset className="space-y-2">
           <legend className="sr-only">Fuente del catálogo de música</legend>
@@ -343,6 +350,8 @@ export function MusicStep({
         />
       )}
 
+      {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
+
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex items-baseline justify-between gap-2 mb-3">
           <p className="text-sm text-gris-600">
@@ -350,15 +359,6 @@ export function MusicStep({
             para <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de
             ruta
           </p>
-          {bestEffortCount > 0 && (
-            <span
-              className="text-xs text-tulipTree-600 flex items-center gap-1"
-              title={`${bestEffortCount} segmento(s) sin candidato de cadencia ideal: el motor eligió los más cercanos`}
-            >
-              <MaterialIcon name="info" size="small" className="text-tulipTree-500" />
-              {bestEffortCount} encaje libre
-            </span>
-          )}
         </div>
         {previewItems.length === 0 ? (
           <p className="text-sm text-gris-500 italic">
@@ -490,34 +490,38 @@ interface FooterActionsProps {
 
 function FooterActions({ onBack, onNext, canGoNext }: FooterActionsProps): JSX.Element {
   return (
-    <>
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gris-200 px-4 py-3 flex items-center justify-between gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={!canGoNext}
-          onClick={onNext}
-          fullWidth
-        >
-          Siguiente: Resultado
-        </Button>
-      </div>
-      <div className="hidden md:flex items-center justify-end gap-3 pt-2">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={!canGoNext}
-          onClick={onNext}
-        >
-          Siguiente: Resultado
-        </Button>
-      </div>
-    </>
+    <WizardStepFooter
+      mobile={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button
+            variant="primary"
+            iconRight="arrow_forward"
+            disabled={!canGoNext}
+            onClick={onNext}
+            fullWidth
+          >
+            Siguiente: Resultado
+          </Button>
+        </>
+      }
+      desktop={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button
+            variant="primary"
+            iconRight="arrow_forward"
+            disabled={!canGoNext}
+            onClick={onNext}
+          >
+            Siguiente: Resultado
+          </Button>
+        </>
+      }
+    />
   );
 }

@@ -15,6 +15,8 @@ import { FileDropzone } from '@ui/components/FileDropzone';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { RouteSummary } from '@ui/components/RouteSummary';
 import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import { WizardStepFooter } from '@ui/components/WizardStepFooter';
+import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import { SessionBuilder } from '@ui/pages/SessionBuilder';
 
 export interface RouteStepProps {
@@ -132,6 +134,10 @@ function GpxRouteFlow({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10 space-y-4 md:space-y-6 pb-32 md:pb-10">
+      <WizardStepHeading
+        title="Tu ruta"
+        subtitle="Sube el GPX que exportaste de Strava o Komoot. Lo procesamos en local."
+      />
       {phase === 'idle' && (
         <>
           <FileDropzone
@@ -237,44 +243,48 @@ function FooterActions({
   canReset,
 }: FooterActionsProps): JSX.Element {
   return (
-    <>
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gris-200 px-4 py-3 flex items-center justify-between gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        {canReset && (
-          <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
-            Otra
+    <WizardStepFooter
+      mobile={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
           </Button>
-        )}
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={!canGoNext}
-          onClick={onNext}
-          fullWidth
-        >
-          Siguiente: Música
-        </Button>
-      </div>
-      <div className="hidden md:flex items-center justify-end gap-3 pt-2">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        {canReset && (
-          <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
-            Subir otra ruta
+          {canReset && (
+            <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
+              Otra
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            iconRight="arrow_forward"
+            disabled={!canGoNext}
+            onClick={onNext}
+            fullWidth
+          >
+            Siguiente: Música
           </Button>
-        )}
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={!canGoNext}
-          onClick={onNext}
-        >
-          Siguiente: Música
-        </Button>
-      </div>
-    </>
+        </>
+      }
+      desktop={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          {canReset && (
+            <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
+              Subir otra ruta
+            </Button>
+          )}
+          <Button
+            variant="primary"
+            iconRight="arrow_forward"
+            disabled={!canGoNext}
+            onClick={onNext}
+          >
+            Siguiente: Música
+          </Button>
+        </>
+      }
+    />
   );
 }

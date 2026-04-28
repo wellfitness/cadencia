@@ -219,11 +219,13 @@ export function App(): JSX.Element {
     return <Landing onStart={() => setView('wizard')} />;
   }
 
+  const currentStepLabel = STEPS[currentStep]?.label ?? '';
+
   return (
-    <div className="min-h-full flex flex-col bg-white">
+    <div className="min-h-full flex flex-col bg-gris-50">
       <Header />
-      <div className="border-b border-gris-200 bg-gris-50">
-        <div className="mx-auto w-full max-w-4xl px-4 py-4">
+      <div className="md:border-b md:border-gris-200 bg-gris-50/95 backdrop-blur-sm sticky top-0 z-30 md:static md:bg-gris-50 md:backdrop-blur-none border-b border-gris-200">
+        <div className="mx-auto w-full max-w-4xl px-4 py-3 md:py-4">
           <Stepper
             steps={STEPS}
             currentStep={currentStep}
@@ -234,6 +236,9 @@ export function App(): JSX.Element {
       </div>
 
       <main className="flex-1">
+        <h1 className="sr-only">
+          Asistente de Cadencia, paso {currentStep + 1} de {STEPS.length}: {currentStepLabel}
+        </h1>
         {currentStep === STEP_TYPE && (
           <SourceTypeStep onSelect={handleSourceTypeSelect} />
         )}

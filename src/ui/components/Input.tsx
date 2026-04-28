@@ -38,7 +38,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const baseInputClasses =
     'block w-full rounded-lg border-2 bg-white px-3 py-2.5 text-base text-gris-800 placeholder-gris-400 transition-colors duration-200 focus:outline-none disabled:bg-gris-50 disabled:text-gris-400 disabled:cursor-not-allowed min-h-[44px] md:min-h-[48px]';
   const stateClasses = error
-    ? 'border-error text-error focus:border-error'
+    ? 'border-rosa-600 text-rosa-600 focus:border-rosa-600'
     : 'border-gris-300 focus:border-turquesa-600';
 
   return (
@@ -77,7 +77,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         )}
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="mt-1.5 text-sm text-error font-medium">
+        <p id={errorId} role="alert" className="mt-1.5 text-sm text-rosa-600 font-medium">
           {error}
         </p>
       ) : helper ? (

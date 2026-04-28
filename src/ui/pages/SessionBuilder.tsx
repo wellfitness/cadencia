@@ -16,6 +16,8 @@ import type { ValidatedUserInputs } from '@core/user/userInputs';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { WizardStepFooter } from '@ui/components/WizardStepFooter';
+import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import { ZoneTimelineChart } from '@ui/components/ZoneTimelineChart';
 import { BlockList } from '@ui/components/session-builder/BlockList';
 import { TemplateGallery } from '@ui/components/session-builder/TemplateGallery';
@@ -204,6 +206,10 @@ export function SessionBuilder({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10 space-y-4 md:space-y-6 pb-32 md:pb-10">
+      <WizardStepHeading
+        title="Construye tu sesión"
+        subtitle="Parte de una plantilla científica o crea tu propia secuencia de bloques."
+      />
       <Card title="Tu sesión indoor" titleIcon="fitness_center">
         <label className="block mb-4">
           <span className="text-xs font-semibold text-gris-700 mb-1 block">Nombre de la sesión</span>
@@ -240,9 +246,9 @@ export function SessionBuilder({
         {error !== null && (
           <p
             role="alert"
-            className="mt-3 text-sm text-error font-medium flex items-center gap-2"
+            className="mt-3 text-sm text-rosa-600 font-medium flex items-center gap-2"
           >
-            <MaterialIcon name="error_outline" size="small" className="text-error" />
+            <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
             {error}
           </p>
         )}
@@ -271,34 +277,38 @@ interface FooterActionsProps {
 
 function FooterActions({ onBack, onContinue, canContinue }: FooterActionsProps): JSX.Element {
   return (
-    <>
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gris-200 px-4 py-3 flex items-center justify-between gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={!canContinue}
-          onClick={onContinue}
-          fullWidth
-        >
-          Siguiente: Música
-        </Button>
-      </div>
-      <div className="hidden md:flex items-center justify-end gap-3 pt-2">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={!canContinue}
-          onClick={onContinue}
-        >
-          Siguiente: Música
-        </Button>
-      </div>
-    </>
+    <WizardStepFooter
+      mobile={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button
+            variant="primary"
+            iconRight="arrow_forward"
+            disabled={!canContinue}
+            onClick={onContinue}
+            fullWidth
+          >
+            Siguiente: Música
+          </Button>
+        </>
+      }
+      desktop={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button
+            variant="primary"
+            iconRight="arrow_forward"
+            disabled={!canContinue}
+            onClick={onContinue}
+          >
+            Siguiente: Música
+          </Button>
+        </>
+      }
+    />
   );
 }

@@ -13,6 +13,7 @@ import {
 } from '@core/segmentation';
 import type { ValidatedUserInputs } from '@core/user/userInputs';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { zoneTextColor } from '@ui/components/zoneColors';
 
 const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
   flat: 'Llano',
@@ -277,7 +278,7 @@ export function SessionTVMode({
 
   if (blocks.length === 0 || currentBlock === undefined) {
     return (
-      <div className="min-h-screen bg-gris-900 text-white flex items-center justify-center p-8">
+      <div className="min-h-[100dvh] bg-gris-900 text-white flex items-center justify-center p-8">
         <p className="text-xl">No hay bloques en la sesión.</p>
       </div>
     );
@@ -302,7 +303,7 @@ export function SessionTVMode({
   const totalProgressPct = totalDurationSec > 0 ? (totalElapsed / totalDurationSec) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gris-900 text-white flex flex-col">
+    <div className="min-h-[100dvh] bg-gris-900 text-white flex flex-col">
       <header className="bg-black/50 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-base md:text-xl font-bold truncate">{plan.name}</h1>
@@ -359,7 +360,7 @@ export function SessionTVMode({
         <div
           className={`w-full max-w-4xl rounded-2xl md:rounded-3xl border-4 overflow-hidden shadow-2xl bg-black/50 ${zoneToBorder(currentBlock.zone)}`}
         >
-          <div className={`${ZONE_BG_DARK[currentBlock.zone]} px-4 md:px-8 py-4 md:py-6`}>
+          <div className={`${ZONE_BG_DARK[currentBlock.zone]} ${zoneTextColor(currentBlock.zone)} px-4 md:px-8 py-4 md:py-6`}>
             <div className="flex items-center justify-between gap-3 md:gap-6">
               <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 <span className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-xl bg-white/30 flex-shrink-0">
@@ -556,7 +557,7 @@ function CompletionScreen({
   onClose,
 }: CompletionScreenProps): JSX.Element {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-turquesa-700 via-turquesa-600 to-turquesa-800 text-white flex items-center justify-center p-6 md:p-8">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-turquesa-700 via-turquesa-600 to-turquesa-800 text-white flex items-center justify-center p-6 md:p-8">
       <div className="text-center max-w-2xl w-full">
         <div className="w-24 h-24 md:w-32 md:h-32 mx-auto mb-6 md:mb-8 rounded-full bg-white/20 flex items-center justify-center">
           <MaterialIcon name="emoji_events" size="xlarge" className="text-tulipTree-300" />

@@ -5,6 +5,8 @@ import {
 } from '@core/user';
 import { Button } from '@ui/components/Button';
 import { UserDataForm } from '@ui/components/UserDataForm';
+import { WizardStepFooter } from '@ui/components/WizardStepFooter';
+import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import type { UserInputsAction } from '@ui/state/userInputsReducer';
 
 export interface UserDataStepProps {
@@ -46,8 +48,14 @@ export function UserDataStep({
   const submitDisabled = !validation.ok;
   const nextLabel = mode === 'session' ? 'Siguiente: Sesión' : 'Siguiente: Ruta';
 
+  const subtitle =
+    mode === 'session'
+      ? 'Solo lo imprescindible para calcular tus zonas de intensidad.'
+      : 'Necesitamos tu peso y, si lo conoces, tu FTP o frecuencia cardíaca.';
+
   return (
     <div className="mx-auto w-full max-w-2xl px-3 py-4 md:py-8 space-y-3 md:space-y-4 pb-32 md:pb-10">
+      <WizardStepHeading title="Tus datos" subtitle={subtitle} />
       <UserDataForm
         inputs={inputs}
         dispatch={dispatch}
@@ -84,30 +92,13 @@ function FooterActions({
   nextLabel,
 }: FooterActionsProps): JSX.Element {
   return (
-    <>
-      <div className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gris-200 px-4 py-3 flex items-center justify-between gap-2 shadow-[0_-4px_12px_rgba(0,0,0,0.04)]">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <Button variant="secondary" onClick={onCancel} aria-label="Limpiar datos">
-          Limpiar
-        </Button>
-        <Button
-          variant="primary"
-          iconRight="arrow_forward"
-          disabled={submitDisabled}
-          onClick={onSubmit}
-          fullWidth
-        >
-          {nextLabel}
-        </Button>
-      </div>
-      <div className="hidden md:flex items-center justify-between gap-3 pt-2">
-        <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-          Atrás
-        </Button>
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={onCancel}>
+    <WizardStepFooter
+      mobile={
+        <>
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <Button variant="secondary" onClick={onCancel} aria-label="Limpiar datos">
             Limpiar
           </Button>
           <Button
@@ -115,11 +106,32 @@ function FooterActions({
             iconRight="arrow_forward"
             disabled={submitDisabled}
             onClick={onSubmit}
+            fullWidth
           >
             {nextLabel}
           </Button>
+        </>
+      }
+      desktop={
+        <div className="flex items-center justify-between gap-3 w-full">
+          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
+            Atrás
+          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={onCancel}>
+              Limpiar
+            </Button>
+            <Button
+              variant="primary"
+              iconRight="arrow_forward"
+              disabled={submitDisabled}
+              onClick={onSubmit}
+            >
+              {nextLabel}
+            </Button>
+          </div>
         </div>
-      </div>
-    </>
+      }
+    />
   );
 }

@@ -27,6 +27,12 @@ export function Stepper({
   onStepClick,
   className = '',
 }: StepperProps): JSX.Element {
+  // Progreso 0..1 para la barra mobile. currentStep+1 porque el indice de
+  // paso actual ya cuenta como "en marcha".
+  const totalSteps = steps.length;
+  const progressRatio = totalSteps > 0 ? (currentStep + 1) / totalSteps : 0;
+  const progressPct = Math.round(progressRatio * 100);
+  const currentLabel = steps[currentStep]?.label ?? '';
   return (
     <nav
       aria-label="Progreso del flujo"
@@ -62,6 +68,23 @@ export function Stepper({
           );
         })}
       </ol>
+      <div
+        className="sm:hidden mt-2 flex items-center gap-2"
+        aria-hidden
+      >
+        <div className="flex-1 h-1 rounded-full bg-gris-200 overflow-hidden">
+          <div
+            className="h-full bg-turquesa-600 transition-[width] duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+        <span className="text-xs text-gris-600 tabular-nums whitespace-nowrap">
+          {currentStep + 1}/{totalSteps}
+        </span>
+      </div>
+      <p className="sr-only" aria-live="polite">
+        Paso {currentStep + 1} de {totalSteps}: {currentLabel}
+      </p>
     </nav>
   );
 }
