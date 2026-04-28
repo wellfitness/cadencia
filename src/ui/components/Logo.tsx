@@ -77,7 +77,7 @@ export function Logo({
           role={isMarkOnly ? 'img' : undefined}
           aria-label={isMarkOnly ? 'Cadencia' : undefined}
           aria-hidden={!isMarkOnly}
-          className={`${markClass} aspect-square select-none bg-turquesa-700`}
+          className={`${markClass} aspect-square select-none bg-gris-900`}
           style={{
             WebkitMaskImage: 'url(/logo.png)',
             WebkitMaskRepeat: 'no-repeat',
@@ -101,13 +101,13 @@ export function Logo({
       {variant !== 'mark' && (
         <div className={textBlockClass}>
           <span
-            className={`font-display text-turquesa-700 ${wordmarkClass} leading-none`}
+            className={`font-display text-gris-900 ${wordmarkClass} leading-none`}
           >
             Cadencia
           </span>
           {variant === 'full' && (
             <span
-              className={`text-turquesa-700/80 ${taglineClass} mt-1 tracking-widest uppercase`}
+              className={`text-gris-500 ${taglineClass} mt-1 tracking-widest uppercase`}
             >
               by Movimiento Funcional
             </span>

@@ -49,16 +49,26 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
       aria-labelledby="hero-title"
       className="bg-white"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 py-10 md:py-16">
+      <div className="mx-auto w-full max-w-6xl px-4 pt-4 pb-10 md:pt-6 md:pb-16">
+        {/* Marco editorial: linea discontinua arriba del bloque de marca */}
+        <div
+          aria-hidden="true"
+          className="mx-auto mb-6 h-1 max-w-4xl"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(to right, #9ca3af 0 28px, transparent 28px 44px)',
+          }}
+        />
+
         {/* Logo + wordmark horizontal centrado */}
         <div className="flex justify-center mb-6">
           <Logo variant="full" size="xl" orientation="horizontal" tinted />
         </div>
 
-        {/* Divisor estilo carretera: linea central discontinua larga */}
+        {/* Marco editorial: linea discontinua bajo el bloque de marca */}
         <div
           aria-hidden="true"
-          className="mx-auto mb-8 md:mb-12 h-1 max-w-md"
+          className="mx-auto mb-8 md:mb-12 h-1 max-w-4xl"
           style={{
             backgroundImage:
               'repeating-linear-gradient(to right, #9ca3af 0 28px, transparent 28px 44px)',
@@ -72,9 +82,9 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
               id="hero-title"
               className="font-display text-4xl md:text-6xl leading-tight mb-6"
             >
-              <span className="block text-gris-800">Tu plan. </span>
+              <span className="block text-turquesa-600">Tu plan. </span>
               <span className="block text-rosa-600">Tu intensidad.</span>
-              <span className="block text-turquesa-600">Tu música.</span>
+              <span className="block text-tulipTree-500">Tu música.</span>
             </h1>
 
             <p className="text-lg md:text-xl text-gris-700 max-w-2xl lg:mx-0 mx-auto mb-6">
