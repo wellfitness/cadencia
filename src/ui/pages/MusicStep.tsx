@@ -1,8 +1,6 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import {
   analyzePoolCoverage,
-  getAlternativesForSegment,
-  replaceTrackInSegment,
   type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
@@ -17,9 +15,10 @@ import { ExportifyHowto } from '@ui/components/ExportifyHowto';
 import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
-import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
+import { PlaylistPreviewRow } from '@ui/components/PlaylistPreviewRow';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
 import type { MusicSourceMode } from '@ui/state/wizardStorage';
+import { navigateInApp } from '@ui/utils/navigation';
 import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
@@ -40,10 +39,6 @@ export interface MusicStepProps {
   onUploadedCsvsChange: (next: readonly UploadedCsv[]) => void;
   /** Matching base calculado en App. null antes del primer calculo. */
   matched: readonly MatchedSegment[] | null;
-  onMatchedChange: (next: MatchedSegment[]) => void;
-  /** Indices reemplazados manualmente con "Otro tema". Viven en App. */
-  replacedIndices: ReadonlySet<number>;
-  onReplacedIndicesChange: (next: ReadonlySet<number>) => void;
   /** Avanza al siguiente paso. El matching ya esta sincronizado en App. */
   onAdvance: () => void;
   onBack: () => void;
@@ -68,9 +63,6 @@ export function MusicStep({
   uploadedCsvs,
   onUploadedCsvsChange,
   matched,
-  onMatchedChange,
-  replacedIndices,
-  onReplacedIndicesChange,
   onAdvance,
   onBack,
   crossZoneMode = 'overlap',
@@ -93,22 +85,6 @@ export function MusicStep({
   // lista vacia hasta que el effect de App dispare. Es un caso fugaz.
   // Memoizado para no romper la igualdad referencial de los useMemo derivados.
   const list = useMemo<readonly MatchedSegment[]>(() => matched ?? [], [matched]);
-
-  // Alternativas validas por fila (excluye URIs ya en la playlist). Mismo
-  // criterio que en Result para que el dropdown sea consistente entre pasos.
-  const alternativesByIndex = useMemo(
-    () => list.map((_, i) => getAlternativesForSegment(list, i, tracks, preferences)),
-    [list, tracks, preferences],
-  );
-
-  const handleReplaceWith = (index: number, uri: string): void => {
-    const result = replaceTrackInSegment(list, index, tracks, preferences, uri);
-    if (!result.replaced) return;
-    onMatchedChange(result.matched);
-    const next = new Set(replacedIndices);
-    next.add(index);
-    onReplacedIndicesChange(next);
-  };
 
   const handleCsvUpload = async (file: File): Promise<void> => {
     setUploadError(null);
@@ -165,7 +141,6 @@ export function MusicStep({
 
   const totalMinutes = Math.round(meta.totalDurationSec / 60);
   const bestEffortCount = list.filter((m) => m.matchQuality === 'best-effort').length;
-  const replacedCount = replacedIndices.size;
 
   const validUploads = uploadedCsvs.filter((c) => c.error === undefined);
   const hasUserTracks = validUploads.length > 0;
@@ -209,6 +184,32 @@ export function MusicStep({
             desc="La biblioteca embebida en la app, sin tus CSV."
           />
         </fieldset>
+
+        <button
+          type="button"
+          onClick={() => navigateInApp('/catalogo')}
+          className="mt-4 w-full inline-flex items-start gap-3 px-3 py-3 rounded-lg border border-gris-300 bg-white text-left hover:border-turquesa-400 hover:bg-turquesa-50 transition-colors min-h-[44px]"
+        >
+          <MaterialIcon
+            name="edit_note"
+            size="small"
+            className="text-turquesa-600 mt-0.5 flex-shrink-0"
+          />
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold text-gris-800">
+              Personalizar catálogo nativo
+            </span>
+            <span className="block text-xs text-gris-500">
+              Descarta canciones que no te gusten y descárgalas como tu CSV propio para
+              subirlo después.
+            </span>
+          </span>
+          <MaterialIcon
+            name="arrow_forward"
+            size="small"
+            className="text-gris-400 mt-0.5 flex-shrink-0"
+          />
+        </button>
 
         {showDropzone && (
           <div className="mt-4 space-y-3">
@@ -329,27 +330,21 @@ export function MusicStep({
             para <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de
             ruta
           </p>
-          {replacedCount > 0 && (
-            <span className="text-xs text-turquesa-700 flex items-center gap-1">
-              <MaterialIcon name="edit" size="small" className="text-turquesa-600" />
-              {replacedCount} cambio{replacedCount !== 1 ? 's' : ''}
-            </span>
-          )}
+          <span className="text-xs text-gris-500 italic">
+            Vista previa — podrás editarla en el siguiente paso.
+          </span>
         </div>
         {list.length === 0 ? (
           <p className="text-sm text-gris-500 italic">
             Sin temas que mostrar. Vuelve a Ruta para procesar un GPX.
           </p>
         ) : (
-          <ul className="space-y-2 md:max-h-[55vh] md:overflow-y-auto md:pr-1">
+          <ul className="space-y-1.5 md:max-h-[55vh] md:overflow-y-auto md:pr-1">
             {list.map((m, i) => (
               <li key={`${m.startSec}-${i}`}>
-                <PlaylistTrackRow
+                <PlaylistPreviewRow
                   matched={m}
                   index={i + 1}
-                  alternatives={alternativesByIndex[i] ?? []}
-                  onReplaceWith={(uri) => handleReplaceWith(i, uri)}
-                  replaced={replacedIndices.has(i)}
                   showSlope={crossZoneMode === 'overlap'}
                 />
               </li>

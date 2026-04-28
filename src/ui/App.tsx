@@ -20,6 +20,7 @@ import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import { CatalogEditorPage } from '@ui/pages/CatalogEditorPage';
 import { Landing } from '@ui/pages/Landing';
 import { SourceTypeStep } from '@ui/pages/SourceTypeStep';
 import { UserDataStep } from '@ui/pages/UserDataStep';
@@ -30,6 +31,7 @@ import { TVModeRoute } from '@ui/pages/TVModeRoute';
 import { writeHandoff } from '@core/tv/tvHandoff';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
+import { navigateBack, usePathname } from '@ui/utils/navigation';
 import {
   loadWizardState,
   saveWizardState,
@@ -52,13 +54,19 @@ const STEP_MUSIC = 3;
 const STEP_RESULT = 4;
 
 export function App(): JSX.Element {
-  // Ruta /tv: pestaña independiente del wizard que ejecuta SessionTVMode con
-  // el plan que la pestaña origen escribio en localStorage. Bifurcamos al
-  // componente TVModeRoute para no montar el wizard ni leer su sessionStorage.
-  // Extraido fuera del wizard para no romper rules-of-hooks (cada rama es un
-  // componente distinto, asi cada uno tiene su propio orden de hooks estable).
-  if (typeof window !== 'undefined' && window.location.pathname === '/tv') {
+  // Bifurcacion reactiva por pathname. Cada rama retorna un componente
+  // distinto para no romper rules-of-hooks (cada componente tiene su propio
+  // orden de hooks estable).
+  // - /tv: pestaña independiente que ejecuta SessionTVMode con el plan
+  //   escrito en localStorage por la pestaña origen.
+  // - /catalogo: editor del catalogo nativo, accesible desde MusicStep para
+  //   curar tracks y descargar el resultado como CSV propio.
+  const pathname = usePathname();
+  if (pathname === '/tv') {
     return <TVModeRoute />;
+  }
+  if (pathname === '/catalogo') {
+    return <CatalogEditorPage onClose={() => navigateBack('/')} />;
   }
   return <WizardApp />;
 }
@@ -478,9 +486,6 @@ function WizardApp(): JSX.Element {
             uploadedCsvs={uploadedCsvs}
             onUploadedCsvsChange={setUploadedCsvs}
             matched={matchedList}
-            onMatchedChange={setMatchedList}
-            replacedIndices={replacedIndices}
-            onReplacedIndicesChange={setReplacedIndices}
             onAdvance={handleMatchedAdvance}
             onBack={handleBack}
             crossZoneMode={crossZoneMode}
