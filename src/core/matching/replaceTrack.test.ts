@@ -285,6 +285,58 @@ describe('getAlternativesForSegment', () => {
     expect(alts).toEqual([]);
   });
 
+  it('prioriza strict: si hay tracks libres con cadencia OK, NO ofrece los que no encajan', () => {
+    // 2 tracks strict para Z3+flat (75, 85) + 2 tracks fuera de cadencia
+    // (100, 110). El segmento usa 1 strict; quedan 1 strict + 2 fuera libres.
+    // El dropdown debe ofrecer SOLO el strict libre (75 u 85), no los 100/110.
+    const tracks = [
+      track({ tempoBpm: 75, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 100, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 110, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments([segment(3)], tracks, EMPTY_PREFERENCES);
+
+    const alts = getAlternativesForSegment(matched, 0, tracks, EMPTY_PREFERENCES);
+    expect(alts.length).toBe(1);
+    // El BPM del unico alternativo debe estar dentro del rango Z3+flat (70-90).
+    expect(alts[0]!.track.tempoBpm).toBeGreaterThanOrEqual(70);
+    expect(alts[0]!.track.tempoBpm).toBeLessThanOrEqual(90);
+  });
+
+  it('encaje libre por agotamiento: ofrece tracks de cadencia no ideal cuando los strict estan todos usados', () => {
+    // 3 tracks strict para Z3+flat (cadencia 70-90), 2 tracks fuera de
+    // cadencia (100, 110). En 4 segmentos Z3 el motor agota los 3 strict y
+    // marca el 4o como 'best-effort' override (caso del bug Wonderwall):
+    // hay strict en el catalogo pero ya estan en uso. El dropdown DEBE
+    // ofrecer los tracks fuera de cadencia como alternativas; antes devolvia
+    // [] porque solo miraba el subset strict y todos estaban en forbidden.
+    const tracks = [
+      track({ tempoBpm: 75, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 82, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 88, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 100, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 110, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const segments = [segment(3), segment(3), segment(3), segment(3)];
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+
+    // Localizar el slot best-effort (el que el motor llenó con un track
+    // fuera de cadencia tras agotar strict).
+    const bestEffortIdx = matched.findIndex((m) => m.matchQuality === 'best-effort');
+    expect(bestEffortIdx).toBeGreaterThanOrEqual(0);
+
+    const alts = getAlternativesForSegment(
+      matched,
+      bestEffortIdx,
+      tracks,
+      EMPTY_PREFERENCES,
+    );
+    // Hay 1 track libre fuera de cadencia (el que no se asignó). Antes del
+    // fix, alts era []. Ahora debe contener al menos 1 alternativa.
+    expect(alts.length).toBeGreaterThan(0);
+  });
+
   it('encaje libre: si el segmento es best-effort las alternativas tambien lo son', () => {
     // Z6 (sprint) requiere cadencia 90-110 (1:1) o 180-220 (2:1). Si TODOS
     // los tracks del catalogo caen fuera, el match es best-effort y las

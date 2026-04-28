@@ -1,7 +1,7 @@
 import type { Track } from '../tracks/types';
-import { findCandidates } from './candidates';
+import { passesCadenceFilter } from './candidates';
 import { scoreTrack } from './score';
-import type { MatchPreferences, MatchQuality, MatchedSegment } from './types';
+import type { MatchPreferences, MatchQuality, MatchedSegment, ZoneMusicCriteria } from './types';
 import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
 
 export interface ReplaceResult {
@@ -18,16 +18,23 @@ export interface ReplaceResult {
 export interface AlternativeCandidate {
   track: Track;
   score: number;
+  /**
+   * Si el track encaja en cadencia (1:1 ∪ 2:1) para la zona del slot. En la
+   * lista por defecto todos seran true (solo strict). En el fallback (cuando
+   * no hay strict libres) todos seran false. Permite a la UI mostrar un aviso
+   * cuando el dropdown opera en modo fallback.
+   */
+  passesCadence: boolean;
 }
 
 interface RankedCandidatesBag {
   ranked: AlternativeCandidate[];
   /**
-   * Calidad heredada de findCandidates: 'strict' si algun track del catalogo
-   * pasa el filtro de cadencia, 'best-effort' si ninguno pasa. Si el segmento
-   * actual es 'best-effort', las alternativas tambien lo seran por construccion.
+   * Criteria efectiva (zona + profile + allEnergetic) usada al rankear. Se
+   * propaga para que `replaceTrackInSegment` calcule la matchQuality correcta
+   * del track elegido (strict si pasa cadencia, best-effort si no).
    */
-  quality: MatchQuality;
+  criteria: ZoneMusicCriteria;
 }
 
 /**
@@ -51,7 +58,6 @@ function rankAvailableCandidates(
 
   const baseCriteria = getZoneCriteria(target.zone, target.cadenceProfile);
   const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
-  const { candidates, quality } = findCandidates(tracks, effective);
 
   // URIs prohibidas: TODAS las que ya estan en la playlist (no solo vecinos).
   // El segmento que estamos reemplazando se incluye explicitamente para que
@@ -61,15 +67,36 @@ function rankAvailableCandidates(
     if (m.track) forbidden.add(m.track.uri);
   }
 
-  const ranked = candidates
-    .filter((t) => !forbidden.has(t.uri))
+  const free = tracks.filter((t) => !forbidden.has(t.uri));
+  const score = (t: Track): number =>
+    scoreTrack(t, effective, preferences.preferredGenres);
+
+  // Por defecto el dropdown ofrece SOLO los tracks que pasan filtro de
+  // cadencia (1:1 ∪ 2:1). Es lo que el usuario espera: alternativas con
+  // calidad equivalente a la asignacion automatica del motor.
+  const strictRanked: AlternativeCandidate[] = free
+    .filter((t) => passesCadenceFilter(t.tempoBpm, effective))
+    .map((t) => ({ track: t, score: score(t), passesCadence: true }))
+    .sort((a, b) => b.score - a.score);
+
+  if (strictRanked.length > 0) {
+    return { ranked: strictRanked, criteria: effective };
+  }
+
+  // Fallback: NO queda ningun track strict libre (o el catalogo no tiene
+  // ninguno para esta zona). Damos al usuario el resto del catalogo no
+  // usado, ordenado por score, para que NUNCA se quede sin alternativas.
+  // Estos tracks no encajan en cadencia: el slot resultante se marcara
+  // 'best-effort' al sustituir.
+  const fallbackRanked: AlternativeCandidate[] = free
     .map((t) => ({
       track: t,
-      score: scoreTrack(t, effective, preferences.preferredGenres),
+      score: score(t),
+      passesCadence: passesCadenceFilter(t.tempoBpm, effective),
     }))
     .sort((a, b) => b.score - a.score);
 
-  return { ranked, quality };
+  return { ranked: fallbackRanked, criteria: effective };
 }
 
 /**
@@ -129,10 +156,18 @@ export function replaceTrackInSegment(
     return { matched: [...matched], replaced: false };
   }
 
+  // La calidad del nuevo slot la determina el track elegido individualmente:
+  // 'strict' si pasa filtro de cadencia (1:1 ∪ 2:1) para la zona del slot,
+  // 'best-effort' si no encaja. No reusamos la quality del bag — esa era una
+  // propiedad del catalogo/agotamiento, no del track concreto que sale.
+  const newQuality: MatchQuality = passesCadenceFilter(next.track.tempoBpm, bag.criteria)
+    ? 'strict'
+    : 'best-effort';
+
   return {
     matched: matched.map((m, i) =>
       i === index
-        ? { ...m, track: next.track, matchScore: next.score, matchQuality: bag.quality }
+        ? { ...m, track: next.track, matchScore: next.score, matchQuality: newQuality }
         : m,
     ),
     replaced: true,
