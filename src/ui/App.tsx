@@ -8,6 +8,7 @@ import {
 } from '@core/user';
 import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/segmentation';
 import { EMPTY_PREFERENCES, type MatchPreferences, type MatchedSegment } from '@core/matching';
+import type { Track } from '@core/tracks';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
@@ -113,6 +114,11 @@ export function App(): JSX.Element {
     persisted?.musicPreferences ?? EMPTY_PREFERENCES,
   );
 
+  // Catalogo activo del paso Musica (puede incluir uploads del usuario). Vive
+  // solo en memoria — no se persiste en sessionStorage para no inflarlo con
+  // CSVs grandes. Si es null, ResultStep cae al subset de nativos.
+  const [livePool, setLivePool] = useState<readonly Track[] | null>(null);
+
   // Persistir el wizard state en sessionStorage en cada cambio.
   useEffect(() => {
     saveWizardState({
@@ -180,9 +186,11 @@ export function App(): JSX.Element {
   const handleMatched = (
     matched: MatchedSegment[],
     preferences: MatchPreferences,
+    tracks: readonly Track[],
   ): void => {
     setMatchedList(matched);
     setMusicPreferences(preferences);
+    setLivePool(tracks);
     handleNext();
   };
 
@@ -289,6 +297,7 @@ export function App(): JSX.Element {
               routeMeta={routeMeta}
               matched={matchedList}
               preferences={musicPreferences}
+              tracks={livePool}
               onMatchedChange={handleMatchedChange}
               onBack={handleBack}
               {...(sourceType === 'session'

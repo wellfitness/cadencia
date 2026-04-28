@@ -57,8 +57,17 @@ const MAX_PREVIEW = 8;
 export interface MusicStepProps {
   segments: readonly ClassifiedSegment[];
   meta: RouteMeta;
-  /** Llamado al pulsar Siguiente con la lista final asignada y las preferencias usadas. */
-  onMatched: (matched: MatchedSegment[], preferences: MatchPreferences) => void;
+  /**
+   * Llamado al pulsar Siguiente con la lista final asignada, las preferencias
+   * usadas y el catalogo activo en este paso (predefinido, propio o ambos).
+   * El catalogo viaja al Resultado para que el dropdown "Otro tema" busque
+   * alternativas en el mismo pool con el que se generó el matching.
+   */
+  onMatched: (
+    matched: MatchedSegment[],
+    preferences: MatchPreferences,
+    tracks: readonly Track[],
+  ) => void;
   onBack: () => void;
   /** Estado inicial de preferencias (si el usuario vuelve atrás y entra otra vez). */
   initialPreferences?: MatchPreferences;
@@ -170,7 +179,7 @@ export function MusicStep({
   };
 
   const handleNext = (): void => {
-    onMatched(matched, preferences);
+    onMatched(matched, preferences, tracks);
   };
 
   const totalMinutes = Math.round(meta.totalDurationSec / 60);

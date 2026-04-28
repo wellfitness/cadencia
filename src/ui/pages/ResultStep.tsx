@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch } from 'react';
 import {
+  getAlternativesForSegment,
   matchTracksToSegments,
   replaceTrackInSegment,
   type CrossZoneMode,
@@ -12,7 +13,7 @@ import {
   extractUris,
 } from '@core/playlist';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import { getTopGenres, loadNativeTracks } from '@core/tracks';
+import { getTopGenres, loadNativeTracks, type Track } from '@core/tracks';
 import type { UserInputsRaw, ValidatedUserInputs, ValidationResult } from '@core/user';
 import {
   clearAuthFlow,
@@ -53,6 +54,13 @@ export interface ResultStepProps {
   routeMeta: RouteMeta;
   matched: readonly MatchedSegment[];
   preferences: MatchPreferences;
+  /**
+   * Catalogo activo del paso Musica (predefinido, propio o ambos). Si es
+   * null o ausente cae al subset de nativos. Necesario para que el dropdown
+   * de "Otro tema" busque alternativas en el mismo pool con el que se generó
+   * el matching original.
+   */
+  tracks?: readonly Track[] | null;
   /** Callback al cambiar matched o preferences (App.tsx persiste). */
   onMatchedChange: (matched: MatchedSegment[], preferences: MatchPreferences) => void;
   onBack: () => void;
@@ -76,6 +84,7 @@ export function ResultStep({
   routeMeta,
   matched,
   preferences,
+  tracks: providedTracks,
   onMatchedChange,
   onBack,
   onEnterTVMode,
@@ -83,7 +92,13 @@ export function ResultStep({
   crossZoneMode = 'overlap',
 }: ResultStepProps): JSX.Element {
   const clientId = getSpotifyClientId();
-  const tracks = useMemo(() => loadNativeTracks(), []);
+  // Catalogo activo: el que viene del paso Musica (incluye uploads del
+  // usuario). Si no hay (refresh de pestaña, callback OAuth), fallback a
+  // los CSVs nativos para no quedarnos sin pool.
+  const tracks = useMemo(
+    () => (providedTracks && providedTracks.length > 0 ? providedTracks : loadNativeTracks()),
+    [providedTracks],
+  );
   const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
 
   const [phase, setPhase] = useState<Phase>('idle');
@@ -94,6 +109,17 @@ export function ResultStep({
   );
   const [replacedIndices, setReplacedIndices] = useState<ReadonlySet<number>>(new Set());
   const [hasSpotifySession, setHasSpotifySession] = useState<boolean>(() => loadTokens() !== null);
+
+  // Alternativas validas por fila (excluye URIs ya en la playlist). Se
+  // recalculan al cambiar la lista o las preferencias para que el dropdown
+  // refleje en tiempo real las opciones disponibles.
+  const alternativesByIndex = useMemo(
+    () =>
+      matched.map((_, i) =>
+        getAlternativesForSegment(matched, i, tracks, preferences),
+      ),
+    [matched, tracks, preferences],
+  );
 
   // Si los inputs cambian (edit-in-place), recalculamos matching desde cero.
   // El indice de "reemplazados manualmente" se reinicia.
@@ -135,8 +161,8 @@ export function ResultStep({
     return <MissingClientIdMessage onBack={onBack} />;
   }
 
-  const handleReplace = (index: number): void => {
-    const result = replaceTrackInSegment(matched, index, tracks, preferences);
+  const handleReplaceWith = (index: number, uri: string): void => {
+    const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
     if (!result.replaced) return;
     onMatchedChange(result.matched, preferences);
     setReplacedIndices((prev) => {
@@ -304,7 +330,8 @@ export function ResultStep({
                 <PlaylistTrackRow
                   matched={m}
                   index={i + 1}
-                  onReplace={() => handleReplace(i)}
+                  alternatives={alternativesByIndex[i] ?? []}
+                  onReplaceWith={(uri) => handleReplaceWith(i, uri)}
                   replaced={replacedIndices.has(i)}
                 />
               </li>
