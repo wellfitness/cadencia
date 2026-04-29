@@ -43,6 +43,7 @@ import {
   type MusicSourceMode,
   type RouteSourceType,
 } from '@ui/state/wizardStorage';
+import { loadCadenciaData, updateSection } from '@ui/state/cadenciaStore';
 
 const STEPS: readonly StepperStep[] = [
   { label: 'Tipo', icon: 'tune' },
@@ -146,10 +147,14 @@ function WizardApp(): JSX.Element {
 
   // State del usuario lifteado aqui para que pasos posteriores (Ruta, Resultado)
   // puedan leerlo y, en el caso de Resultado, editarlo en linea sin volver atras.
+  // Estrategia de hidratacion: cadenciaStore (nuevo SoT con sync Drive) primero,
+  // legacy storage despues. La migracion one-shot en main.tsx asegura que los
+  // datos antiguos viajen al cadenciaStore en el primer arranque tras el deploy.
   const [inputs, dispatch] = useReducer(
     userInputsReducer,
     null,
-    (): UserInputsRaw => loadUserInputs() ?? EMPTY_USER_INPUTS,
+    (): UserInputsRaw =>
+      loadCadenciaData().userInputs ?? loadUserInputs() ?? EMPTY_USER_INPUTS,
   );
 
   // currentYear cacheado en una sesion (no cambia significativamente durante el uso normal).
@@ -157,10 +162,11 @@ function WizardApp(): JSX.Element {
 
   // Opt-in del usuario a persistir sus datos fisiologicos entre sesiones en
   // este dispositivo (localStorage). La fuente de verdad arranca en la
-  // presencia de la key, asi que estados imposibles (flag sin datos /
-  // datos sin flag) no existen.
+  // presencia de userInputs en cadenciaStore (SoT actual) o en la key legacy
+  // (compat tras migracion). Estados imposibles (flag sin datos / datos
+  // sin flag) no existen.
   const [persistentStorage, setPersistentStorageState] = useState<boolean>(
-    () => isPersistentStorageEnabled(),
+    () => loadCadenciaData().userInputs !== null || isPersistentStorageEnabled(),
   );
 
   const handlePersistentStorageChange = useCallback(
@@ -170,19 +176,25 @@ function WizardApp(): JSX.Element {
         // Snapshot inmediato: si el usuario marca el checkbox tras rellenar
         // el formulario, no esperamos al siguiente render para escribir.
         saveUserInputsToLocal(inputs);
+        updateSection('userInputs', inputs);
       } else {
         clearUserInputsFromLocal();
+        updateSection('userInputs', null);
       }
     },
     [inputs],
   );
 
   // Persistencia debounceada. sessionStorage se actualiza siempre (necesario
-  // para sobrevivir al OAuth de Spotify); localStorage solo si el opt-in
-  // esta activo.
+  // para sobrevivir al OAuth de Spotify); cadenciaStore (y localStorage
+  // legacy mientras dure la migracion) solo si el opt-in esta activo.
+  // cadenciaStore es el SoT que el motor de Drive sync observa.
   useEffect(() => {
     const id = setTimeout(() => {
       saveUserInputs(inputs, persistentStorage);
+      if (persistentStorage) {
+        updateSection('userInputs', inputs);
+      }
     }, 300);
     return () => clearTimeout(id);
   }, [inputs, persistentStorage]);
@@ -222,12 +234,24 @@ function WizardApp(): JSX.Element {
     persisted?.matchedList ?? null,
   );
   const [musicPreferences, setMusicPreferences] = useState<MatchPreferences>(() => {
-    const base = persisted?.musicPreferences ?? EMPTY_PREFERENCES;
+    // Estrategia de hidratacion: cadenciaStore (SoT con sync Drive) primero,
+    // wizardStorage (sessionStorage) despues, EMPTY al final. Esto permite
+    // que las preferencias musicales sobrevivan al cierre de pestana, no
+    // solo al redirect OAuth de Spotify.
+    const fromCadencia = loadCadenciaData().musicPreferences;
+    const base = fromCadencia ?? persisted?.musicPreferences ?? EMPTY_PREFERENCES;
     // Auto-seed la primera vez. La semilla se persiste con el resto de
-    // musicPreferences en sessionStorage, asi el OAuth callback de Spotify
-    // (full reload) reproduce exactamente la misma playlist al volver.
+    // musicPreferences, asi el OAuth callback de Spotify (full reload)
+    // reproduce exactamente la misma playlist al volver.
     return base.seed === undefined ? { ...base, seed: makeRandomSeed() } : base;
   });
+
+  // Sync musicPreferences -> cadenciaStore en cada cambio. cadenciaStore
+  // es el SoT que el motor de Drive sync observa para propagar entre
+  // dispositivos.
+  useEffect(() => {
+    updateSection('musicPreferences', musicPreferences);
+  }, [musicPreferences]);
 
   const handleRegenerateSeed = useCallback((): void => {
     // Cambiar la semilla regenera la playlist completa con elecciones nuevas:
@@ -245,8 +269,10 @@ function WizardApp(): JSX.Element {
     () => new Set(persisted?.replacedIndices ?? []),
   );
 
-  // Fuente del catalogo en MusicStep: predefinido (CSVs embebidos), solo lo
-  // subido por el usuario, o ambos combinados. Default 'both'.
+  // Fuente del catalogo en MusicStep: solo lo subido por el usuario o ambos
+  // combinados (predefinido + uploads). Default 'both' — el catalogo nativo
+  // viaja siempre como base; "Solo predefinida" se retiro del UI porque era
+  // redundante con "Combinar ambas" sin CSVs subidos.
   const [musicSourceMode, setMusicSourceMode] = useState<MusicSourceMode>(
     persisted?.musicSourceMode ?? 'both',
   );
@@ -260,12 +286,11 @@ function WizardApp(): JSX.Element {
   // el usuario no tenga que reescribirlo si vuelve a Datos/Musica y vuelve.
   const [playlistName, setPlaylistName] = useState<string>(persisted?.playlistName ?? '');
 
-  // Catalogo activo del paso Musica (predefinido, propio o ambos combinados).
+  // Catalogo activo del paso Musica (solo CSVs propios o ambos combinados).
   // Memoizado a partir del modo y los CSVs subidos: una sola fuente de verdad
   // que alimenta tanto el matching como el dropdown de "Otro tema" en Result.
   const livePool = useMemo<readonly Track[]>(() => {
     const userTracks: Track[] = uploadedCsvs.flatMap((c) => [...c.tracks]);
-    if (musicSourceMode === 'predefined') return loadNativeTracks();
     if (musicSourceMode === 'mine') return dedupeByUri(userTracks);
     return dedupeByUri([...loadNativeTracks(), ...userTracks]);
   }, [musicSourceMode, uploadedCsvs]);
