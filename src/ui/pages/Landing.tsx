@@ -910,8 +910,8 @@ function Privacy(): JSX.Element {
     {
       num: '02',
       icon: 'no_accounts',
-      title: 'Sin registros ni inicio de sesión',
-      body: 'No pides correo, no creas cuenta, no recuperas contraseña. Abres la app y entrenas.',
+      title: 'Sin registros obligatorios',
+      body: 'No pides correo, no creas cuenta, no recuperas contraseña. Si quieres, puedes conectar Google Drive opcionalmente para sincronizar tus ajustes y sesiones entre dispositivos — viajan a una carpeta privada tuya, nunca pasan por nosotros.',
     },
     {
       num: '03',

@@ -143,53 +143,108 @@
         </li>
       </ul>
 
-      <h2>4. Lo que NO hacemos</h2>
+      <h2>4. Conexión opcional con Google Drive</h2>
+      <p>
+        Si pulsas <strong>"Conectar mi Google Drive"</strong> en los ajustes de la app,
+        Cadencia solicita acceso al espacio
+        <code>drive.appdata</code> de tu Google Drive: una carpeta privada y oculta,
+        invisible incluso para ti en la UI normal de Drive. Esta función es 100%
+        opcional — la app funciona idéntica sin ella.
+      </p>
       <ul>
-        <li>No tenemos cuentas, registros ni base de datos de usuarios.</li>
+        <li>
+          <strong>Permiso solicitado</strong>:
+          <code>https://www.googleapis.com/auth/drive.appdata</code>. Solo da acceso a
+          esa carpeta privada; <strong>no</strong> a otros archivos de tu Drive.
+        </li>
+        <li>
+          <strong>Qué se guarda en tu Drive</strong>: tus inputs fisiológicos
+          (peso, FTP, FC), tus preferencias musicales (géneros, semilla) y las
+          sesiones que hayas guardado con un nombre. Todo en un único archivo
+          JSON llamado <code>cadencia_data.json</code>.
+        </li>
+        <li>
+          <strong>Quién puede leer ese archivo</strong>: solo tú y la propia
+          aplicación Cadencia desde tu navegador. Nosotros no tenemos servidor
+          intermedio — los datos viajan directos entre tu navegador y Google.
+        </li>
+        <li>
+          <strong>Token de acceso</strong>: se guarda en
+          <code>localStorage</code> de tu navegador. Para revocarlo y borrar los
+          datos en Drive, ve a
+          <a
+            href="https://drive.google.com/drive/u/0/settings"
+            target="_blank"
+            rel="noopener noreferrer"
+            >drive.google.com → Configuración → Administrar aplicaciones</a
+          >
+          y elimina los datos ocultos de Cadencia.
+        </li>
+      </ul>
+
+      <h2>5. Lo que NO hacemos</h2>
+      <ul>
+        <li>No tenemos cuentas, registros obligatorios ni base de datos de usuarios.</li>
         <li>No usamos cookies de seguimiento ni de terceros.</li>
         <li>No usamos analítica (Google Analytics, Plausible, etc.).</li>
         <li>No mostramos publicidad ni vendemos datos a anunciantes.</li>
         <li>No hay servidor backend al que tu información pueda llegar.</li>
       </ul>
 
-      <h2>5. Almacenamiento técnico necesario</h2>
+      <h2>6. Almacenamiento técnico</h2>
       <p>
-        Usamos exclusivamente <code>sessionStorage</code> del navegador (no
-        <code>localStorage</code>) para conservar tus datos físicos mientras navegas entre los
-        pasos de la app. Se borra automáticamente al cerrar la pestaña.
+        Tus datos físicos y preferencias musicales se guardan en
+        <code>localStorage</code> de tu navegador para que sobrevivan al cierre
+        de la pestaña (si activas "Recordar mis datos"). Si <strong>no</strong>
+        activas esa opción, se usan solo en <code>sessionStorage</code> y se
+        borran al cerrar la pestaña.
       </p>
       <p>
-        Como Aplicación Web Progresiva (PWA), el navegador puede cachear el código de la app
-        (HTML, CSS, JavaScript) para que funcione sin conexión. Esto NO incluye datos personales
-        tuyos.
+        El estado intermedio del wizard (paso actual, ruta procesada, lista
+        casada) vive siempre en <code>sessionStorage</code> y se borra al cerrar
+        la pestaña, independientemente del opt-in.
+      </p>
+      <p>
+        Como Aplicación Web Progresiva (PWA), el navegador puede cachear el
+        código de la app (HTML, CSS, JavaScript) para que funcione sin conexión.
+        Esto NO incluye datos personales tuyos.
       </p>
 
-      <h2>6. Menores</h2>
+      <h2>7. Menores</h2>
       <p>
         La app está pensada para personas mayores de 16 años (edad mínima de Spotify). Si eres
         menor, no la uses sin consentimiento de tus padres o tutores.
       </p>
 
-      <h2>7. Cambios en esta política</h2>
+      <h2>8. Cambios en esta política</h2>
       <p>
         Si en el futuro se modifica esta política, la nueva versión se publicará aquí con su
         fecha. Como la app no tiene cuentas, no podemos avisarte por correo: te invitamos a
         revisarla periódicamente.
       </p>
 
-      <h2>8. Contacto</h2>
+      <h2>9. Contacto</h2>
       <p>
         Para cualquier consulta sobre privacidad puedes escribir a
         <a href="mailto:movimientofuncional.net@gmail.com">movimientofuncional.net@gmail.com</a>.
       </p>
 
-      <h2>9. Jurisdicción</h2>
+      <h2>10. Jurisdicción</h2>
       <p>
-        Esta política se rige por la legislación española. Los datos tratados por Spotify están
-        sujetos a su propia
-        <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer"
-          >política de privacidad</a
-        >.
+        Esta política se rige por la legislación española. Los datos tratados por Spotify y por
+        Google están sujetos a sus propias políticas de privacidad
+        (<a
+          href="https://www.spotify.com/legal/privacy-policy/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Spotify</a
+        >,
+        <a
+          href="https://policies.google.com/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Google</a
+        >).
       </p>
 
       <hr />
