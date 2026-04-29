@@ -64,6 +64,15 @@ export const HELP_ARTICLES: readonly HelpArticleMeta[] = [
     description: 'OAuth PKCE, errores comunes y tracks no encontrados.',
     readTime: '4 min',
   },
+  {
+    slug: 'sincronizar-drive',
+    path: '/ayuda/sincronizar-drive',
+    icon: 'cloud_sync',
+    title: 'Sincronizar con Google Drive',
+    description:
+      'Cómo conectar Drive opcionalmente para llevar tus ajustes y sesiones entre dispositivos.',
+    readTime: '4 min',
+  },
 ];
 
 export function findHelpArticle(slug: string): HelpArticleMeta | undefined {

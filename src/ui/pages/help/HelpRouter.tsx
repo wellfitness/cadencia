@@ -6,6 +6,7 @@ import { IntervalosArticle } from './articles/IntervalosArticle';
 import { PlantillasArticle } from './articles/PlantillasArticle';
 import { MusicaArticle } from './articles/MusicaArticle';
 import { SpotifyArticle } from './articles/SpotifyArticle';
+import { SincronizarDriveArticle } from './articles/SincronizarDriveArticle';
 
 export interface HelpRouterProps {
   pathname: string;
@@ -64,6 +65,12 @@ export function HelpRouter({ pathname }: HelpRouterProps): JSX.Element {
       return (
         <HelpLayout activeSlug="spotify">
           <SpotifyArticle />
+        </HelpLayout>
+      );
+    case '/ayuda/sincronizar-drive':
+      return (
+        <HelpLayout activeSlug="sincronizar-drive">
+          <SincronizarDriveArticle />
         </HelpLayout>
       );
     default:
