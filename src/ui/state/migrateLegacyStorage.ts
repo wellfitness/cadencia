@@ -22,5 +22,4 @@ export function migrateLegacyStorageOnce(): void {
 
   updateSection('userInputs', legacy);
   clearUserInputsFromLocal();
-  console.info('[Cadencia] Migrado userInputs legacy a cadenciaStore');
 }
