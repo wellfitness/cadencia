@@ -23,6 +23,7 @@ import {
 import { BIKE_TYPE_ICONS, BIKE_TYPE_LABELS } from '@core/power';
 import { calculateMaxHeartRate } from '@core/physiology';
 import { Card } from './Card';
+import { GoogleSyncCard } from './sync/GoogleSyncCard';
 import { Input } from './Input';
 import { MaterialIcon } from './MaterialIcon';
 import { SexSelector } from './SexSelector';
@@ -523,10 +524,13 @@ export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
         )}
 
         {persistentStorage !== undefined && onPersistentStorageChange !== undefined && (
-          <RememberMeBlock
-            enabled={persistentStorage}
-            onChange={onPersistentStorageChange}
-          />
+          <>
+            <RememberMeBlock
+              enabled={persistentStorage}
+              onChange={onPersistentStorageChange}
+            />
+            <GoogleSyncCard />
+          </>
         )}
       </div>
     );
