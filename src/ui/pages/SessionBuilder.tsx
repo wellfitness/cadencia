@@ -26,6 +26,7 @@ import { navigateInApp } from '@ui/utils/navigation';
 import { ZoneTimelineChart } from '@ui/components/ZoneTimelineChart';
 import { BlockList, type PhysioContext } from '@ui/components/session-builder/BlockList';
 import { TemplateGallery } from '@ui/components/session-builder/TemplateGallery';
+import { SaveSessionDialog } from '@ui/components/session-builder/SaveSessionDialog';
 
 export interface SessionBuilderProps {
   validatedInputs: ValidatedUserInputs;
@@ -198,6 +199,36 @@ export function SessionBuilder({
     setError(null);
   }, [onChange, onActiveTemplateIdChange]);
 
+  /**
+   * Carga una sesion guardada por el usuario (tab "Mis sesiones").
+   * Distinta de handleLoadTemplate: no asigna activeTemplateId (las
+   * sesiones del usuario no tienen un ID de plantilla built-in) y
+   * clona el plan completo, items incluidos.
+   */
+  const handleLoadSavedPlan = useCallback(
+    (savedPlan: EditableSessionPlan): void => {
+      dispatch({
+        type: 'loadTemplate',
+        template: {
+          id: 'user-saved' as never,
+          name: savedPlan.name,
+          description: '',
+          items: savedPlan.items.map((it) => cloneItem(it)),
+        },
+      });
+      onChange({
+        name: savedPlan.name,
+        items: savedPlan.items.map((it) => cloneItem(it)),
+      });
+      if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
+      setError(null);
+    },
+    [onChange, onActiveTemplateIdChange],
+  );
+
+  const [savingDialog, setSavingDialog] = useState<boolean>(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+
   const handleAddBlock = useCallback((): void => {
     dispatch({ type: 'addBlock' });
     // addBlock se considera edicion manual: limpia el highlight de plantilla.
@@ -368,6 +399,7 @@ export function SessionBuilder({
           activeTemplateId={state.activeTemplateId}
           onSelect={handleLoadTemplate}
           onStartFromScratch={handleStartFromScratch}
+          onLoadSavedPlan={handleLoadSavedPlan}
           onImportFile={handleImportZwo}
         />
         {importNotice !== null && (
@@ -425,6 +457,20 @@ export function SessionBuilder({
         </Card>
       )}
 
+      {saveNotice !== null && (
+        <p
+          role="status"
+          className="text-xs text-turquesa-800 bg-turquesa-50 border border-turquesa-200 rounded-md px-3 py-2 flex items-start gap-2"
+        >
+          <MaterialIcon
+            name="check_circle"
+            size="small"
+            className="text-turquesa-600 flex-shrink-0 mt-0.5"
+          />
+          <span>{saveNotice}</span>
+        </p>
+      )}
+
       <FooterActions
         onBack={onBack}
         onContinue={handleContinue}
@@ -433,7 +479,21 @@ export function SessionBuilder({
         onExport={handleExportZwo}
         canShare={canShareZwo && expandedBlocks.length > 0}
         onShare={handleShareZwo}
+        canSave={expandedBlocks.length > 0}
+        onSave={() => setSavingDialog(true)}
       />
+
+      {savingDialog && (
+        <SaveSessionDialog
+          plan={state.plan}
+          onClose={() => setSavingDialog(false)}
+          onSaved={() => {
+            setSavingDialog(false);
+            setSaveNotice(`«${state.plan.name}» guardada en Mis sesiones.`);
+            setTimeout(() => setSaveNotice(null), 4000);
+          }}
+        />
+      )}
     </WizardStep>
   );
 }
@@ -446,6 +506,8 @@ interface FooterActionsProps {
   onExport: () => void;
   canShare: boolean;
   onShare: () => void;
+  canSave: boolean;
+  onSave: () => void;
 }
 
 function FooterActions({
@@ -456,6 +518,8 @@ function FooterActions({
   onExport,
   canShare,
   onShare,
+  canSave,
+  onSave,
 }: FooterActionsProps): JSX.Element {
   return (
     <WizardStepFooter
@@ -464,6 +528,16 @@ function FooterActions({
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {canSave && (
+            <Button
+              variant="accent"
+              size="sm"
+              iconLeft="bookmark_add"
+              onClick={onSave}
+              aria-label="Guardar como mi sesión"
+              title="Guardar esta sesión para reutilizarla luego"
+            />
+          )}
           {canShare && (
             <Button
               variant="accent"
@@ -502,6 +576,16 @@ function FooterActions({
           <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
             Atrás
           </Button>
+          {canSave && (
+            <Button
+              variant="accent"
+              iconLeft="bookmark_add"
+              onClick={onSave}
+              title="Guardar esta sesión para reutilizarla luego"
+            >
+              Guardar como mi sesión
+            </Button>
+          )}
           {canShare && (
             <Button
               variant="accent"

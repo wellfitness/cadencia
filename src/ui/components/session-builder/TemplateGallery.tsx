@@ -1,13 +1,15 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   calculateTotalDurationSec,
   SESSION_TEMPLATES,
+  type EditableSessionPlan,
   type SessionTemplate,
 } from '@core/segmentation';
 import { MaterialIcon } from '../MaterialIcon';
 import { Button } from '../Button';
 import { buildIntensityBars, ZONE_BG_BAR } from '../help/intensityBars';
 import { navigateInApp } from '@ui/utils/navigation';
+import { MySavedSessionsTab } from './MySavedSessionsTab';
 
 export interface TemplateGalleryProps {
   /** ID de la plantilla actualmente cargada (para resaltarla). */
@@ -15,12 +17,19 @@ export interface TemplateGalleryProps {
   onSelect: (template: SessionTemplate) => void;
   onStartFromScratch: () => void;
   /**
+   * Cargar un plan editable directamente (sin pasar por SessionTemplate).
+   * Lo usan las "Mis sesiones" guardadas por el usuario.
+   */
+  onLoadSavedPlan?: (plan: EditableSessionPlan) => void;
+  /**
    * Importar un workout desde archivo .zwo (Zwift, TrainingPeaks Virtual,
    * TrainerRoad, Wahoo SYSTM, MyWhoosh). Si se proporciona, aparece un
    * tercer botón "Importar (.zwo)" en el header de la galería.
    */
   onImportFile?: (file: File) => void;
 }
+
+type Tab = 'templates' | 'mine';
 
 const TEMPLATE_ICONS: Record<string, string> = {
   sit: 'bolt',
@@ -41,9 +50,11 @@ export function TemplateGallery({
   activeTemplateId,
   onSelect,
   onStartFromScratch,
+  onLoadSavedPlan,
   onImportFile,
 }: TemplateGalleryProps): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>('templates');
 
   const handleImportClick = (): void => {
     fileInputRef.current?.click();
@@ -54,7 +65,6 @@ export function TemplateGallery({
     if (file !== undefined && onImportFile !== undefined) {
       onImportFile(file);
     }
-    // Reset para permitir reimportar el mismo archivo
     e.target.value = '';
   };
 
@@ -63,7 +73,7 @@ export function TemplateGallery({
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h3 className="text-base md:text-lg font-semibold text-gris-800 flex items-center gap-2">
           <MaterialIcon name="auto_awesome" size="small" className="text-turquesa-600" />
-          Empieza con una plantilla
+          {tab === 'templates' ? 'Empieza con una plantilla' : 'Mis sesiones guardadas'}
         </h3>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onStartFromScratch}>
@@ -91,28 +101,72 @@ export function TemplateGallery({
           )}
         </div>
       </header>
-      <a
-        href="/ayuda/plantillas"
-        onClick={(e) => {
-          e.preventDefault();
-          navigateInApp('/ayuda/plantillas');
-        }}
-        className="inline-flex items-center gap-1.5 text-xs md:text-sm text-turquesa-600 hover:text-turquesa-700 transition-colors"
-      >
-        <MaterialIcon name="help_outline" size="small" decorative />
-        ¿Qué plantilla elegir? Consulta la guía
-        <MaterialIcon name="arrow_forward" size="small" decorative />
-      </a>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-        {SESSION_TEMPLATES.map((template) => (
-          <TemplateCard
-            key={template.id}
-            template={template}
-            active={activeTemplateId === template.id}
-            onSelect={onSelect}
-          />
-        ))}
-      </div>
+
+      {onLoadSavedPlan !== undefined && (
+        <div
+          className="flex gap-1 border-b border-gris-200"
+          role="tablist"
+          aria-label="Origen del plan"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'templates'}
+            onClick={() => setTab('templates')}
+            className={`px-4 py-2 text-sm min-h-[44px] transition-colors ${
+              tab === 'templates'
+                ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+                : 'text-gris-600 hover:text-gris-800'
+            }`}
+          >
+            <MaterialIcon name="science" size="small" className="mr-1" />
+            Plantillas científicas
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'mine'}
+            onClick={() => setTab('mine')}
+            className={`px-4 py-2 text-sm min-h-[44px] transition-colors ${
+              tab === 'mine'
+                ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+                : 'text-gris-600 hover:text-gris-800'
+            }`}
+          >
+            <MaterialIcon name="bookmark" size="small" className="mr-1" />
+            Mis sesiones
+          </button>
+        </div>
+      )}
+
+      {tab === 'templates' ? (
+        <>
+          <a
+            href="/ayuda/plantillas"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/plantillas');
+            }}
+            className="inline-flex items-center gap-1.5 text-xs md:text-sm text-turquesa-600 hover:text-turquesa-700 transition-colors"
+          >
+            <MaterialIcon name="help_outline" size="small" decorative />
+            ¿Qué plantilla elegir? Consulta la guía
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </a>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+            {SESSION_TEMPLATES.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                active={activeTemplateId === template.id}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        onLoadSavedPlan !== undefined && <MySavedSessionsTab onLoad={onLoadSavedPlan} />
+      )}
     </div>
   );
 }
