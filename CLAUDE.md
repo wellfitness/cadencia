@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Outdoor**: subes un GPX de tu ruta, la app estima la **potencia (vatios)** por segmentos y genera una playlist Spotify ordenada donde el BPM/energy de cada track encaja con la intensidad del segmento correspondiente.
 - **Indoor cycling**: construyes una sesión por bloques (calentamiento, intervalos, recuperación, sprints…) desde cero o partiendo de **plantillas científicas** (SIT, HIIT, Noruego 4×4, Z2…) y la app genera la playlist sincronizada para esa sesión.
 
-Sin registros, sin base de datos, sin backend. Toda la lógica corre en cliente.
+Sin registros obligatorios, sin base de datos propia, sin backend. Toda la lógica corre en cliente. Opcionalmente, el usuario puede conectar **Google Drive** para sincronizar sus ajustes y sesiones guardadas entre dispositivos — los datos viajan a una carpeta privada de su propio Drive (scope `drive.appdata`, invisible incluso para él en la UI normal de Drive), nunca pasan por nosotros.
 
 Bajo el paraguas de **Movimiento Funcional**.
 
@@ -37,7 +37,9 @@ No hay APK Android nativa: el alcance se simplificó a webapp+PWA porque (a) no 
 - **Charts**: Recharts (sobre puntos ya downsampleados a bloques de 60 s)
 - **Tests unit**: Vitest + Testing Library + jsdom
 - **Tests E2E**: Playwright
-- **OAuth**: PKCE flow puro en cliente, **solo Spotify** y solo al pulsar "Crear playlist". Token en `sessionStorage`, expira con la pestaña.
+- **OAuth**: dos integraciones independientes, ambas opt-in y solo activadas al pulsar acciones explícitas:
+  - **Spotify** (PKCE puro en cliente, solo al pulsar "Crear playlist"). Token en `sessionStorage`, expira con la pestaña.
+  - **Google Drive** (Google Identity Services, scope `drive.appdata`, solo al pulsar "Conectar mi Google Drive"). Token en `localStorage` con expiry 1 h y silent refresh.
 
 ---
 
@@ -77,7 +79,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 
 Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect).
 
-El estado del wizard persiste en `sessionStorage` (`@ui/state/wizardStorage`) para sobrevivir al redirect del OAuth de Spotify (full page navigation a `/callback`).
+El estado **ephemeral** del wizard (paso actual, ruta procesada, lista casada, índices reemplazados, etc.) persiste en `sessionStorage` (`@ui/state/wizardStorage`) para sobrevivir al redirect del OAuth de Spotify (full page navigation a `/callback`). El estado **duradero** del usuario (inputs fisiológicos, preferencias musicales, sesiones guardadas) vive en `localStorage` vía `@ui/state/cadenciaStore` y se sincroniza opcionalmente con Google Drive (ver "Sincronización opcional con Google Drive" más abajo).
 
 ---
 
@@ -100,20 +102,37 @@ src/
     user/                     # Inputs del usuario, validación bifurcada (gpx|session), persistencia
       userInputs.ts           # Tipo UserInputsRaw + EMPTY
       validation.ts           # validateUserInputs(raw, currentYear, mode)
-      storage.ts              # sessionStorage wrapper
+      storage.ts              # sessionStorage wrapper + localStorage opt-in legacy
     playlist/                 # Builders de nombre y descripción de la playlist Spotify
     sessionFormats/           # Import/export de planes en formatos externos (zwo.ts → Zwift Workout)
+    sync/                     # Motor de sincronización (puro, agnóstico de Drive)
+      types.ts                # SyncedData, SectionMeta, SavedSession
+      schema.ts               # emptySyncedData(), isSyncedData()
+      merge.ts                # mergeData() LWW por sección + array merge por id
+      tombstones.ts           # cleanExpiredTombstones() con expiry 30 días
+      richness.ts             # calculateDataRichness, isEmptyData (anti-regresión)
+    sessions/                 # CRUD de sesiones guardadas por el usuario
+      saved.ts                # createSavedSession, list, get, update, delete (tombstone)
 
   integrations/
     spotify/                  # OAuth PKCE + endpoints search/playlists/items
+    gdrive/                   # Sincronización opcional con Google Drive (drive.appdata)
+      config.ts               # SCOPE, FILE_NAME, CLIENT_ID desde VITE_GOOGLE_CLIENT_ID
+      auth.ts                 # signIn / getTokenSilent / refreshToken / signOut (GIS)
+      drive-api.ts            # findFile, readFile, createFile, updateFile, getFileMetadata
+      sync.ts                 # init, connect, disconnect, push, pull, polling 30s
 
   ui/
     components/
-      session-builder/        # BlockList, BlockEditor, TemplateGallery, RepeatGroup
+      session-builder/        # BlockList, BlockEditor, TemplateGallery, RepeatGroup,
+                              # SaveSessionDialog, MySavedSessionsTab
+      sync/                   # GoogleSyncCard, SyncStatusBadge
       …                       # Resto: Stepper, Card, FileDropzone, ZoneBadge, Charts, etc.
     pages/                    # Landing, SourceTypeStep, UserDataStep, RouteStep, MusicStep,
                               # ResultStep, SessionBuilder, SessionTVMode, SpotifyCallback
-    state/                    # wizardStorage, userInputsReducer (state global del wizard)
+    state/                    # cadenciaStore (single source of truth localStorage),
+                              # wizardStorage (sessionStorage para wizard ephemeral),
+                              # userInputsReducer, migrateLegacyStorage
 
   data/tracks/                # all.csv (catalogo unificado bundled) + sources/ (12 listas fuente)
 ```
@@ -342,10 +361,11 @@ En `MusicStep` el usuario elige fuente: `'predefined'` (solo `all.csv`), `'mine'
 | Servicio | Uso | Token |
 |---|---|---|
 | **Spotify** | OAuth PKCE solo al pulsar "Crear playlist" | `sessionStorage`, expira con la pestaña |
+| **Google Drive** | OAuth GIS opt-in para sincronizar ajustes y sesiones entre dispositivos. Scope `drive.appdata` (carpeta privada del usuario, invisible en su UI normal de Drive) | `localStorage` (`cadencia:gdrive:token`), expiry 1h con silent refresh |
 | **Strava** | Import GPX manual (el usuario exporta el GPX desde Strava y lo sube) | — |
 | **Komoot** | Import GPX manual (su API requiere partner comercial) | — |
 
-**Ningún token va a `localStorage`, a un backend, ni a logs.** La única superficie OAuth de la app es Spotify, y solo se activa cuando el usuario pulsa "Crear playlist".
+**Ningún token de Spotify va a `localStorage`, a un backend, ni a logs.** El token de Google Drive sí va a `localStorage` (el patrón GIS lo requiere) pero nunca a backend ni a logs. Las dos superficies OAuth de la app son **Spotify** (al pulsar "Crear playlist") y **Google Drive** (al pulsar "Conectar mi Google Drive"); ambas son opt-in explícito y la app funciona sin ninguna de ellas.
 
 ### Endpoints Spotify usados
 
@@ -388,6 +408,85 @@ Ver [.env.example](.env.example) para la plantilla.
 - **YouTube Music**: no tiene API oficial; las soluciones no oficiales (ytmusicapi y similares) requieren cookies del usuario y violan ToS.
 
 Si en el futuro se quisiera soportar otras plataformas, requeriría cambio arquitectónico (mini-backend que firme tokens).
+
+### Sincronización opcional con Google Drive
+
+Para que el usuario pueda llevar sus datos entre el móvil y el ordenador sin registrarse en Cadencia, se ofrece sincronización opcional con Google Drive usando el scope **`drive.appdata`** — una carpeta oculta privada del propio usuario, invisible incluso para él en la UI normal de Drive. Solo Cadencia (con el Client ID configurado) puede leer y escribir en esa carpeta, y solo en la cuenta del usuario. Nosotros no vemos ningún dato.
+
+**Qué se sincroniza** (un único archivo `cadencia_data.json`):
+
+- `userInputs`: peso, FTP, FCmáx, FC reposo, año de nacimiento, sexo biológico, tipo y peso de bici.
+- `musicPreferences`: géneros preferidos, semilla de generación, "todo con energía", modo de fuente.
+- `savedSessions`: planes de sesión indoor que el usuario haya guardado con un nombre desde el botón "Guardar como mi sesión" en `SessionBuilder`.
+
+**Qué NO se sincroniza** (deliberadamente):
+
+- Estado del wizard ephemeral (paso actual, ruta procesada, lista casada, índices reemplazados): vive solo en `sessionStorage` y se borra al cerrar la pestaña. No tiene sentido sincronizarlo.
+- GPX subidos: pueden ser MB; el usuario ya los tiene en Strava/Komoot.
+- CSVs de música propios: futuro (Fase 3 del plan original).
+- Tokens de Spotify ni de Drive: nunca se exfiltran.
+
+**Arquitectura del motor de sync**:
+
+`src/core/sync/` (puro, testable sin DOM):
+
+```typescript
+// types.ts
+export interface SyncedData {
+  schemaVersion: 1;
+  updatedAt: string;
+  _sectionMeta: { userInputs?: SectionMeta; musicPreferences?: SectionMeta; savedSessions?: SectionMeta };
+  userInputs: UserInputsRaw | null;
+  musicPreferences: MatchPreferences | null;
+  savedSessions: SavedSession[];
+}
+```
+
+- **Atomic LWW por sección** (`userInputs`, `musicPreferences`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
+- **Array merge por id con tombstones** (`savedSessions`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
+- **Anti-regresión**: si local está vacío y remote tiene datos, aplica remote sin merge. Si local tiene <30% de la riqueza de remote (instalación nueva), también aplica remote directo.
+- **Anti-ciclo**: flag `_applyingRemote` evita que `pull` dispare `push` tras actualizar `cadenciaStore` con datos descargados.
+
+`src/integrations/gdrive/` (auth + REST, depende de `core/sync`):
+
+- `auth.ts`: GIS popup, tokens en `localStorage` con buffer 5min antes del expiry real.
+- `drive-api.ts`: REST puro contra Drive v3, retry automático en 401 vía `setTokenRefresher`.
+- `sync.ts`: orquestador. Push debounceado (2s), pull periódico (30s) ligero (solo metadata), pull en `visibilitychange`. `init()` registra los listeners y hace silent sync inicial si el usuario ya estaba conectado.
+
+`src/ui/state/cadenciaStore.ts`: single source of truth en `localStorage` con la key `cadencia:data:v1`. Cada `updateSection` bumpea el meta de la sección y dispara el evento `cadencia-data-saved` que el motor de sync observa.
+
+`src/ui/components/sync/`: `GoogleSyncCard` (botón conectar/desconectar) y `SyncStatusBadge` (indicador de salud).
+
+### Endpoints Drive API usados
+
+```http
+GET  /drive/v3/files?spaces=appDataFolder&q=name='cadencia_data.json'   # findFile
+GET  /drive/v3/files/{id}?alt=media                                      # readFile
+GET  /drive/v3/files/{id}?fields=id,version,modifiedTime                 # getFileMetadata (poll)
+POST /upload/drive/v3/files?uploadType=multipart                         # createFile
+PATCH /upload/drive/v3/files/{id}?uploadType=multipart                   # updateFile
+```
+
+Scope: `https://www.googleapis.com/auth/drive.appdata` (no requiere verificación de Google porque es "non-sensitive").
+
+### Configuración del Client ID Google
+
+Se configura por `.env.local`:
+
+```
+VITE_GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
+```
+
+Pasos:
+1. https://console.cloud.google.com/apis/credentials → Create Credentials → OAuth client ID → Web application.
+2. Authorized JavaScript origins: `http://127.0.0.1:5173` (dev) y `https://cadencia.movimientofuncional.app` (prod).
+3. Authorized redirect URIs: ninguno (GIS usa popup, no redirect).
+4. OAuth consent screen: añadir scope `https://www.googleapis.com/auth/drive.appdata`. App publishing puede quedarse en "Testing" — el scope es non-sensitive y no necesita verificación.
+5. Copiar el Client ID al `.env.local`.
+
+**Sin Client Secret**: PKCE no lo necesita (igual que Spotify). Aunque Google lo muestre, no debe meterse en `.env.local` con prefijo `VITE_*` — acabaría visible en el bundle JS público.
+
+**`127.0.0.1` no `localhost`**: por consistencia con Spotify (Spotify lo exige; Google es más laxo pero conviene unificar).
 
 ---
 
