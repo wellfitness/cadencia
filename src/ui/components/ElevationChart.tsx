@@ -12,6 +12,7 @@ import {
 import type { HeartRateZone, KarvonenZoneRange } from '@core/physiology/karvonen';
 import type { ClassifiedSegment } from '@core/segmentation';
 import { ZoneBadge } from './ZoneBadge';
+import { ZONE_LABEL_SHORT } from './zoneLabels';
 
 export interface ElevationChartProps {
   segments: readonly ClassifiedSegment[];
@@ -31,17 +32,9 @@ const ZONE_FILL: Record<HeartRateZone, string> = {
   3: '#eab308',
   4: '#f97316',
   5: '#ef4444',
-  6: '#7c2d12',
+  6: '#7e22ce',
 };
 
-const ZONE_LABEL: Record<HeartRateZone, string> = {
-  1: 'Recuperación',
-  2: 'Aeróbico',
-  3: 'Tempo',
-  4: 'Umbral',
-  5: 'Muros',
-  6: 'Sprint',
-};
 
 /**
  * Perfil de elevacion con bandas verticales coloreadas por zona de potencia.
@@ -186,7 +179,7 @@ export function ElevationChart({
                       {Math.round(s.endElevationMeters - s.startElevationMeters)}
                     </td>
                     <td className="px-2 py-1.5">
-                      <ZoneBadge zone={s.zone} label={ZONE_LABEL[s.zone]} size="sm" />
+                      <ZoneBadge zone={s.zone} label={ZONE_LABEL_SHORT[s.zone]} size="sm" />
                     </td>
                     <td className="px-2 py-1.5 tabular-nums">
                       {Math.round(s.avgPowerWatts)}
@@ -246,7 +239,7 @@ function ChartTooltip({
       {segment && (
         <div className="flex flex-col gap-1 pt-1 border-t border-gris-100">
           <div className="flex items-center gap-2">
-            <ZoneBadge zone={segment.zone} label={ZONE_LABEL[segment.zone]} size="sm" />
+            <ZoneBadge zone={segment.zone} label={ZONE_LABEL_SHORT[segment.zone]} size="sm" />
             <span className="text-gris-700 font-medium tabular-nums">
               {Math.round(segment.avgPowerWatts)} W
             </span>

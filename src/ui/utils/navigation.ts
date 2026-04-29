@@ -41,10 +41,16 @@ export function usePathname(): string {
  *
  * Marca cada entrada con un sentinel en `history.state` para que
  * `navigateBack` distinga rutas creadas dentro de la app de las externas.
+ *
+ * Resetea el scroll al inicio: a diferencia de un click `<a>` clasico,
+ * `pushState` no toca la posicion. El reset se hace despues del pushState
+ * para que la entry previa conserve su scroll y el back del navegador lo
+ * restaure (history.scrollRestoration = 'auto' por defecto).
  */
 export function navigateInApp(path: string): void {
   if (typeof window === 'undefined') return;
   window.history.pushState(IN_APP_STATE, '', path);
+  window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 

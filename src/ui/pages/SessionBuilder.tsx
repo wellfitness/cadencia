@@ -22,6 +22,7 @@ import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
+import { navigateInApp } from '@ui/utils/navigation';
 import { ZoneTimelineChart } from '@ui/components/ZoneTimelineChart';
 import { BlockList, type PhysioContext } from '@ui/components/session-builder/BlockList';
 import { TemplateGallery } from '@ui/components/session-builder/TemplateGallery';
@@ -222,7 +223,7 @@ export function SessionBuilder({
         onChange(result.plan);
         if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
         setImportNotice(
-          `Workout "${result.plan.name}" importado. Revisa los bloques antes de continuar — ZWO no preserva si cada bloque era llano, escalada o sprint.`,
+          `Sesión "${result.plan.name}" importada. Revisa los bloques antes de continuar — ZWO no preserva si cada bloque era llano, escalada o sprint.`,
         );
       };
       reader.onerror = (): void => {
@@ -277,7 +278,7 @@ export function SessionBuilder({
     navigator
       .share({
         title: state.plan.name,
-        text: `Workout «${state.plan.name}» creado con Cadencia`,
+        text: `Sesión «${state.plan.name}» creada con Cadencia`,
         files: [file],
       })
       .catch(() => {
@@ -332,10 +333,25 @@ export function SessionBuilder({
 
   return (
     <WizardStep maxWidth="max-w-3xl">
-      <WizardStepHeading
-        title="Construye tu sesión"
-        subtitle="Parte de una plantilla científica o crea tu propia secuencia de bloques."
-      />
+      <div className="flex items-start justify-between gap-3 mb-3 md:mb-4">
+        <WizardStepHeading
+          title="Construye tu sesión"
+          subtitle="Parte de una plantilla científica o crea tu propia secuencia de bloques."
+          className="mb-0 flex-1 min-w-0"
+        />
+        <a
+          href="/ayuda/sesion-indoor"
+          onClick={(e) => {
+            e.preventDefault();
+            navigateInApp('/ayuda/sesion-indoor');
+          }}
+          aria-label="Abrir centro de ayuda"
+          title="Centro de ayuda"
+          className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-full text-turquesa-600 hover:bg-turquesa-50 transition-colors"
+        >
+          <MaterialIcon name="help_outline" size="medium" decorative />
+        </a>
+      </div>
       <Card title="Tu sesión indoor" titleIcon="fitness_center">
         <label className="block mb-4">
           <span className="text-xs font-semibold text-gris-700 mb-1 block">Nombre de la sesión</span>
@@ -454,7 +470,7 @@ function FooterActions({
               size="sm"
               iconLeft="share"
               onClick={onShare}
-              aria-label="Compartir workout .zwo"
+              aria-label="Compartir sesión .zwo"
               title="Compartir .zwo (WhatsApp, Mail, Drive…)"
             />
           )}
@@ -464,7 +480,7 @@ function FooterActions({
               size="sm"
               iconLeft="download"
               onClick={onExport}
-              aria-label="Descargar workout en formato .zwo"
+              aria-label="Descargar sesión en formato .zwo"
               title="Descargar para Zwift / TrainingPeaks Virtual / TrainerRoad / Wahoo SYSTM"
             >
               .zwo

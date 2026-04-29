@@ -3,6 +3,7 @@ import type {
   KarvonenZoneRange,
   PowerZoneRange,
 } from '@core/physiology';
+import { getRecommendedCadence, type CadenceProfile } from '@core/segmentation';
 
 /**
  * Devuelve "min-max bpm" para la zona pedida, o null si no hay datos Karvonen
@@ -34,4 +35,18 @@ export function formatWattsRange(
   if (range.minWatts === 0) return `<${Math.round(range.maxWatts)} W`;
   if (!Number.isFinite(range.maxWatts)) return `>${Math.round(range.minWatts)} W`;
   return `${Math.round(range.minWatts)}-${Math.round(range.maxWatts)} W`;
+}
+
+/**
+ * Devuelve "min-max rpm" para la cadencia recomendada al ciclista en la
+ * combinacion (zona, profile). A diferencia de bpm/W, esta informacion no
+ * depende de los datos del usuario, solo de la zona y el profile, asi que
+ * siempre devuelve un string (nunca null).
+ */
+export function formatRecommendedCadence(
+  zone: HeartRateZone,
+  profile: CadenceProfile,
+): string {
+  const range = getRecommendedCadence(zone, profile);
+  return `${range.min}-${range.max} rpm`;
 }

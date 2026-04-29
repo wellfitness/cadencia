@@ -1,22 +1,13 @@
 import { useRef } from 'react';
 import {
   calculateTotalDurationSec,
-  expandSessionPlan,
   SESSION_TEMPLATES,
   type SessionTemplate,
 } from '@core/segmentation';
-import type { HeartRateZone } from '@core/physiology/karvonen';
 import { MaterialIcon } from '../MaterialIcon';
 import { Button } from '../Button';
-
-const ZONE_BG_BAR: Record<HeartRateZone, string> = {
-  1: 'bg-zone-1',
-  2: 'bg-zone-2',
-  3: 'bg-zone-3',
-  4: 'bg-zone-4',
-  5: 'bg-zone-5',
-  6: 'bg-zone-6',
-};
+import { buildIntensityBars, ZONE_BG_BAR } from '../help/intensityBars';
+import { navigateInApp } from '@ui/utils/navigation';
 
 export interface TemplateGalleryProps {
   /** ID de la plantilla actualmente cargada (para resaltarla). */
@@ -36,6 +27,10 @@ const TEMPLATE_ICONS: Record<string, string> = {
   'hiit-10-20-30': 'local_fire_department',
   'noruego-4x4': 'trending_up',
   'zona2-continuo': 'favorite',
+  'tempo-mlss': 'speed',
+  'umbral-progresivo': 'show_chart',
+  'vo2max-cortos': 'rocket_launch',
+  'recuperacion-activa': 'self_improvement',
 };
 
 /**
@@ -96,6 +91,18 @@ export function TemplateGallery({
           )}
         </div>
       </header>
+      <a
+        href="/ayuda/plantillas"
+        onClick={(e) => {
+          e.preventDefault();
+          navigateInApp('/ayuda/plantillas');
+        }}
+        className="inline-flex items-center gap-1.5 text-xs md:text-sm text-turquesa-600 hover:text-turquesa-700 transition-colors"
+      >
+        <MaterialIcon name="help_outline" size="small" decorative />
+        ¿Qué plantilla elegir? Consulta la guía
+        <MaterialIcon name="arrow_forward" size="small" decorative />
+      </a>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
         {SESSION_TEMPLATES.map((template) => (
           <TemplateCard
@@ -172,29 +179,3 @@ function TemplateCard({ template, active, onSelect }: TemplateCardProps): JSX.El
   );
 }
 
-/**
- * Construye una representacion en N segmentos de la composicion de zonas de
- * una plantilla. Cada segmento toma la zona del bloque que cae en su tramo
- * temporal, dando una vista visual del progreso de intensidad.
- */
-function buildIntensityBars(template: SessionTemplate, n: number): HeartRateZone[] {
-  const expanded = expandSessionPlan({ name: template.name, items: [...template.items] });
-  const totalSec = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
-  if (totalSec === 0) return [];
-  const segLen = totalSec / n;
-  const result: HeartRateZone[] = [];
-  for (let i = 0; i < n; i++) {
-    const tMid = segLen * (i + 0.5);
-    let cursor = 0;
-    let zone: HeartRateZone = 1;
-    for (const b of expanded.blocks) {
-      if (tMid < cursor + b.durationSec) {
-        zone = b.zone;
-        break;
-      }
-      cursor += b.durationSec;
-    }
-    result.push(zone);
-  }
-  return result;
-}

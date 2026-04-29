@@ -46,6 +46,30 @@
       href="https://fonts.googleapis.com/css2?family=ABeeZee:ital@0;1&family=Righteous&display=swap"
     />
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+
+    <!--
+      Preload del hero (LCP target). Art-direction: cada navegador descarga
+      solo la variante que matchea su breakpoint, no ambas.
+      - <768px → vertical 9:16
+      - ≥768px → panorámica 16:9
+      Con fetchpriority="high" en el <img> del HeroVisual, el navegador prioriza
+      esta descarga frente a otros assets no críticos (fuentes externas, JS).
+    -->
+    <link
+      rel="preload"
+      as="image"
+      href="/hero_cadencia_movil.webp"
+      type="image/webp"
+      media="(max-width: 767px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/hero_cadencia.webp"
+      type="image/webp"
+      media="(min-width: 768px)"
+    />
+
     <title>Cadencia — para ciclistas con ritmo</title>
 
     <!-- Structured data: WebApplication -->

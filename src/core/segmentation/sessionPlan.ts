@@ -105,7 +105,15 @@ export interface SessionPlan {
   blocks: SessionBlock[];
 }
 
-export type SessionTemplateId = 'sit' | 'hiit-10-20-30' | 'noruego-4x4' | 'zona2-continuo';
+export type SessionTemplateId =
+  | 'sit'
+  | 'hiit-10-20-30'
+  | 'noruego-4x4'
+  | 'zona2-continuo'
+  | 'tempo-mlss'
+  | 'umbral-progresivo'
+  | 'vo2max-cortos'
+  | 'recuperacion-activa';
 
 export interface SessionTemplate {
   id: SessionTemplateId;

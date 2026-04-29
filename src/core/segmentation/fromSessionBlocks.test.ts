@@ -236,3 +236,143 @@ describe('SESSION_TEMPLATES integracion', () => {
     expect(total).toBe(2100);
   });
 });
+
+/**
+ * Tests del preprocesado coalescing + detectIntervalSets aplicado dentro de
+ * classifySessionPlan. Garantiza que las plantillas interválicas se reducen
+ * a macrobloques de zona alta (resolviendo el caso "track de recuperacion
+ * sonando en intervalo Z4/Z5/Z6") y que las plantillas no interválicas
+ * conservan su estructura original.
+ *
+ * La duracion total del plan SIEMPRE debe preservarse (los preprocesados
+ * suman, nunca descartan tiempo).
+ */
+describe('classifySessionPlan — preprocesado para plantillas reales', () => {
+  it('SIT: el set se fusiona en 1 macrobloque Z6 sprint, warmup y cooldown intactos', () => {
+    const sit = SESSION_TEMPLATES.find((t) => t.id === 'sit')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...sit.items] });
+    const totalOriginal = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[0]?.zone).toBe(2); // warmup
+    expect(segments[1]?.zone).toBe(6); // macrobloque
+    expect(segments[1]?.cadenceProfile).toBe('sprint');
+    expect(segments[1]?.durationSec).toBe(6 * (30 + 4 * 60)); // 1620
+    expect(segments[2]?.zone).toBe(1); // cooldown
+
+    const totalClassified = segments.reduce((acc, s) => acc + s.durationSec, 0);
+    expect(totalClassified).toBe(totalOriginal);
+  });
+
+  it('HIIT 10-20-30: el set se fusiona en 1 macrobloque Z6 sprint', () => {
+    const hiit = SESSION_TEMPLATES.find((t) => t.id === 'hiit-10-20-30')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...hiit.items] });
+    const totalOriginal = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[0]?.zone).toBe(2); // warmup
+    expect(segments[1]?.zone).toBe(6); // macrobloque sprint
+    expect(segments[1]?.cadenceProfile).toBe('sprint');
+    expect(segments[1]?.durationSec).toBe(4 * 5 * (30 + 20 + 10)); // 1200
+    expect(segments[2]?.zone).toBe(1); // cooldown
+
+    const totalClassified = segments.reduce((acc, s) => acc + s.durationSec, 0);
+    expect(totalClassified).toBe(totalOriginal);
+  });
+
+  it('VO2max Cortos: el set se fusiona en 1 macrobloque Z5 climb', () => {
+    const vo2 = SESSION_TEMPLATES.find((t) => t.id === 'vo2max-cortos')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...vo2.items] });
+    const totalOriginal = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[0]?.zone).toBe(2); // warmup
+    expect(segments[1]?.zone).toBe(5); // macrobloque climb
+    expect(segments[1]?.cadenceProfile).toBe('climb');
+    expect(segments[1]?.durationSec).toBe(6 * (2 * 60 + 90)); // 1260
+    expect(segments[2]?.zone).toBe(1); // cooldown
+
+    const totalClassified = segments.reduce((acc, s) => acc + s.durationSec, 0);
+    expect(totalClassified).toBe(totalOriginal);
+  });
+
+  it('Noruego 4×4: NO se fusiona (work=240 ≥ 180), conserva estructura alterna', () => {
+    const nor = SESSION_TEMPLATES.find((t) => t.id === 'noruego-4x4')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...nor.items] });
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    // 1 warmup + 4 × (work + recovery) + 1 cooldown = 10 segments
+    expect(segments).toHaveLength(10);
+    // Alternancia Z4/Z2 dentro del set
+    expect(segments[1]?.zone).toBe(4);
+    expect(segments[2]?.zone).toBe(2);
+    expect(segments[3]?.zone).toBe(4);
+    expect(segments[4]?.zone).toBe(2);
+  });
+
+  it('Tempo MLSS: NO se fusiona (Z3 < 4 y work=720 ≥ 180)', () => {
+    const tempo = SESSION_TEMPLATES.find((t) => t.id === 'tempo-mlss')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...tempo.items] });
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    // 1 warmup + 3 × (work + recovery) + 1 cooldown = 8 segments
+    expect(segments).toHaveLength(8);
+    expect(segments[1]?.zone).toBe(3);
+    expect(segments[2]?.zone).toBe(2);
+  });
+
+  it('Umbral Progresivo: NO se fusiona (work=300 ≥ 180)', () => {
+    const umbral = SESSION_TEMPLATES.find((t) => t.id === 'umbral-progresivo')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...umbral.items] });
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    // 1 warmup + 5 × (work + recovery) + 1 cooldown = 12 segments
+    expect(segments).toHaveLength(12);
+    expect(segments[1]?.zone).toBe(4);
+    expect(segments[2]?.zone).toBe(2);
+  });
+
+  it('Z2 Continuo: NO se fusiona, conserva 3 bloques', () => {
+    const z2 = SESSION_TEMPLATES.find((t) => t.id === 'zona2-continuo')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...z2.items] });
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[1]?.zone).toBe(2);
+    expect(segments[1]?.durationSec).toBe(60 * 60);
+  });
+
+  it('Recuperacion Activa: NO se fusiona, conserva 3 bloques', () => {
+    const recup = SESSION_TEMPLATES.find((t) => t.id === 'recuperacion-activa')!;
+    const expanded = expandSessionPlan({ name: 'x', items: [...recup.items] });
+
+    const segments = classifySessionPlan(expanded, userWithFtp);
+
+    expect(segments).toHaveLength(3);
+  });
+
+  it('coalescing: 3 bloques contiguos Z2 flat warmup → 1 segmento Z2 flat', () => {
+    const plan = expandSessionPlan({
+      name: 'x',
+      items: [
+        { type: 'block', block: { id: 'a', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 60 } },
+        { type: 'block', block: { id: 'b', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 60 } },
+        { type: 'block', block: { id: 'c', phase: 'warmup', zone: 2, cadenceProfile: 'flat', durationSec: 60 } },
+      ],
+    });
+    const segments = classifySessionPlan(plan, userWithFtp);
+    expect(segments).toHaveLength(1);
+    expect(segments[0]?.durationSec).toBe(180);
+    expect(segments[0]?.zone).toBe(2);
+  });
+});

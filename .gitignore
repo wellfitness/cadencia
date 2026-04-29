@@ -66,3 +66,10 @@ scripts/.backup/
 # deban entrar al repo.
 /CICLO INDOOR Y PROGRESIONES - CICLO INDOOR.pdf
 /Julio_3.csv
+CICLO INDOOR Y PROGRESIONES.xlsx
+
+# Originales de assets grandes en raiz (5-7 MB cada PNG). El asset que
+# sirve la app son los .webp optimizados de public/. Los originales se
+# regeneran/optimizan con scripts/generate-assets.py.
+/hero_cadencia.png
+/hero_cadencia_movil.png

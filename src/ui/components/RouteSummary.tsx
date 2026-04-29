@@ -4,6 +4,7 @@ import { Card } from './Card';
 import { MaterialIcon } from './MaterialIcon';
 import { ZoneBadge } from './ZoneBadge';
 import { ZoneStackedBar } from './ZoneStackedBar';
+import { ZONE_LABEL_SHORT } from './zoneLabels';
 
 export interface RouteSummaryProps {
   meta: RouteMeta;
@@ -11,15 +12,6 @@ export interface RouteSummaryProps {
   karvonenZones?: readonly KarvonenZoneRange[];
   className?: string;
 }
-
-const ZONE_LABEL: Record<HeartRateZone, string> = {
-  1: 'Recuperación',
-  2: 'Aeróbico',
-  3: 'Tempo',
-  4: 'Umbral',
-  5: 'Muros',
-  6: 'Sprint',
-};
 
 const ZONE_BAR_BG: Record<HeartRateZone, string> = {
   1: 'bg-zone-1',
@@ -147,7 +139,7 @@ export function RouteSummary({
               <li key={z} className={liClass}>
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="sm:w-36 shrink-0">
-                    <ZoneBadge zone={z} label={ZONE_LABEL[z]} size="sm" />
+                    <ZoneBadge zone={z} label={ZONE_LABEL_SHORT[z]} size="sm" />
                   </div>
                   {karvonenZones && (
                     <div className="sm:w-24 shrink-0 text-xs text-gris-500 tabular-nums whitespace-nowrap">

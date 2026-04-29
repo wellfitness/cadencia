@@ -251,7 +251,7 @@ Se trabaja con **6 zonas** (Z1-Z6 lineales, sin sub-zonas), siguiendo el estánd
 | Z3 | Tempo / MLSS | 75-90% | 70-80% | flat **o** climb | 0.70 | 0.55 | amarillo `#eab308` |
 | Z4 | Potencia umbral / VT2 | 90-105% | 80-90% | flat **o** climb | 0.80 | 0.60 | naranja `#f97316` |
 | Z5 | VT2 / PAM (muros) | 105-120% | 90-100% | climb (fijo) | 0.90 | 0.65 | rojo `#ef4444` |
-| Z6 | Supramáxima (sprint) | >120% | (FC saturada) | sprint (fijo) | 0.95 | 0.70 | carmesí `#7c2d12` |
+| Z6 | Supramáxima (sprint) | >120% | (FC saturada) | sprint (fijo) | 0.95 | 0.70 | morado `#7e22ce` |
 
 Tracks con `energy`/`valence` lejos del ideal puntúan más bajo pero siguen siendo elegibles. El motor maximiza el score conjunto.
 

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Button } from '@ui/components/Button';
-import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { SiteFooter } from '@ui/components/SiteFooter';
 import { BetaAccessModal } from '@ui/components/BetaAccessModal';
 import { usePwaInstall } from '@ui/state/usePwaInstall';
+import { navigateInApp } from '@ui/utils/navigation';
 
 export interface LandingProps {
   onStart: () => void;
@@ -22,7 +22,8 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
   return (
     <div className="min-h-full flex flex-col bg-white">
       <main className="flex-1">
-        <Hero onTry={openModal} />
+        <HeroVisual onTry={openModal} />
+        <Intro />
         <HowItWorks />
         <InteropZwo />
         <PersonalizedRanges />
@@ -41,79 +42,253 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
   );
 }
 
-function Hero({ onTry }: { onTry: () => void }): JSX.Element {
+/**
+ * HeroVisual: imagen full-bleed (panorámica en md+, vertical en <md) con un
+ * H1 sr-only para SEO/lectores de pantalla y un único CTA "Probar aplicación"
+ * superpuesto. La imagen ya contiene texto pintado ("Cadencia / para ciclistas
+ * con ritmo / Tu plan / Tu intensidad / Tu música") y el mockup holográfico
+ * sobre el manillar; ese contenido NO se duplica en HTML.
+ *
+ * Art-direction con <picture>: cada breakpoint descarga solo su variante.
+ * El <img> es decoración (alt="" + aria-hidden), eager + fetchpriority="high"
+ * + decoding="async" para optimizar LCP.
+ *
+ * Posición del botón:
+ * - Mobile (vertical 9:16): mitad inferior, centrado horizontal — encaja con
+ *   el espacio bajo el texto pintado.
+ * - Desktop (panorámica 16:9): inferior izquierda, alineado con la columna
+ *   donde está el texto pintado.
+ *
+ * Ajuste fino (porcentajes) puede requerir tuning visual una vez se ve la
+ * página renderizada — los valores de partida están calibrados para que el
+ * CTA caiga sobre la zona despejada de las imágenes.
+ */
+function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
+  return (
+    <section
+      aria-labelledby="hero-title"
+      className="relative w-full overflow-hidden bg-gris-100"
+    >
+      {/* H1 real, oculto visualmente (la imagen ya muestra la marca pintada).
+          Único H1 de la página: SEO + lectores de pantalla. */}
+      <h1 id="hero-title" className="sr-only">
+        Cadencia: listas de Spotify sincronizadas con tu ruta GPX o sesión de ciclo indoor
+      </h1>
+
+      {/* Imagen responsive con art-direction.
+          - aspect-[9/16] en mobile cubre el viewport vertical sin estirar.
+          - aspect-[16/9] en md+ sin override de altura: el contenedor
+            adopta exactamente el ratio de la imagen panorámica, así
+            con object-cover no hay recortes laterales (tablet portrait,
+            que antes sufría min-h-[520px]) ni verticales (xl/2xl con
+            h-[640px] o max-h-[80vh] forzando ratios distintos del 16:9). */}
+      <div className="relative w-full aspect-[9/16] md:aspect-[16/9]">
+        <picture>
+          <source media="(min-width: 768px)" srcSet="/hero_cadencia.webp" type="image/webp" />
+          <img
+            src="/hero_cadencia_movil.webp"
+            alt=""
+            aria-hidden="true"
+            loading="eager"
+            // fetchPriority es válido en React 18+ aunque TS quizá no lo
+            // tipice; con casing camelCase pasa el JSX-attr genérico.
+            fetchPriority="high"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        </picture>
+
+        {/* Chips de beneficios SOLO en desktop (lg+ ≥1024px): cápsulas
+            con fondo blanco translúcido + backdrop-blur para legibilidad
+            sobre cualquier zona de la imagen. Anclados en la esquina
+            inferior derecha; el CTA vive en la inferior izquierda con
+            simétrico padding, así ambos cierran la composición a la misma
+            altura vertical en bordes opuestos y liberan la franja superior
+            para el texto pintado de la imagen.
+
+            En mobile y tablet (<lg) los chips no caben limpios sobre la
+            imagen — en mobile la imagen vertical compite con el texto
+            pintado, y en tablet la panorámica reduce el aire útil para
+            overlay (HUD holográfico + manillar comen casi todo el ancho).
+            En esos breakpoints los chips se renderizan al inicio de la
+            sección Intro como tira contigua a la imagen. */}
+        <ul
+          aria-label="Beneficios de Cadencia"
+          className="absolute hidden lg:flex right-[10%] bottom-[10%] flex-nowrap justify-end gap-2"
+        >
+          <li className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-md">
+            <MaterialIcon name="favorite" size="small" className="text-turquesa-600" />
+            <span className="text-xs sm:text-sm font-semibold text-gris-800">Más adherencia</span>
+          </li>
+          <li className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-md">
+            <MaterialIcon name="mood" size="small" className="text-turquesa-600" />
+            <span className="text-xs sm:text-sm font-semibold text-gris-800">Más disfrute</span>
+          </li>
+          <li className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-md">
+            <MaterialIcon name="trending_up" size="small" className="text-turquesa-600" />
+            <span className="text-xs sm:text-sm font-semibold text-gris-800">Más rendimiento</span>
+          </li>
+        </ul>
+
+        {/* Overlay gradient sutil sobre la mitad inferior de la imagen para
+            garantizar contraste WCAG AA del CTA + microcopy con independencia
+            del recorte de `object-cover` en cada viewport. No afecta a los
+            chips top (cielo, sin overlay) ni intercepta clicks. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none"
+        />
+
+        {/* CTA + microcopy en bloque inferior. Microcopy debajo del botón
+            como reaffirmation de bajo coste de entrada. Texto en blanco con
+            drop-shadow porque el fondo (manillar / paisaje en sombra) varía,
+            reforzado por el overlay gradient anterior. */}
+        <div className="absolute inset-x-0 bottom-[8%] flex flex-col items-center gap-3 md:bottom-[10%] md:items-start md:pl-[8%] lg:pl-[10%]">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={onTry}
+            iconRight="arrow_forward"
+            aria-label="Probar aplicación de Cadencia"
+            className="shadow-2xl ring-2 ring-white/60"
+          >
+            Probar aplicación
+          </Button>
+          <p className="text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
+            Gratis. Sin registro. Sin servidor.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Intro: bloque inmediatamente bajo el HeroVisual. NO duplica el logo, los
+ * marcos editoriales ni el "Tu plan. Tu intensidad. Tu música." porque la
+ * imagen del HeroVisual ya muestra esos elementos pintados. Aquí va solo el
+ * contenido que añade información nueva: párrafo descriptivo, chips de
+ * beneficios, botón "Instalar app" (PWA) condicional, microcopy y el
+ * HeroMockup (card con altimetría y tracks, output real del producto).
+ *
+ * El H2 se mantiene en sr-only para conservar jerarquía DOM (SEO + lectores
+ * de pantalla) sin contaminar la vista — el ojo del usuario no necesita un
+ * título encima del párrafo cuando viene de un Hero visualmente cargado.
+ *
+ * El botón "Instalar app" (PWA) vive aquí, no en el HeroVisual: en el Hero
+ * solo queremos un CTA dominante (Probar aplicación). Al moverlo a Intro,
+ * mantenemos la opción de instalación visible sin saturar la imagen ni
+ * solapar el mockup holográfico en mobile.
+ */
+function Intro(): JSX.Element {
   const { canInstall, installing, install } = usePwaInstall();
 
   return (
     <section
-      aria-labelledby="hero-title"
-      className="bg-white"
+      aria-labelledby="intro-title"
+      className="relative bg-white"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 pt-4 pb-10 md:pt-6 md:pb-16">
-        {/* Marco editorial: linea discontinua arriba del bloque de marca */}
-        <div
-          aria-hidden="true"
-          className="mx-auto mb-6 h-1 max-w-4xl"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(to right, #9ca3af 0 28px, transparent 28px 44px)',
-          }}
-        />
-
-        {/* Logo + wordmark horizontal centrado */}
-        <div className="flex justify-center mb-6">
-          <Logo variant="full" size="xl" orientation="horizontal" tinted />
-        </div>
-
-        {/* Marco editorial: linea discontinua bajo el bloque de marca */}
-        <div
-          aria-hidden="true"
-          className="mx-auto mb-8 md:mb-12 h-1 max-w-4xl"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(to right, #9ca3af 0 28px, transparent 28px 44px)',
-          }}
-        />
+      <div className="mx-auto w-full max-w-6xl px-4 pt-6 pb-10 md:pt-14 md:pb-16">
+        {/* Chips de beneficios en mobile y tablet (<lg): el HeroVisual los
+            esconde porque sobre la imagen compiten con el texto pintado y
+            el HUD holográfico (especialmente en tablets, donde la imagen
+            panorámica reduce el espacio útil para overlay). Aquí, sobre
+            fondo blanco, ya no necesitan backdrop-blur: simples cápsulas
+            turquesa-50 con borde sutil. Pegados al límite superior de
+            Intro para que se sientan continuación visual del Hero. */}
+        <ul
+          aria-label="Beneficios de Cadencia"
+          className="lg:hidden flex flex-wrap justify-center gap-2 mb-8"
+        >
+          <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
+            <MaterialIcon name="favorite" size="small" className="text-turquesa-600" />
+            <span className="text-sm font-semibold text-gris-800">Más adherencia</span>
+          </li>
+          <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
+            <MaterialIcon name="mood" size="small" className="text-turquesa-600" />
+            <span className="text-sm font-semibold text-gris-800">Más disfrute</span>
+          </li>
+          <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
+            <MaterialIcon name="trending_up" size="small" className="text-turquesa-600" />
+            <span className="text-sm font-semibold text-gris-800">Más rendimiento</span>
+          </li>
+        </ul>
 
         <div className="grid lg:grid-cols-[1.1fr,1fr] gap-8 lg:gap-12 items-center">
           <div className="text-center lg:text-left">
-            {/* H1 con remate cromatico en la ultima frase */}
-            <h1
-              id="hero-title"
-              className="font-display text-4xl md:text-6xl leading-tight mb-6"
+            {/* H2 visible (no sr-only): el bloque necesita un título para
+                competir visualmente con el HeroMockup denso de la columna
+                derecha. El copy NO repite "Tu plan / Tu intensidad / Tu
+                música" (eso ya está pintado en la imagen del Hero); estrena
+                un ángulo nuevo: la sincronía como diferenciador. */}
+            <h2
+              id="intro-title"
+              className="font-display text-3xl md:text-4xl text-gris-800 mb-5"
             >
-              <span className="block text-turquesa-600">Tu plan. </span>
-              <span className="block text-rosa-600">Tu intensidad.</span>
-              <span className="block text-tulipTree-500">Tu música.</span>
-            </h1>
+              Música que sigue <span className="text-turquesa-600">cada cambio de intensidad</span>.
+            </h2>
 
-            <p className="text-lg md:text-xl text-gris-700 max-w-2xl lg:mx-0 mx-auto mb-6">
-              Sube un GPX de tu ruta o construye tu sesión indoor por bloques.
-              La app te genera una playlist de Spotify donde cada canción encaja
-              con la intensidad real de cada tramo. Puedes exportar tu sesión a Zwift,
-              TrainingPeaks Virtual y otros simuladores.
-            </p>
-
-            <ul className="flex flex-wrap justify-center lg:justify-start gap-3 md:gap-6 mb-8 text-gris-700">
-              <li className="flex items-center gap-2">
-                <MaterialIcon name="favorite" className="text-turquesa-600" />
-                <span className="font-semibold">Más adherencia</span>
+            {/* Tres rasgos clave del producto en lista escaneable: input
+                flexible, matching musical, export a simuladores. Mejor que un
+                párrafo de 3 frases para lectura en mobile y desktop — el ojo
+                detecta cada bloque por su icono. Las viñetas se alinean a la
+                izquierda incluso cuando el bloque está centrado en mobile,
+                porque las listas con texto centrado se leen peor (los ojos
+                pierden el origen de cada línea). */}
+            <ul className="space-y-3 mb-6 max-w-xl mx-auto lg:mx-0 text-left">
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="route" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Sube un GPX o construye tu sesión indoor por bloques.</span>
               </li>
-              <li className="flex items-center gap-2">
-                <MaterialIcon name="mood" className="text-turquesa-600" />
-                <span className="font-semibold">Más disfrute</span>
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="music_note" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Cada canción encaja con la intensidad real de cada tramo.</span>
               </li>
-              <li className="flex items-center gap-2">
-                <MaterialIcon name="trending_up" className="text-turquesa-600" />
-                <span className="font-semibold">Más rendimiento</span>
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="import_export" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Compatible con Zwift, TrainingPeaks Virtual y otros simuladores (.zwo).</span>
               </li>
             </ul>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start items-center">
-              <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
-                Probar aplicación
-              </Button>
-              {canInstall ? (
+            {/* Plantillas científicas listas para usar — argumento de
+                seriedad técnica (no es una "lista al azar", hay
+                literatura detrás). Mostramos 4 nombres reconocibles + "y más"
+                con salida al centro de ayuda nuevo, donde el artículo de
+                /ayuda/plantillas explica cuándo usar cada una. Misma técnica
+                editorial con middots que la lista de "Compatible con" en
+                InteropZwo, para coherencia visual. */}
+            <p className="text-sm text-gris-600 mb-2 max-w-xl mx-auto lg:mx-0">
+              <span className="text-xs font-semibold uppercase tracking-wider text-gris-500 mr-2">
+                8 plantillas con base científica:
+              </span>
+              <strong className="font-semibold text-gris-800">SIT</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <strong className="font-semibold text-gris-800">HIIT 10-20-30</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <strong className="font-semibold text-gris-800">Noruego 4×4</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <strong className="font-semibold text-gris-800">VO2max</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <span>y más</span>
+            </p>
+            <a
+              href="/ayuda/plantillas"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateInApp('/ayuda/plantillas');
+              }}
+              className="inline-flex items-center gap-1 mb-6 font-semibold text-turquesa-600 hover:text-turquesa-700 transition-colors"
+            >
+              Ver todas las plantillas
+              <MaterialIcon name="arrow_forward" size="small" decorative />
+            </a>
+
+            {/* CTA secundario: Instalar app (PWA). Solo aparece si el
+                navegador expone el prompt de instalación. El CTA primario
+                "Probar aplicación" vive en el HeroVisual; aquí no se duplica
+                para no canibalizar conversión. */}
+            {canInstall ? (
+              <div className="flex justify-center lg:justify-start">
                 <Button
                   variant="secondary"
                   size="lg"
@@ -125,17 +300,16 @@ function Hero({ onTry }: { onTry: () => void }): JSX.Element {
                 >
                   Instalar app
                 </Button>
-              ) : null}
-            </div>
-            <p className="text-sm text-gris-500 mt-3 text-center lg:text-left">
-              Gratis. Sin cuenta. Sin servidor.
-            </p>
+              </div>
+            ) : null}
           </div>
 
-          {/* Mock visual del producto: solo se muestra a partir de lg para no
-              comer espacio en mobile/tablet (el hero ya tiene mucha densidad). */}
-          <div className="hidden lg:flex justify-center">
-            <HeroMockup />
+          {/* HeroMockup: en mobile/tablet bajo el texto, en desktop columna
+              derecha. Mismo componente que antes, sin cambios. */}
+          <div className="flex justify-center mt-10 lg:mt-0 w-full">
+            <div className="w-full max-w-sm sm:max-w-md">
+              <HeroMockup />
+            </div>
           </div>
         </div>
       </div>
@@ -152,7 +326,7 @@ function HeroMockup(): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="relative w-full max-w-md transform rotate-1 transition-transform duration-300 hover:rotate-0"
+      className="relative w-full max-w-md transform rotate-0 sm:rotate-1 transition-transform duration-300 hover:rotate-0"
     >
       <div className="bg-white rounded-2xl shadow-xl border border-gris-200 p-5 md:p-6 space-y-4">
         <header className="flex items-center justify-between">
@@ -297,7 +471,7 @@ function HowItWorks(): JSX.Element {
         >
           Cómo funciona
         </h2>
-        <ol className="grid md:grid-cols-3 gap-6 md:gap-8 list-none">
+        <ol className="grid md:grid-cols-3 gap-6 md:gap-8 list-none pt-2">
           <StepCard
             num={1}
             icon="person"
@@ -314,7 +488,7 @@ function HowItWorks(): JSX.Element {
             num={3}
             icon="music_note"
             title="Tu música"
-            desc="Generamos una playlist de Spotify donde el BPM y la energía de cada canción se ajustan a la intensidad de cada tramo."
+            desc="Generamos una lista de Spotify donde el BPM y la energía de cada canción se ajustan a la intensidad de cada tramo."
           />
         </ol>
       </div>
@@ -373,7 +547,7 @@ function InteropZwo(): JSX.Element {
               TrainingPeaks Virtual con un clic.
             </p>
             <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
-              ¿Tienes ya un workout en{' '}
+              ¿Tienes ya una sesión en{' '}
               <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code>?
               Súbelo y conviértelo en sesión con música sincronizada.
             </p>
@@ -435,19 +609,19 @@ function ZwoMockup(): JSX.Element {
   return (
     <div
       aria-hidden="true"
-      className="relative w-full max-w-md transform -rotate-1 transition-transform duration-300 hover:rotate-0"
+      className="relative w-full max-w-md transform rotate-0 sm:-rotate-1 transition-transform duration-300 hover:rotate-0"
     >
       <div className="bg-white rounded-2xl shadow-xl border border-gris-200 p-5 md:p-6 space-y-4">
         <header className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-gris-500 mb-0.5">
-              Workout exportable
+              Sesión exportable
             </p>
             <p className="font-display text-lg text-gris-800 leading-tight truncate">
               Noruego 4×4
             </p>
           </div>
-          <span className="inline-flex items-center gap-1 text-xs font-bold text-rosa-700 bg-rosa-100 border border-rosa-300 px-2.5 py-1 rounded-full whitespace-nowrap">
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-turquesa-700 bg-turquesa-100 border border-turquesa-300 px-2.5 py-1 rounded-full whitespace-nowrap">
             <MaterialIcon name="download" size="small" />
             .zwo
           </span>
@@ -812,7 +986,7 @@ function Privacy(): JSX.Element {
                 <MaterialIcon name="bolt" size="small" className="mt-1 shrink-0 text-tulipTree-500" />
                 <span>
                   Solo nos conectamos a Spotify cuando{' '}
-                  <span className="font-semibold text-gris-800">tú</span> decides crear la playlist, y únicamente para añadir canciones a tu cuenta. Tus datos físicos, tu GPX y tu ruta nunca salen de tu navegador.
+                  <span className="font-semibold text-gris-800">tú</span> decides crear la lista, y únicamente para añadir canciones a tu cuenta. Tus datos físicos, tu GPX y tu ruta nunca salen de tu navegador.
                 </span>
               </p>
             </div>
@@ -847,38 +1021,22 @@ function Privacy(): JSX.Element {
   );
 }
 
+// Las 3 preguntas top que mas peso tienen en la decision del usuario al
+// llegar a la landing: indoor (la mitad de la propuesta de valor), Zwift
+// (interoperabilidad con la herramienta que ya usan) y Premium (objecion
+// comercial mas frecuente). El resto del FAQ vive en /ayuda/spotify.
 const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   {
-    q: '¿Necesito conocer mi FTP?',
-    a: 'No. Si no tienes potenciómetro, basta con tu peso y tu frecuencia cardíaca máxima (medida o estimada por edad y sexo: Gulati en mujeres, Tanaka en hombres). Calculamos las zonas con la fórmula de Karvonen. Si tienes FTP, las añadimos como rangos de vatios complementarios.',
-  },
-  {
     q: '¿Sirve para entrenamiento indoor (rodillo o bici estática)?',
-    a: 'Sí. Además de procesar GPX outdoor, Cadencia tiene un constructor de sesiones indoor: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas (SIT, HIIT, Noruego 4×4) y la app te genera la playlist sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar.',
+    a: 'Sí. Además de procesar GPX outdoor, Cadencia tiene un constructor de sesiones indoor: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas (SIT, HIIT, Noruego 4×4) y la app te genera la lista sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar.',
   },
   {
     q: '¿Es compatible con Zwift, TrainerRoad o TrainingPeaks?',
-    a: 'Sí. Cadencia exporta tu sesión en formato .zwo (estándar abierto de workouts) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte un workout ya hecho y convertirlo en sesión con música sincronizada.',
-  },
-  {
-    q: '¿Puedo personalizar el catálogo de canciones?',
-    a: 'Sí. Durante el flujo puedes subir tus propios CSV exportados desde Spotify (o desde Exportify) y combinarlos con el catálogo nativo. Además hay un editor avanzado en la ruta /catalogo para depurar el catálogo nativo (BPM, energía, géneros) y descargar el resultado.',
+    a: 'Sí. Cadencia exporta tu sesión en formato .zwo (estándar abierto de sesiones) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte una sesión ya hecha y darle música sincronizada.',
   },
   {
     q: '¿Funciona sin Spotify Premium?',
-    a: 'Para crear la playlist sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción.',
-  },
-  {
-    q: '¿Cómo puedo escuchar mi música en ruta?',
-    a: 'En España (Reglamento General de Circulación, art. 18.2) está prohibido conducir cualquier vehículo, bici incluida, con auriculares conectados a un reproductor de sonido. La sanción son 200 € y 3 puntos del carné de coche. La prohibición abarca también los auriculares de conducción ósea, porque la norma no distingue por tipo. Opciones legales: altavoz Bluetooth montado en el manillar o en el cuadro, o un altavoz portátil en la mochila o en el bolsillo del maillot. Para sesiones indoor (rodillo, bici estática, Modo TV) no hay restricción: ahí los auriculares son perfectos.',
-  },
-  {
-    q: '¿Es gratis?',
-    a: 'Sí. Es código abierto bajo licencia PolyForm Noncommercial. Puedes usarla libremente para tu uso personal o sin fines comerciales. Puedes colaborar y proponer mejoras a través de GitHub',
-  },
-  {
-    q: '¿Mis datos físicos se guardan en algún sitio?',
-    a: 'Nunca en un servidor. Por defecto viven solo en la pestaña actual y se borran al cerrarla. Si marcas "Recordar mis datos en este dispositivo", se guardan en el almacenamiento local del navegador para no tener que volver a escribirlos — siguen estando solo en tu equipo, no salen a ningún servidor, y puedes borrarlos cuando quieras desde la propia app.',
+    a: 'Para crear la lista sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción.',
   },
 ] as const;
 
@@ -930,6 +1088,19 @@ function Faq(): JSX.Element {
             </details>
           ))}
         </div>
+        <div className="mt-6 text-center">
+          <a
+            href="/ayuda/spotify"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/spotify');
+            }}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-turquesa-600 hover:text-turquesa-700 transition-colors"
+          >
+            Ver todas las preguntas
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </a>
+        </div>
       </div>
     </section>
   );
@@ -939,7 +1110,7 @@ function FinalCta({ onTry }: { onTry: () => void }): JSX.Element {
   return (
     <section
       aria-labelledby="final-cta-title"
-      className="bg-gradient-to-b from-white to-turquesa-50"
+      className="bg-gradient-to-b from-turquesa-50 to-turquesa-100"
     >
       <div className="mx-auto w-full max-w-3xl px-4 py-12 md:py-16 text-center">
         <h2
@@ -949,7 +1120,7 @@ function FinalCta({ onTry }: { onTry: () => void }): JSX.Element {
           ¿Listo para pedalear con ritmo?
         </h2>
         <p className="text-gris-700 mb-6 text-lg">
-          Tarda menos de un minuto en generarte la playlist.
+          Tarda menos de un minuto en generarte la lista.
         </p>
         <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
           Probar aplicación

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { HeartRateZone } from '@core/physiology';
-import { getZoneCriteria } from '@core/matching';
 import {
   defaultCadenceProfile,
+  getRecommendedCadence,
   getValidProfiles,
   PHASES,
   reconcileCadenceProfile,
@@ -13,6 +13,7 @@ import {
 import { Button } from '../Button';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
+import { ZONE_LABEL_WITH_CODE } from '../zoneLabels';
 import type { PhysioContext } from './BlockList';
 import { formatBpmRange, formatWattsRange } from './zoneRangeFormat';
 
@@ -42,14 +43,7 @@ const PHASE_ICONS: Record<Phase, string> = {
   main: 'directions_bike',
 };
 
-const ZONE_LABELS: Record<HeartRateZone, string> = {
-  1: 'Z1 — Recuperación',
-  2: 'Z2 — Aeróbico base',
-  3: 'Z3 — Tempo / MLSS',
-  4: 'Z4 — Umbral',
-  5: 'Z5 — Muros / escalada',
-  6: 'Z6 — Sprint supramáximo',
-};
+const ZONE_LABELS: Record<HeartRateZone, string> = ZONE_LABEL_WITH_CODE;
 
 const PROFILE_LABELS: Record<CadenceProfile, string> = {
   flat: 'Llano',
@@ -91,8 +85,8 @@ export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEdi
     }
   }, [zone, validProfiles, cadenceProfile]);
 
-  const criteria = getZoneCriteria(zone, cadenceProfile);
-  const cadenceHint = `${criteria.cadenceMin}-${criteria.cadenceMax} rpm`;
+  const recommended = getRecommendedCadence(zone, cadenceProfile);
+  const cadenceHint = `${recommended.min}-${recommended.max} rpm`;
 
   const bpmHint = formatBpmRange(zone, physioContext?.karvonen ?? null);
   const wattsHint = formatWattsRange(zone, physioContext?.power ?? null);
@@ -184,7 +178,10 @@ export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEdi
             </option>
           ))}
         </select>
-        <p className="text-xs text-gris-500 mt-1">Cadencia objetivo: {cadenceHint}</p>
+        <p className="text-xs text-gris-500 mt-1 flex items-center gap-1.5">
+          <MaterialIcon name="speed" size="small" className="text-turquesa-600" />
+          Cadencia recomendada: {cadenceHint}
+        </p>
       </label>
 
       <div>

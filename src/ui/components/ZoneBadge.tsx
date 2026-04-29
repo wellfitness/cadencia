@@ -11,7 +11,7 @@ export interface ZoneBadgeProps {
 
 /**
  * Badge semantico de zona Z1..Z6. Usa la paleta de zonas del proyecto
- * (azul -> verde -> amarillo -> naranja -> rojo -> carmesi oscuro) destinada
+ * (azul -> verde -> amarillo -> naranja -> rojo -> morado oscuro) destinada
  * exclusivamente a visualizacion de datos.
  */
 export function ZoneBadge({ zone, label, size = 'md', className = '' }: ZoneBadgeProps): JSX.Element {

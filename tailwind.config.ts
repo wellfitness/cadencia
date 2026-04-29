@@ -73,7 +73,7 @@ export default {
           3: '#eab308',
           4: '#f97316',
           5: '#ef4444',
-          6: '#7c2d12',
+          6: '#7e22ce',
         },
       },
       fontFamily: {

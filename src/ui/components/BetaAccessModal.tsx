@@ -11,7 +11,7 @@ export interface BetaAccessModalProps {
 
 /**
  * Modal pre-acceso al wizard. Avisa al usuario de los dos requisitos
- * para usar la creacion de playlist en Spotify:
+ * para usar la creacion de lista en Spotify:
  *
  *   1. Spotify Premium (sino la lista se reproduce en aleatorio).
  *   2. Estar en la lista de testers de la app en Spotify Developer
@@ -75,7 +75,7 @@ export function BetaAccessModal({
           Antes de empezar
         </h2>
         <p className="text-gris-700 mb-5">
-          Cadencia se conecta a tu cuenta de Spotify para crear la playlist
+          Cadencia se conecta a tu cuenta de Spotify para crear la lista
           ordenada en tu biblioteca. Para que esto funcione necesitas dos cosas:
         </p>
 
@@ -109,7 +109,7 @@ export function BetaAccessModal({
               <p className="text-sm text-gris-600 mt-0.5">
                 La app está en proceso de aprobación pública por Spotify. Hasta
                 que termine ese trámite, debo añadirte manualmente como usuario
-                autorizado. Si no estás en la lista, la creación de playlist en
+                autorizado. Si no estás en la lista, la creación de la lista en
                 tu cuenta Spotify fallará. Apúntate con tu email de Spotify y te
                 añado.
               </p>
@@ -140,7 +140,7 @@ export function BetaAccessModal({
 
         <p className="text-xs text-gris-500 mt-4">
           También puedes continuar sin estar en la lista para construir
-          sesiones indoor y previsualizar la playlist. La exportación a Spotify
+          sesiones indoor y previsualizar la lista. La exportación a Spotify
           solo funcionará cuando estés autorizado.
         </p>
       </div>

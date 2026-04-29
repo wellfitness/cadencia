@@ -16,9 +16,12 @@ Genera assets de marca a partir de public/logo.png:
   Open Graph (1200x630 social card):
     public/og-image.png
 
-El logo de marca esta en silueta negra (public/logo.png). Aqui se TINTA en
-turquesa-700 (#0e7e85) para que sea coherente con como se renderiza en la
-Landing (componente <Logo tinted />). El tinte se aplica usando el canal alpha
+El logo de marca esta en silueta negra (public/logo.png). En la Landing y el
+Header el componente <Logo /> lo muestra tal cual (negro nativo). Aqui, sin
+embargo, se TINTA en turquesa-700 (#0e7e85) para los assets PWA/favicon/OG:
+sobre la pantalla de inicio del movil o en una preview social, una silueta
+turquesa lee como icono de marca, mientras que un negro plano se confunde
+con cualquier otro icono oscuro. El tinte se aplica usando el canal alpha
 del PNG original como mascara.
 
 Las fuentes Righteous y ABeeZee (Google Fonts, SIL OFL) se descargan a
@@ -68,7 +71,7 @@ ensure_fonts()
 # Paleta Cadencia (de tailwind.config.ts / design-system)
 WHITE = (255, 255, 255, 255)
 TURQUESA_600 = (0, 190, 200, 255)        # #00bec8 - acento, OG
-TURQUESA_700 = (14, 126, 133, 255)       # #0e7e85 - silueta tintada (coincide con <Logo tinted />)
+TURQUESA_700 = (14, 126, 133, 255)       # #0e7e85 - silueta tintada para favicons / iconos PWA / og-image
 TULIP_TREE = (234, 179, 8, 255)          # #eab308 (tulipTree-500)
 GRIS_800 = (38, 41, 48, 255)             # #262930
 

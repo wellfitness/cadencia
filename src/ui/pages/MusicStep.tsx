@@ -99,7 +99,7 @@ export function MusicStep({
             name: file.name,
             trackCount: 0,
             tracks: [],
-            error: 'CSV sin tracks válidos',
+            error: 'CSV sin canciones válidas',
           },
         ]);
         return;
@@ -167,7 +167,7 @@ export function MusicStep({
             current={sourceMode}
             onChange={onSourceModeChange}
             title="Combinar ambas"
-            desc="La biblioteca predefinida más tus CSV. Más variedad y siempre hay tracks disponibles."
+            desc="La biblioteca predefinida más tus CSV. Más variedad y siempre hay canciones disponibles."
           />
           <SourceRadio
             value="mine"
@@ -253,7 +253,7 @@ export function MusicStep({
                           {c.name}
                         </p>
                         <p className="text-xs text-gris-500">
-                          {c.error ?? `${c.trackCount} tracks cargados`}
+                          {c.error ?? `${c.trackCount} canciones cargadas`}
                         </p>
                       </div>
                     </div>
@@ -448,7 +448,7 @@ function PoolCoverageWarning({
             <strong className="tabular-nums">{coverage.neededTotal}</strong>{' '}
             canciones únicas, y tu catálogo tiene{' '}
             <strong className="tabular-nums">{coverage.availableTotal}</strong>.
-            La playlist se generará igualmente; subiendo más listas
+            La lista se generará igualmente; subiendo más listas
             {sourceMode !== 'both' && (
               <>
                 {' '}o{' '}

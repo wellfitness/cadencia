@@ -5,7 +5,7 @@ import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
 import { BlockEditor } from './BlockEditor';
 import { RepeatGroup } from './RepeatGroup';
-import { formatBpmRange, formatWattsRange } from './zoneRangeFormat';
+import { formatBpmRange, formatRecommendedCadence, formatWattsRange } from './zoneRangeFormat';
 
 /**
  * Bandas de FC y vatios precalculadas a partir de los inputs validados del
@@ -339,7 +339,7 @@ function BlockRow({
 }: BlockRowProps): JSX.Element {
   const bpm = formatBpmRange(block.zone, physioContext?.karvonen ?? null);
   const watts = formatWattsRange(block.zone, physioContext?.power ?? null);
-  const hasRange = bpm !== null || watts !== null;
+  const cadence = formatRecommendedCadence(block.zone, block.cadenceProfile);
   return (
     <div
       className={`flex items-center gap-2 rounded-md border bg-white px-2.5 py-2 ${
@@ -396,22 +396,24 @@ function BlockRow({
           </span>
           <span className="text-xs text-gris-500">{PHASE_LABELS[block.phase] ?? block.phase}</span>
         </div>
-        {hasRange && (
-          <p className="text-xs text-gris-500 mt-0.5 flex items-center gap-2 flex-wrap tabular-nums">
-            {bpm !== null && (
-              <span className="inline-flex items-center gap-1">
-                <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
-                {bpm}
-              </span>
-            )}
-            {watts !== null && (
-              <span className="inline-flex items-center gap-1">
-                <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
-                {watts}
-              </span>
-            )}
-          </p>
-        )}
+        <p className="text-xs text-gris-500 mt-0.5 flex items-center gap-2 flex-wrap tabular-nums">
+          <span className="inline-flex items-center gap-1">
+            <MaterialIcon name="speed" size="small" className="text-turquesa-600" />
+            {cadence}
+          </span>
+          {bpm !== null && (
+            <span className="inline-flex items-center gap-1">
+              <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
+              {bpm}
+            </span>
+          )}
+          {watts !== null && (
+            <span className="inline-flex items-center gap-1">
+              <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
+              {watts}
+            </span>
+          )}
+        </p>
         {block.description !== undefined && (
           <p className="text-xs text-gris-500 italic truncate mt-0.5">{block.description}</p>
         )}

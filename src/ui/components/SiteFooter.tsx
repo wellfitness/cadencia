@@ -1,4 +1,5 @@
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { navigateInApp } from '@ui/utils/navigation';
 
 interface NavCardProps {
   href: string;
@@ -203,9 +204,41 @@ export function SiteFooter(): JSX.Element {
           </div>
         </div>
 
-        {/* Columna 3: Legal + Proyecto */}
+        {/* Columna 3: Ayuda + Legal + Proyecto */}
         <div className="flex flex-col">
-          <h4 className="text-white text-base font-semibold mb-2">Legal</h4>
+          <h4 className="text-white text-base font-semibold mb-2">Ayuda</h4>
+          <a
+            href="/ayuda"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda');
+            }}
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
+          >
+            Centro de ayuda
+          </a>
+          <a
+            href="/ayuda/sesion-indoor"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/sesion-indoor');
+            }}
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
+          >
+            Cómo construir una sesión
+          </a>
+          <a
+            href="/ayuda/plantillas"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/plantillas');
+            }}
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
+          >
+            Plantillas y cuándo usarlas
+          </a>
+
+          <h4 className="text-white text-base font-semibold mt-4 mb-2">Legal</h4>
           <a
             href="/terms.html"
             className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"

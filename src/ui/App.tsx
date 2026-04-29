@@ -9,6 +9,7 @@ import {
   validateUserInputs,
   type UserInputsRaw,
 } from '@core/user';
+import { findTemplate } from '@core/segmentation';
 import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/segmentation';
 import {
   EMPTY_PREFERENCES,
@@ -24,6 +25,7 @@ import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import type { RouteSourceChoice } from '@ui/components/SourceSelector';
 import { CatalogEditorPage } from '@ui/pages/CatalogEditorPage';
+import { HelpRouter } from '@ui/pages/help/HelpRouter';
 import { Landing } from '@ui/pages/Landing';
 import { SourceTypeStep } from '@ui/pages/SourceTypeStep';
 import { UserDataStep } from '@ui/pages/UserDataStep';
@@ -34,7 +36,7 @@ import { TVModeRoute } from '@ui/pages/TVModeRoute';
 import { writeHandoff } from '@core/tv/tvHandoff';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
-import { navigateBack, usePathname } from '@ui/utils/navigation';
+import { navigateBack, navigateInApp, usePathname } from '@ui/utils/navigation';
 import {
   loadWizardState,
   saveWizardState,
@@ -71,6 +73,9 @@ export function App(): JSX.Element {
   if (pathname === '/catalogo') {
     return <CatalogEditorPage onClose={() => navigateBack('/')} />;
   }
+  if (pathname.startsWith('/ayuda')) {
+    return <HelpRouter pathname={pathname} />;
+  }
   return <WizardApp />;
 }
 
@@ -87,16 +92,39 @@ function WizardApp(): JSX.Element {
   // sobrevivir al redirect de Spotify en /callback (full page navigation).
   const persisted = useState(() => loadWizardState())[0];
 
+  // Lectura lazy del query param "?plantilla=" en el primer render. Si llega
+  // una plantilla valida, configura los estados iniciales para abrir directo
+  // el constructor con la sesion cargada — flujo de "Cargar en constructor"
+  // desde el centro de ayuda. La URL se limpia tras consumirlo para que un
+  // refresh manual no sobrescriba el progreso del usuario.
+  const pendingTemplate = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const id = new URLSearchParams(window.location.search).get('plantilla');
+    if (id === null) return null;
+    return findTemplate(id) ?? null;
+  })[0];
+  const hasPendingTemplate = pendingTemplate !== null;
+
+  useEffect(() => {
+    if (!hasPendingTemplate) return;
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('plantilla');
+    const search = url.search.length > 0 ? url.search : '';
+    window.history.replaceState({}, '', url.pathname + search + url.hash);
+  }, [hasPendingTemplate]);
+
   // Vista activa: la landing es la pantalla de inicio para usuarios nuevos
   // o sesiones limpias. Si hay progreso persistido (vuelta de OAuth Spotify
-  // o refresh a media tarea) saltamos directos al wizard para no interrumpir.
+  // o refresh a media tarea) o plantilla pendiente del centro de ayuda
+  // saltamos directos al wizard para no interrumpir.
   const hasPersistedProgress =
     persisted !== null &&
     (persisted.currentStep > 0 ||
       persisted.completedSteps.length > 0 ||
       persisted.sourceType !== undefined);
   const [view, setView] = useState<'landing' | 'wizard'>(
-    hasPersistedProgress ? 'wizard' : 'landing',
+    hasPersistedProgress || hasPendingTemplate ? 'wizard' : 'landing',
   );
 
   // Banner de "datos restaurados" tras un refresh / vuelta de OAuth: solo se
@@ -109,9 +137,11 @@ function WizardApp(): JSX.Element {
     return () => clearTimeout(id);
   }, [showRestoredToast]);
 
-  const [currentStep, setCurrentStep] = useState<number>(persisted?.currentStep ?? STEP_TYPE);
+  const [currentStep, setCurrentStep] = useState<number>(
+    hasPendingTemplate ? STEP_ROUTE : (persisted?.currentStep ?? STEP_TYPE),
+  );
   const [completedSteps, setCompletedSteps] = useState<readonly number[]>(
-    persisted?.completedSteps ?? [],
+    hasPendingTemplate ? [STEP_TYPE] : (persisted?.completedSteps ?? []),
   );
 
   // State del usuario lifteado aqui para que pasos posteriores (Ruta, Resultado)
@@ -159,14 +189,16 @@ function WizardApp(): JSX.Element {
 
   // Origen de la ruta y plan de sesion editable (rama indoor cycling).
   const [sourceType, setSourceType] = useState<RouteSourceType | null>(
-    persisted?.sourceType ?? null,
+    hasPendingTemplate ? 'session' : (persisted?.sourceType ?? null),
   );
   const [sessionPlan, setSessionPlan] = useState<EditableSessionPlan | null>(
-    persisted?.sessionPlan ?? null,
+    pendingTemplate !== null
+      ? { name: pendingTemplate.name, items: [...pendingTemplate.items] }
+      : (persisted?.sessionPlan ?? null),
   );
   // Plantilla activa de la SessionBuilder (null si edita desde cero).
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(
-    persisted?.activeTemplateId ?? null,
+    pendingTemplate !== null ? pendingTemplate.id : (persisted?.activeTemplateId ?? null),
   );
 
   // La validacion depende del sourceType: en modo 'session' relajamos las
@@ -656,7 +688,7 @@ function Header(): JSX.Element {
   return (
     <header className="border-b border-gris-200 bg-white">
       <div className="mx-auto w-full max-w-4xl px-4 py-4 flex items-center gap-3">
-        <Logo variant="full" size="md" tinted />
+        <Logo variant="full" size="md" />
       </div>
     </header>
   );
@@ -669,13 +701,25 @@ function Footer(): JSX.Element {
         <div className="flex flex-col gap-0.5">
           <p className="flex items-center gap-1.5">
             <MaterialIcon name="lock" size="small" className="text-gris-400" />
-            Sin cuentas, sin cookies, sin servidores. Todo corre en tu dispositivo.
+            Sin registros, sin cookies, sin servidores. Todo corre en tu dispositivo.
           </p>
           <p className="text-xs text-gris-400 pl-5">
             Tus datos se guardan en el navegador hasta que cierres la pestaña.
           </p>
         </div>
         <nav className="flex items-center gap-3">
+          <a
+            href="/ayuda"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda');
+            }}
+            className="flex items-center gap-1 text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"
+          >
+            <MaterialIcon name="help_outline" size="small" />
+            Ayuda
+          </a>
+          <span aria-hidden className="text-gris-300">·</span>
           <a
             href="/privacy.html"
             className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"

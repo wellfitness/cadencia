@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getZoneCriteria } from '@core/matching';
 import {
   calculateKarvonenZones,
   type HeartRateZone,
@@ -7,11 +6,13 @@ import {
 } from '@core/physiology/karvonen';
 import {
   expandSessionPlan,
+  getRecommendedCadence,
   type CadenceProfile,
   type EditableSessionPlan,
   type SessionBlock,
 } from '@core/segmentation';
 import type { ValidatedUserInputs } from '@core/user/userInputs';
+import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { zoneTextColor } from '@ui/components/zoneColors';
 
@@ -337,11 +338,19 @@ export function SessionTVMode({
   return (
     <div className="min-h-[100dvh] bg-gris-900 text-white flex flex-col">
       <header className="bg-black/50 px-3 sm:px-4 md:px-6 py-3 md:py-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-          <h1 className="text-base md:text-xl font-bold truncate">{plan.name}</h1>
-          <p className="text-xs md:text-sm opacity-70">
-            Bloque {currentIndex + 1} de {blocks.length}
-          </p>
+        <div className="flex items-center gap-3 min-w-0 flex-1 basis-full sm:basis-auto">
+          <Logo
+            variant="brand"
+            size="sm"
+            tone="dark"
+            className="flex-shrink-0"
+          />
+          <div className="min-w-0 border-l border-white/20 pl-3">
+            <h1 className="text-base md:text-xl font-bold truncate">{plan.name}</h1>
+            <p className="text-xs md:text-sm opacity-70">
+              Bloque {currentIndex + 1} de {blocks.length}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
           <ControlButton
@@ -417,11 +426,11 @@ export function SessionTVMode({
                     Zona {currentBlock.zone} · {CADENCE_PROFILE_LABELS[currentBlock.cadenceProfile]}
                   </p>
                   {(() => {
-                    const c = getZoneCriteria(currentBlock.zone, currentBlock.cadenceProfile);
+                    const r = getRecommendedCadence(currentBlock.zone, currentBlock.cadenceProfile);
                     return (
                       <p className="text-sm sm:text-base md:text-xl opacity-90 mt-1 flex items-center gap-1.5">
                         <MaterialIcon name="speed" size="small" />
-                        Cadencia: {c.cadenceMin}-{c.cadenceMax} rpm
+                        Cadencia: {r.min}-{r.max} rpm
                       </p>
                     );
                   })()}
@@ -496,12 +505,28 @@ export function SessionTVMode({
         </div>
       </main>
 
-      <footer className="bg-black/40 px-4 md:px-6 py-2 md:py-3 text-center text-[11px] md:text-xs opacity-60">
-        <span className="hidden md:inline">
+      <footer className="bg-black/40 px-4 md:px-6 py-2 md:py-3 flex items-center justify-between gap-3 text-[11px] md:text-xs">
+        <div className="flex-shrink-0">
+          <Logo
+            variant="full"
+            size="sm"
+            orientation="horizontal"
+            tone="dark"
+            className="hidden sm:flex"
+          />
+          <Logo
+            variant="brand"
+            size="sm"
+            orientation="horizontal"
+            tone="dark"
+            className="flex sm:hidden"
+          />
+        </div>
+        <span className="hidden md:inline opacity-60 flex-1 text-center">
           Espacio: pausa · Flechas: saltar fase · S: sonido · R: reiniciar · Esc: cerrar
         </span>
-        <span className="md:hidden">
-          Tiempo total: {formatTime(totalElapsed)} · {Math.round(totalProgressPct)}%
+        <span className="md:hidden opacity-60 flex-shrink-0 tabular-nums">
+          Total {formatTime(totalElapsed)} · {Math.round(totalProgressPct)}%
         </span>
       </footer>
     </div>
@@ -746,6 +771,13 @@ function CompletionScreen({
             Finalizar
           </button>
         </div>
+
+        <footer className="mt-10 md:mt-14 pt-6 md:pt-8 border-t border-white/15 flex flex-col items-center gap-2">
+          <Logo variant="full" size="sm" tone="dark" orientation="horizontal" />
+          <p className="text-[11px] md:text-xs text-white/60 tracking-wide">
+            Creado por Elena Cruces · © 2026 Movimiento Funcional
+          </p>
+        </footer>
       </div>
     </div>
   );

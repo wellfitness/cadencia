@@ -30,3 +30,4 @@ export {
 } from './segmentSlope';
 export { SESSION_TEMPLATES, findTemplate } from './sessionTemplates';
 export { classifySessionPlan, buildSessionRouteMeta } from './fromSessionBlocks';
+export { getRecommendedCadence, type CadenceRange } from './cadenceRecommendation';

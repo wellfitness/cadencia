@@ -1,5 +1,7 @@
 import type { HeartRateZone } from '../physiology/karvonen';
 import type { ValidatedUserInputs } from '../user/userInputs';
+import { coalesceContiguousBlocks } from './coalesceBlocks';
+import { detectIntervalSets } from './intervalSets';
 import type { SessionPlan } from './sessionPlan';
 import type { ClassifiedSegment, RouteMeta } from './types';
 
@@ -58,16 +60,27 @@ function effectiveFtp(validated: ValidatedUserInputs): number {
 /**
  * Mapea cada SessionBlock a un ClassifiedSegment con potencia sintetica
  * coherente con la zona. Determinista: misma entrada → misma salida.
+ *
+ * Antes del mapeo aplica un pre-procesado que el matcher recibe ya cocinado:
+ *   1. coalesceContiguousBlocks: fusiona runs contiguos de misma
+ *      (zone, profile, phase) — limpia bloques fragmentados.
+ *   2. detectIntervalSets: detecta sets interválicos con bloques cortos
+ *      (SIT, HIIT, VO2max Cortos) y los sustituye por un macrobloque virtual
+ *      de la zona alta del set. Evita que un track de recuperacion derrame a
+ *      un intervalo de Z4/Z5/Z6.
+ *
+ * El matcher (matchDiscrete / matchOverlap) no se entera del pre-procesado.
  */
 export function classifySessionPlan(
   plan: SessionPlan,
   validated: ValidatedUserInputs,
 ): ClassifiedSegment[] {
   const ftp = effectiveFtp(validated);
+  const preprocessed = detectIntervalSets(coalesceContiguousBlocks(plan.blocks));
   const segments: ClassifiedSegment[] = [];
   let cursorSec = 0;
 
-  for (const block of plan.blocks) {
+  for (const block of preprocessed) {
     if (block.durationSec <= 0) continue;
     const avgPowerWatts = ftp * ZONE_FTP_MIDPOINT[block.zone];
     segments.push({

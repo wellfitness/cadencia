@@ -291,7 +291,7 @@ export function ResultStep({
   return (
     <WizardStep maxWidth="max-w-3xl">
       <WizardStepHeading
-        title="Tu playlist"
+        title="Tu lista"
         subtitle="Revisa la lista, ajusta lo que quieras y créala en tu cuenta de Spotify."
       />
       {repeatedCount > 0 && (
@@ -307,8 +307,8 @@ export function ResultStep({
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
               {repeatedCount === 1
-                ? '1 canción se repite en la playlist'
-                : `${repeatedCount} canciones se repiten en la playlist`}
+                ? '1 canción se repite en la lista'
+                : `${repeatedCount} canciones se repiten en la lista`}
             </h2>
             <p className="text-sm text-gris-700 mt-1">
               No había candidatos únicos suficientes en tu catálogo. Subiendo
@@ -334,7 +334,7 @@ export function ResultStep({
                 : `${insufficientCount} zonas sin canciones disponibles`}
             </h2>
             <p className="text-sm text-gris-700 mt-1">
-              Tu catálogo no tiene tracks con la cadencia adecuada. Vuelve a
+              Tu catálogo no tiene canciones con la cadencia adecuada. Vuelve a
               «Música» y sube más listas para cubrir esas zonas.
             </p>
           </div>
@@ -385,7 +385,7 @@ export function ResultStep({
               size="sm"
               iconLeft="casino"
               onClick={onRegenerateSeed}
-              title="Genera una playlist nueva con la misma ruta y catálogo, eligiendo tracks distintos entre los mejores candidatos de cada tramo."
+              title="Genera una lista nueva con la misma ruta y catálogo, eligiendo canciones distintas entre los mejores candidatos de cada tramo."
             >
               Regenerar lista
             </Button>
@@ -551,7 +551,7 @@ function FooterActions({
               iconLeft="download"
               onClick={onDownloadZwo}
               fullWidth
-              aria-label="Descargar la ruta como workout .zwo para Zwift, TrainerRoad o similares"
+              aria-label="Descargar la ruta como sesión .zwo para Zwift, TrainerRoad o similares"
               title="Descargar .zwo (Zwift, TrainerRoad, Wahoo SYSTM…)"
             >
               Descargar .zwo
@@ -572,7 +572,7 @@ function FooterActions({
               variant="secondary"
               iconLeft="download"
               onClick={onDownloadZwo}
-              aria-label="Descargar la ruta como workout .zwo para Zwift, TrainerRoad o similares"
+              aria-label="Descargar la ruta como sesión .zwo para Zwift, TrainerRoad o similares"
               title="Descargar .zwo (Zwift, TrainerRoad, Wahoo SYSTM…)"
             >
               Descargar .zwo
@@ -625,7 +625,7 @@ function DonePanel({
     .slice(0, 8);
 
   const handleShare = (): void => {
-    const text = `Escucha mi playlist «${playlist.name}» creada con Cadencia: ${playlist.externalUrl}`;
+    const text = `Escucha mi lista «${playlist.name}» creada con Cadencia: ${playlist.externalUrl}`;
     if (typeof navigator.share === 'function') {
       navigator
         .share({ title: playlist.name, text, url: playlist.externalUrl })
@@ -716,7 +716,7 @@ function DonePanel({
       {onResetWizard !== undefined && (
         <div className="flex justify-center pt-2">
           <Button variant="secondary" iconLeft="refresh" onClick={onResetWizard}>
-            Crear otra playlist
+            Crear otra lista
           </Button>
         </div>
       )}
