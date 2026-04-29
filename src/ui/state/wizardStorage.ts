@@ -14,7 +14,14 @@ import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/se
 
 export type RouteSourceType = 'gpx' | 'session';
 
-export type MusicSourceMode = 'predefined' | 'mine' | 'both';
+/**
+ * Modos vivos de fuente de catalogo. La opcion "solo predefinida" se retiro
+ * del UI: con catalogo predefinido por defecto, "Combinar ambas" cubre el
+ * mismo caso cuando el usuario no sube CSVs. Si el sessionStorage de un
+ * usuario antiguo trae 'predefined', `loadWizardState` lo coerce a 'both'
+ * antes de devolverlo.
+ */
+export type MusicSourceMode = 'mine' | 'both';
 
 export interface WizardState {
   currentStep: number;
@@ -61,12 +68,25 @@ export function loadWizardState(): WizardState | null {
     if (typeof sessionStorage === 'undefined') return null;
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!isWizardState(parsed)) return null;
-    return parsed;
+    const parsedRaw: unknown = JSON.parse(raw);
+    // Coercion de modo retirado: 'predefined' (legacy) -> 'both'. Lo hacemos
+    // sobre el objeto crudo antes del type guard, porque `isWizardState`
+    // rechaza ahora 'predefined' como valor valido.
+    const coerced = coerceLegacyMusicSourceMode(parsedRaw);
+    if (!isWizardState(coerced)) return null;
+    return coerced;
   } catch {
     return null;
   }
+}
+
+function coerceLegacyMusicSourceMode(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+  const v = value as Record<string, unknown>;
+  if (v['musicSourceMode'] === 'predefined') {
+    return { ...v, musicSourceMode: 'both' };
+  }
+  return value;
 }
 
 export function clearWizardState(): void {
@@ -98,7 +118,6 @@ function isWizardState(value: unknown): value is WizardState {
       v['activeTemplateId'] === null ||
       typeof v['activeTemplateId'] === 'string') &&
     (v['musicSourceMode'] === undefined ||
-      v['musicSourceMode'] === 'predefined' ||
       v['musicSourceMode'] === 'mine' ||
       v['musicSourceMode'] === 'both') &&
     (v['replacedIndices'] === undefined || Array.isArray(v['replacedIndices'])) &&

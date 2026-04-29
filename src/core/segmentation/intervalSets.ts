@@ -10,6 +10,17 @@ import type { SessionBlock } from './sessionPlan';
  */
 const SHORT_BLOCK_THRESHOLD_SEC = 180;
 
+/**
+ * Umbral por encima del cual un bloque de recovery/rest se considera
+ * "descanso entre sets" (no parte del estimulo continuo) y rompe el patron
+ * B. Frontera fisiologica: a partir de ~90s la FC y el lactato bajan lo
+ * suficiente para que el cuerpo entre en modo recuperacion real. Por debajo
+ * (los 30s "suaves" del 10-20-30) el sistema sigue cargado y la pausa es
+ * parte del intervalo. Coherente con el recovery de 90s de VO2max-cortos
+ * (que NO debe romperse — pero usa Patron A, no este).
+ */
+const LONG_RECOVERY_THRESHOLD_SEC = 90;
+
 /** Zona considerada "alta" — donde la queja del usuario es crítica. */
 const HIGH_ZONE_MIN: HeartRateZone = 4;
 
@@ -70,6 +81,13 @@ function detectPatternA(
  * Patron B: secuencia de >=4 bloques contiguos cortos (<180s) donde al menos
  * uno es work con zone >= 4. Captura sets interválicos multi-fase como
  * HIIT 10-20-30 que no encajan con el patron A.
+ *
+ * Cierra el set al encontrar un recovery/rest "largo" (>=90s) — eso indica
+ * descanso entre series, no parte del estimulo continuo. Asi el HIIT
+ * 10-20-30 con 2 min de recuperacion entre los 4 bloques se fusiona en 4
+ * macrobloques separados, no en uno gigante: la musica suave puede sonar
+ * en las pausas reales mientras los 30s "suaves" intra-serie siguen
+ * tratandose como parte del intervalo Z6.
  */
 function detectPatternB(
   blocks: readonly SessionBlock[],
@@ -77,6 +95,10 @@ function detectPatternB(
 ): { endExclusive: number; blockCount: number } | null {
   let j = start;
   while (j < blocks.length && isShort(blocks[j]!)) {
+    const b = blocks[j]!;
+    if (isRecoveryOrRest(b) && b.durationSec >= LONG_RECOVERY_THRESHOLD_SEC) {
+      break;
+    }
     j++;
   }
   const window = blocks.slice(start, j);

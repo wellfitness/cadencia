@@ -14,8 +14,23 @@ const W_GENRE = 0.2;
 const NEUTRAL_GENRE_SCORE = 0.5; // sin preferencias o catalogo sin generos
 
 /**
- * Calcula la puntuacion [0..1] de un track para una (zona, profile) dada y
- * las preferencias de genero del usuario. Determinista.
+ * Bonus aditivo cuando el track viene del CSV subido por el usuario
+ * (`source === 'user'`). Sube ligeramente la probabilidad de que las canciones
+ * propias ganen el slot frente a tracks predefinidos con score similar, sin
+ * pisar tracks predefinidos claramente mejores. Equivale a ~0.4 puntos de
+ * componente individual (cada componente pesa 0.20-0.30). El score puede
+ * superar 1.0; el motor solo usa el orden, no el valor absoluto.
+ */
+const USER_SOURCE_BONUS = 0.08;
+
+/**
+ * Calcula la puntuacion de un track para una (zona, profile) dada y las
+ * preferencias de genero del usuario. Determinista.
+ *
+ * Rango: la suma ponderada de componentes esta en [0..1]. Si el track viene
+ * del CSV del usuario (`source === 'user'`) se anade un bonus aditivo
+ * (USER_SOURCE_BONUS), por lo que el score final puede llegar a [0..1.08].
+ * El motor solo usa el orden para escoger, no el valor absoluto.
  *
  * Componentes (todos 0..1):
  *  - cadenceScore:  proximidad al midpoint del rango de cadencia, tomando
@@ -71,10 +86,18 @@ export function scoreTrack(
         ? 1
         : 0;
 
+  // === USER SOURCE BONUS ===
+  // Sube la probabilidad de que un track del CSV del usuario gane el slot
+  // frente a uno predefinido con score similar. Si todos los tracks del pool
+  // son 'user' (modo "Solo mis CSV") el bonus es uniforme y no afecta al
+  // ranking: solo desempata cuando coexisten origenes distintos ("Combinar").
+  const sourceBonus = track.source === 'user' ? USER_SOURCE_BONUS : 0;
+
   return (
     W_CADENCE * cadenceScore +
     W_ENERGY * energyScore +
     W_VALENCE * valenceScore +
-    W_GENRE * genreScore
+    W_GENRE * genreScore +
+    sourceBonus
   );
 }

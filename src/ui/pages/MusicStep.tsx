@@ -31,7 +31,7 @@ export interface MusicStepProps {
   /** Preferencias controladas: el reducer vive en App para sobrevivir remountajes. */
   preferences: MatchPreferences;
   onPreferencesChange: (next: MatchPreferences) => void;
-  /** Fuente del catalogo (predefined / mine / both). Controlada desde App. */
+  /** Fuente del catalogo (mine / both). Controlada desde App. */
   sourceMode: MusicSourceMode;
   onSourceModeChange: (next: MusicSourceMode) => void;
   /** CSVs subidos por el usuario. Viven en App (in-memory) para que persistan al ir y volver. */
@@ -167,7 +167,7 @@ export function MusicStep({
             current={sourceMode}
             onChange={onSourceModeChange}
             title="Combinar ambas"
-            desc="La biblioteca predefinida más tus CSV. Más variedad y siempre hay canciones disponibles."
+            desc="La biblioteca predefinida más tus CSV. Damos preferencia a tus canciones cuando encajan; si te quedas corto, completamos con la predefinida."
           />
           <SourceRadio
             value="mine"
@@ -175,13 +175,6 @@ export function MusicStep({
             onChange={onSourceModeChange}
             title="Solo mis CSV"
             desc="Solo canciones que tú subas. Máxima personalización; necesitas subir al menos un CSV."
-          />
-          <SourceRadio
-            value="predefined"
-            current={sourceMode}
-            onChange={onSourceModeChange}
-            title="Solo predefinida"
-            desc="La biblioteca embebida en la app, sin tus CSV."
           />
         </fieldset>
 
@@ -284,8 +277,7 @@ export function MusicStep({
             />
             <p className="text-sm text-gris-800">
               <strong>No puedes continuar con esta fuente sin CSV cargados.</strong>{' '}
-              Sube al menos un CSV válido o cambia la fuente a «Combinar ambas» o
-              «Solo predefinida».
+              Sube al menos un CSV válido o cambia la fuente a «Combinar ambas».
             </p>
           </div>
         )}

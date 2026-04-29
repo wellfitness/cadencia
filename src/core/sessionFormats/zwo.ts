@@ -36,12 +36,40 @@ const ZONE_TO_POWER: Record<HeartRateZone, number> = {
   6: 1.3,
 };
 
-/** rpm representativa de cada cadenceProfile (centro del rango aceptado). */
-const PROFILE_TO_RPM: Record<CadenceProfile, number> = {
-  flat: 80,
-  climb: 65,
-  sprint: 100,
+/**
+ * Rango de cadencia orientativo por profile. Se usa para emitir Cadence+
+ * CadenceHigh nativos en Warmup/Cooldown y para componer el textevent que
+ * acompaña a los SteadyState. Coincide con CADENCE_BY_PROFILE de
+ * src/core/matching/zoneCriteria.ts (1:1) — mantenerlos en sync.
+ */
+const CADENCE_RANGE_BY_PROFILE: Record<CadenceProfile, { min: number; max: number }> = {
+  flat: { min: 70, max: 90 },
+  climb: { min: 55, max: 80 },
+  sprint: { min: 90, max: 115 },
 };
+
+/**
+ * Cadencia recomendada (rpm) para una combinacion (zona, profile). Se emite
+ * en el textevent del SteadyState como sugerencia, NO se usa como Cadence
+ * fijo del bloque — el simulador no debe obligar a una rpm concreta.
+ *
+ * Diferenciacion clave por zona en climb:
+ *   - Z3-Z4 + climb: 75 rpm. Aunque el rango admite 55-80, lo recomendable
+ *     en escalada moderada es cadencia alta (mejor eficiencia metabolica).
+ *   - Z5 + climb: 65 rpm. Aqui si aplica cadencia baja: muro de fuerza pura.
+ */
+function recommendedRpm(zone: HeartRateZone, profile: CadenceProfile): number {
+  if (profile === 'flat') {
+    if (zone <= 2) return 80;
+    if (zone === 3) return 82;
+    return 85;
+  }
+  if (profile === 'climb') {
+    if (zone === 5) return 65;
+    return 75;
+  }
+  return 105;
+}
 
 /**
  * Inverso de ZONE_TO_POWER: mapea %FTP a la zona Coggan correspondiente.
@@ -104,18 +132,24 @@ function fmtPower(p: number): string {
 
 function blockToZwoElement(block: SessionBlock): string {
   const power = fmtPower(ZONE_TO_POWER[block.zone]);
-  const cadence = PROFILE_TO_RPM[block.cadenceProfile];
+  const range = CADENCE_RANGE_BY_PROFILE[block.cadenceProfile];
+  const recommended = recommendedRpm(block.zone, block.cadenceProfile);
   const dur = Math.max(1, Math.round(block.durationSec));
   switch (block.phase) {
     case 'warmup':
-      // CadenceHigh igual al Cadence para que parsers que leen la rampa
-      // (TrainingPeaks, p.ej.) no muestren "X-undefined rpm". Como nuestro
-      // modelo no varia la cadencia dentro del warmup, ambos coinciden.
-      return `    <Warmup Duration="${dur}" PowerLow="0.5" PowerHigh="${power}" Cadence="${cadence}" CadenceHigh="${cadence}"/>`;
+      // Warmup admite rango nativo via Cadence (low) + CadenceHigh. El
+      // simulador muestra el rango sin forzar una cadencia fija.
+      return `    <Warmup Duration="${dur}" PowerLow="0.5" PowerHigh="${power}" Cadence="${range.min}" CadenceHigh="${range.max}"/>`;
     case 'cooldown':
-      return `    <Cooldown Duration="${dur}" PowerLow="${power}" PowerHigh="0.4" Cadence="${cadence}" CadenceHigh="${cadence}"/>`;
-    default:
-      return `    <SteadyState Duration="${dur}" Power="${power}" Cadence="${cadence}"/>`;
+      return `    <Cooldown Duration="${dur}" PowerLow="${power}" PowerHigh="0.4" Cadence="${range.min}" CadenceHigh="${range.max}"/>`;
+    default: {
+      // SteadyState NO admite rango nativo. Omitimos Cadence (asi el simulador
+      // no fija una cadencia obligatoria) y emitimos un textevent en t=0 con
+      // rango orientativo + cadencia recomendada. Visible como cue al iniciar
+      // el bloque en Zwift, TrainerRoad, SYSTM, MyWhoosh.
+      const message = `Cadencia ${range.min}-${range.max} rpm (recomendado ${recommended})`;
+      return `    <SteadyState Duration="${dur}" Power="${power}">\n      <textevent timeoffset="0" message="${escapeXml(message)}"/>\n    </SteadyState>`;
+    }
   }
 }
 
@@ -131,10 +165,34 @@ function canUseIntervalsT(blocks: SessionBlock[]): boolean {
 function groupToIntervalsT(repeat: number, on: SessionBlock, off: SessionBlock): string {
   const onPower = fmtPower(ZONE_TO_POWER[on.zone]);
   const offPower = fmtPower(ZONE_TO_POWER[off.zone]);
-  const onCad = PROFILE_TO_RPM[on.cadenceProfile];
-  const offCad = PROFILE_TO_RPM[off.cadenceProfile];
   const r = Math.max(1, Math.floor(repeat));
-  return `    <IntervalsT Repeat="${r}" OnDuration="${Math.max(1, Math.round(on.durationSec))}" OffDuration="${Math.max(1, Math.round(off.durationSec))}" OnPower="${onPower}" OffPower="${offPower}" Cadence="${onCad}" CadenceResting="${offCad}"/>`;
+  // IntervalsT no admite textevent anidado segun spec, asi que no se emiten
+  // Cadence/CadenceResting (no obligamos una cadencia fija). El rango
+  // orientativo de los profiles presentes viaja en el <description> global.
+  return `    <IntervalsT Repeat="${r}" OnDuration="${Math.max(1, Math.round(on.durationSec))}" OffDuration="${Math.max(1, Math.round(off.durationSec))}" OnPower="${onPower}" OffPower="${offPower}"/>`;
+}
+
+/**
+ * Compone una linea con los rangos de cadencia orientativos para los profiles
+ * presentes en el plan. Se concatena al <description> del workout para que el
+ * usuario vea las referencias incluso en bloques IntervalsT (que no aceptan
+ * textevent anidado).
+ */
+function describeCadenceRanges(plan: EditableSessionPlan): string {
+  const profiles = new Set<CadenceProfile>();
+  for (const item of plan.items) {
+    if (item.type === 'block') profiles.add(item.block.cadenceProfile);
+    else for (const b of item.blocks) profiles.add(b.cadenceProfile);
+  }
+  const labels: Record<CadenceProfile, string> = {
+    flat: 'flat 70-90 rpm',
+    climb: 'climb 55-80 rpm',
+    sprint: 'sprint 90-115 rpm',
+  };
+  const order: CadenceProfile[] = ['flat', 'climb', 'sprint'];
+  const present = order.filter((p) => profiles.has(p));
+  if (present.length === 0) return '';
+  return `Cadencias orientativas (no obligatorias): ${present.map((p) => labels[p]).join(' · ')}`;
 }
 
 export interface ZwoExportOptions {
@@ -150,7 +208,11 @@ export interface ZwoExportOptions {
  */
 export function exportZwo(plan: EditableSessionPlan, options: ZwoExportOptions = {}): string {
   const author = options.author ?? 'Cadencia';
-  const description = 'Generado por cadencia.movimientofuncional.app';
+  const cadenceLine = describeCadenceRanges(plan);
+  const description =
+    cadenceLine.length > 0
+      ? `Generado por cadencia.movimientofuncional.app\n${cadenceLine}`
+      : 'Generado por cadencia.movimientofuncional.app';
   const lines: string[] = [];
   for (const item of plan.items) {
     if (item.type === 'block') {
@@ -399,7 +461,8 @@ export function importZwo(xml: string): ZwoImportResult {
 // contra los mismos valores que usa el encoder/decoder.
 export const __testing = {
   ZONE_TO_POWER,
-  PROFILE_TO_RPM,
+  CADENCE_RANGE_BY_PROFILE,
+  recommendedRpm,
   powerToZone,
   inferCadenceProfile,
   defaultCadenceProfile,

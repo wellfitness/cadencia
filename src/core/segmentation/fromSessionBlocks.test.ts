@@ -226,14 +226,14 @@ describe('SESSION_TEMPLATES integracion', () => {
     expect(total).toBe(80 * 60);
   });
 
-  it('HIIT 10-20-30 suma 35 minutos (10 warmup + 4 × 5min + 5 cooldown)', () => {
+  it('HIIT 10-20-30 suma 43 minutos (10 warmup + 4 × (5min + 2min recovery) + 5 cooldown)', () => {
     const hiit = SESSION_TEMPLATES.find((t) => t.id === 'hiit-10-20-30');
     expect(hiit).toBeDefined();
     const expanded = expandSessionPlan({ name: 'x', items: [...hiit!.items] });
     const total = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
-    // 10' warmup + 4 × (5 × (30 + 20 + 10)) + 5' cooldown
-    // = 600 + 4 × 300 + 300 = 600 + 1200 + 300 = 2100 = 35 min
-    expect(total).toBe(2100);
+    // 10' warmup + 4 × (5 × (30 + 20 + 10) + 120) + 5' cooldown
+    // = 600 + 4 × 420 + 300 = 600 + 1680 + 300 = 2580 = 43 min
+    expect(total).toBe(2580);
   });
 });
 
@@ -266,19 +266,31 @@ describe('classifySessionPlan — preprocesado para plantillas reales', () => {
     expect(totalClassified).toBe(totalOriginal);
   });
 
-  it('HIIT 10-20-30: el set se fusiona en 1 macrobloque Z6 sprint', () => {
+  it('HIIT 10-20-30: cada bloque se fusiona en un macrobloque Z6 sprint, separados por recoveries Z2', () => {
     const hiit = SESSION_TEMPLATES.find((t) => t.id === 'hiit-10-20-30')!;
     const expanded = expandSessionPlan({ name: 'x', items: [...hiit.items] });
     const totalOriginal = expanded.blocks.reduce((acc, b) => acc + b.durationSec, 0);
 
     const segments = classifySessionPlan(expanded, userWithFtp);
 
-    expect(segments).toHaveLength(3);
+    // warmup + 4 × (macrobloque Z6 + recovery Z2) + cooldown = 10 segmentos
+    expect(segments).toHaveLength(10);
     expect(segments[0]?.zone).toBe(2); // warmup
-    expect(segments[1]?.zone).toBe(6); // macrobloque sprint
-    expect(segments[1]?.cadenceProfile).toBe('sprint');
-    expect(segments[1]?.durationSec).toBe(4 * 5 * (30 + 20 + 10)); // 1200
-    expect(segments[2]?.zone).toBe(1); // cooldown
+    expect(segments[9]?.zone).toBe(1); // cooldown
+
+    // 4 macrobloques Z6 sprint en posiciones impares 1, 3, 5, 7
+    for (const i of [1, 3, 5, 7]) {
+      expect(segments[i]?.zone, `segmento ${i} debe ser Z6`).toBe(6);
+      expect(segments[i]?.cadenceProfile, `segmento ${i} debe ser sprint`).toBe('sprint');
+      expect(segments[i]?.durationSec, `segmento ${i} dura 5 min`).toBe(5 * (30 + 20 + 10)); // 300
+    }
+    // 4 recoveries Z2 flat de 2 min en posiciones 2, 4, 6, 8 (incluye el ultimo
+    // del grupo × 4, antes del cooldown — convencion compartida con Noruego/etc).
+    for (const i of [2, 4, 6, 8]) {
+      expect(segments[i]?.zone, `segmento ${i} debe ser Z2`).toBe(2);
+      expect(segments[i]?.cadenceProfile, `segmento ${i} debe ser flat`).toBe('flat');
+      expect(segments[i]?.durationSec, `segmento ${i} dura 2 min`).toBe(120);
+    }
 
     const totalClassified = segments.reduce((acc, s) => acc + s.durationSec, 0);
     expect(totalClassified).toBe(totalOriginal);

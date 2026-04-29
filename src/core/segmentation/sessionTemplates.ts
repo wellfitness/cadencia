@@ -63,27 +63,29 @@ const SIT: SessionTemplate = {
 };
 
 /**
- * HIIT 10-20-30 (protocolo Bangsbo). El sub-ciclo de 1 minuto (30s suave +
- * 20s tempo + 10s sprint) se repite 5 veces dentro de cada bloque, y luego
- * el bloque de 5 minutos se repite 4 veces. Para evitar grupos anidados
- * pre-expandimos las 5 sub-rondas dentro del grupo principal × 4.
+ * HIIT 10-20-30 (protocolo Bangsbo original). El sub-ciclo de 1 minuto
+ * (30s suave + 20s tempo + 10s sprint) se repite 5 veces dentro de cada
+ * bloque, y luego el bloque de 5 minutos se repite 4 veces con 2 minutos
+ * de recuperacion Z2 entre cada uno (frontera fisiologica para que el set
+ * se "rompa" — sin esa pausa la sesion es muy dura de llevar). Para evitar
+ * grupos anidados pre-expandimos las 5 sub-rondas dentro del grupo principal
+ * × 4 y a~nadimos el descanso al final del bloque.
  */
 const HIIT_10_20_30: SessionTemplate = {
   id: 'hiit-10-20-30',
   name: 'HIIT 10-20-30',
   description:
-    'Protocolo Bangsbo: ciclos de 30 s suave, 20 s tempo y 10 s sprint, repetidos 5 veces por bloque, en 4 bloques. Mejora VO2max y umbral.',
+    'Protocolo Bangsbo: 4 bloques de 5 sub-ciclos (30 s suave, 20 s tempo, 10 s sprint) separados por 2 minutos de recuperación Z2. Mejora VO2max y umbral con menos desgaste neuromuscular que un sprint puro.',
   items: [
     single(block('hiit-warmup', 'warmup', 2, 10 * 60, 'Calentamiento')),
-    group(
-      'hiit-rounds',
-      4,
-      ['a', 'b', 'c', 'd', 'e'].flatMap((s) => [
+    group('hiit-rounds', 4, [
+      ...['a', 'b', 'c', 'd', 'e'].flatMap((s) => [
         block(`hiit-easy-${s}`, 'recovery', 2, 30, '30 s suave'),
         block(`hiit-tempo-${s}`, 'work', 3, 20, '20 s tempo'),
         block(`hiit-sprint-${s}`, 'work', 6, 10, '10 s sprint'),
       ]),
-    ),
+      block('hiit-rest', 'rest', 2, 2 * 60, 'Descanso entre bloques', 'flat'),
+    ]),
     single(block('hiit-cooldown', 'cooldown', 1, 5 * 60, 'Vuelta a la calma')),
   ],
 };

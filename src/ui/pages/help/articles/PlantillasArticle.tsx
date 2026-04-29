@@ -6,7 +6,7 @@ const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
   sit:
     'Cuando tienes 30 minutos justos y quieres un estímulo neuromuscular potente. Ideal para días sueltos sin programa.',
   'hiit-10-20-30':
-    'Para sumar tiempo en VO2max sin agotar las piernas. El sub-ciclo de 30/20/10 mantiene la frecuencia cardiaca alta entre los pequeños sprints sin necesidad de recuperación profunda.',
+    'Para sumar tiempo en VO2max sin agotar las piernas. Dentro de cada bloque, el sub-ciclo 30/20/10 mantiene la frecuencia cardiaca alta sin recuperación profunda; entre bloques, los 2 min en Z2 dejan respirar antes del siguiente envite — protocolo Bangsbo original.',
   'noruego-4x4':
     'El estándar oro para mejorar VO2max. Si solo pudieras hacer una sesión a la semana, sería esta. Coste: muy alta percepción del esfuerzo.',
   'zona2-continuo':

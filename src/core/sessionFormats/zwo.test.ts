@@ -58,6 +58,28 @@ describe('zwo: inferCadenceProfile', () => {
   });
 });
 
+describe('zwo: recommendedRpm', () => {
+  it('flat: ~80 rpm en Z1-Z2, sube en Z3-Z4', () => {
+    expect(__testing.recommendedRpm(1, 'flat')).toBe(80);
+    expect(__testing.recommendedRpm(2, 'flat')).toBe(80);
+    expect(__testing.recommendedRpm(3, 'flat')).toBe(82);
+    expect(__testing.recommendedRpm(4, 'flat')).toBe(85);
+  });
+
+  it('climb: alto en Z3-Z4 (75 rpm), bajo solo en Z5 (muro de fuerza)', () => {
+    // En Z3/Z4 la cadencia recomendada es ALTA dentro del rango 55-80, no
+    // baja: lo eficiente en escalada moderada es pedaleo redondo, no fuerza.
+    expect(__testing.recommendedRpm(3, 'climb')).toBe(75);
+    expect(__testing.recommendedRpm(4, 'climb')).toBe(75);
+    // Z5 es la excepcion: muro de fuerza con cadencia baja.
+    expect(__testing.recommendedRpm(5, 'climb')).toBe(65);
+  });
+
+  it('sprint: 105 rpm en Z6', () => {
+    expect(__testing.recommendedRpm(6, 'sprint')).toBe(105);
+  });
+});
+
 describe('zwo: exportZwo', () => {
   it('genera XML con cabecera, sportType bike y elementos', () => {
     const plan: EditableSessionPlan = {
@@ -132,6 +154,113 @@ describe('zwo: exportZwo', () => {
     expect(xml).toContain('Repeat="4"');
     expect(xml).toContain('OnDuration="240"');
     expect(xml).toContain('OffDuration="180"');
+  });
+
+  it('SteadyState NO emite Cadence fijo y lleva textevent con rango orientativo', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Test',
+      items: [
+        {
+          type: 'block',
+          block: {
+            id: 'b1',
+            phase: 'work',
+            zone: 4,
+            cadenceProfile: 'climb',
+            durationSec: 240,
+          },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    // El SteadyState no debe llevar atributo Cadence (no obligamos cadencia).
+    expect(xml).not.toMatch(/<SteadyState[^>]*\sCadence=/);
+    // Pero sí un textevent con el rango y la recomendacion.
+    expect(xml).toContain('<textevent');
+    expect(xml).toContain('timeoffset="0"');
+    expect(xml).toContain('Cadencia 55-80 rpm');
+    expect(xml).toContain('recomendado 75'); // Z4+climb → 75
+  });
+
+  it('Warmup y Cooldown emiten rango nativo Cadence/CadenceHigh', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Test',
+      items: [
+        {
+          type: 'block',
+          block: {
+            id: 'wu',
+            phase: 'warmup',
+            zone: 2,
+            cadenceProfile: 'flat',
+            durationSec: 300,
+          },
+        },
+        {
+          type: 'block',
+          block: {
+            id: 'cd',
+            phase: 'cooldown',
+            zone: 1,
+            cadenceProfile: 'flat',
+            durationSec: 300,
+          },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    // Rango nativo en flat: 70-90 rpm.
+    expect(xml).toMatch(/<Warmup[^>]*Cadence="70"[^>]*CadenceHigh="90"/);
+    expect(xml).toMatch(/<Cooldown[^>]*Cadence="70"[^>]*CadenceHigh="90"/);
+  });
+
+  it('IntervalsT NO emite Cadence ni CadenceResting', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Test',
+      items: [
+        {
+          type: 'group',
+          id: 'g1',
+          repeat: 4,
+          blocks: [
+            { id: 'on', phase: 'work', zone: 4, cadenceProfile: 'flat', durationSec: 240 },
+            {
+              id: 'off',
+              phase: 'recovery',
+              zone: 2,
+              cadenceProfile: 'flat',
+              durationSec: 180,
+            },
+          ],
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    expect(xml).toContain('<IntervalsT');
+    expect(xml).not.toMatch(/<IntervalsT[^>]*\sCadence=/);
+    expect(xml).not.toMatch(/<IntervalsT[^>]*CadenceResting=/);
+  });
+
+  it('description incluye los rangos orientativos de los profiles presentes', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Test',
+      items: [
+        {
+          type: 'block',
+          block: { id: 'a', phase: 'work', zone: 4, cadenceProfile: 'climb', durationSec: 60 },
+        },
+        {
+          type: 'block',
+          block: { id: 'b', phase: 'work', zone: 6, cadenceProfile: 'sprint', durationSec: 30 },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    expect(xml).toContain('Cadencias orientativas');
+    expect(xml).toContain('climb 55-80 rpm');
+    expect(xml).toContain('sprint 90-115 rpm');
+    // Solo los profiles presentes — flat no aparece.
+    expect(xml).not.toContain('flat 70-90 rpm');
   });
 
   it('grupo de 3+ bloques se expande como bloques sueltos repetidos', () => {

@@ -51,14 +51,15 @@ const MANUAL_BARS_24: Partial<Record<SessionTemplateId, readonly HeartRateZone[]
     4, 4, 4, 2,
     1, 1, 1, 1,
   ],
-  // 6 + 3×4 + 6 = 24 — 4 ciclos visibles del 30/20/10
+  // 5 + 4×4 + 3 = 24 — 4 bloques del 30/20/10, cada uno con 3 barras de
+  // sub-ciclo (Z2-Z3-Z6) + 1 barra Z2 de descanso entre series (Bangsbo)
   'hiit-10-20-30': [
-    2, 2, 2, 2, 2, 2,
-    2, 3, 6,
-    2, 3, 6,
-    2, 3, 6,
-    2, 3, 6,
-    1, 1, 1, 1, 1, 1,
+    2, 2, 2, 2, 2,
+    2, 3, 6, 2,
+    2, 3, 6, 2,
+    2, 3, 6, 2,
+    2, 3, 6, 2,
+    1, 1, 1,
   ],
   // 5 + 2×6 + 7 = 24 — 6 intervalos Z5 alternados con recuperacion Z1
   'vo2max-cortos': [
@@ -95,7 +96,7 @@ const MANUAL_BARS_8: Partial<Record<SessionTemplateId, readonly HeartRateZone[]>
   'tempo-mlss': [2, 3, 2, 3, 2, 3, 2, 1],
   'umbral-progresivo': [2, 4, 2, 4, 2, 4, 2, 1],
   'noruego-4x4': [2, 4, 2, 4, 2, 4, 2, 1],
-  'hiit-10-20-30': [2, 2, 6, 3, 6, 3, 1, 1],
+  'hiit-10-20-30': [2, 6, 2, 6, 2, 6, 2, 1],
   'vo2max-cortos': [2, 5, 1, 5, 1, 5, 1, 1],
   sit: [2, 6, 1, 6, 1, 6, 1, 1],
 };

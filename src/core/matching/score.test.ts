@@ -74,7 +74,7 @@ describe('scoreTrack', () => {
     expect(dFar).toBeGreaterThan(0); // sigue siendo candidato
   });
 
-  it('siempre devuelve valor entre 0 y 1', () => {
+  it('track de catalogo predefinido (source != "user") queda en [0..1]', () => {
     const t = track({ tempoBpm: 80, energy: 1, valence: 1, genres: ['edm'] });
     const score = scoreTrack(t, z3, ['edm']);
     expect(score).toBeGreaterThanOrEqual(0);
@@ -86,5 +86,31 @@ describe('scoreTrack', () => {
     const a = scoreTrack(t, z3, ['trance']);
     const b = scoreTrack(t, z3, ['trance']);
     expect(a).toBe(b);
+  });
+
+  it('track con source "user" recibe bonus aditivo de 0.08 sobre el score base', () => {
+    const base = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, source: 'cinelli_rider' });
+    const userTrack = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, source: 'user' });
+    const diff = scoreTrack(userTrack, z3, []) - scoreTrack(base, z3, []);
+    expect(diff).toBeCloseTo(0.08, 5);
+  });
+
+  it('bonus user puede empujar el score por encima de 1.0', () => {
+    // Track perfecto en todas las dimensiones (genero matched) + source 'user':
+    // cadencia=1, energy=1, valence=1, genre=1 → 1.0 + 0.08 = 1.08
+    const t = track({
+      tempoBpm: 80,
+      energy: 0.7,
+      valence: 0.55,
+      genres: ['edm'],
+      source: 'user',
+    });
+    expect(scoreTrack(t, z3, ['edm'])).toBeCloseTo(1.08, 2);
+  });
+
+  it('bonus user es uniforme: dos tracks "user" identicos puntuan igual', () => {
+    const a = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, source: 'user' });
+    const b = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, source: 'user' });
+    expect(scoreTrack(a, z3, [])).toBe(scoreTrack(b, z3, []));
   });
 });

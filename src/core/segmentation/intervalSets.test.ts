@@ -156,6 +156,74 @@ describe('detectIntervalSets', () => {
       expect(result[0]!.zone).toBe(6);
       expect(result[0]!.durationSec).toBe(90);
     });
+
+    it('recovery ≥90s en mitad rompe el set en dos macrobloques (HIIT 10-20-30 con descanso Bangsbo)', () => {
+      // Patron real del 10-20-30 con descanso entre bloques: 5 sub-ciclos
+      // (recovery+work+work) seguidos de un rest 120s, repetido 2 veces.
+      const blocks: SessionBlock[] = [];
+      for (let r = 0; r < 2; r++) {
+        for (const s of ['a', 'b', 'c', 'd', 'e']) {
+          blocks.push(makeBlock(`easy-${r}-${s}`, 2, 'flat', 30, 'recovery'));
+          blocks.push(makeBlock(`tempo-${r}-${s}`, 3, 'flat', 20, 'work'));
+          blocks.push(makeBlock(`sprint-${r}-${s}`, 6, 'sprint', 10, 'work'));
+        }
+        blocks.push(makeBlock(`rest-${r}`, 2, 'flat', 120, 'rest'));
+      }
+      const result = detectIntervalSets(blocks);
+      // 2 macrobloques Z6 sprint + 2 rests = 4 elementos
+      expect(result).toHaveLength(4);
+      expect(result[0]!.zone).toBe(6);
+      expect(result[0]!.durationSec).toBe(300);
+      expect(result[1]!.id).toBe('rest-0');
+      expect(result[1]!.durationSec).toBe(120);
+      expect(result[2]!.zone).toBe(6);
+      expect(result[2]!.durationSec).toBe(300);
+      expect(result[3]!.id).toBe('rest-1');
+    });
+
+    it('recovery <90s NO rompe el set (los 30s suaves del 10-20-30 son intra-set)', () => {
+      // Solo 30s de recovery entre work-work — sigue siendo parte del estimulo.
+      const blocks: SessionBlock[] = [
+        makeBlock('w0', 6, 'sprint', 10, 'work'),
+        makeBlock('r0', 2, 'flat', 30, 'recovery'),
+        makeBlock('w1', 6, 'sprint', 10, 'work'),
+        makeBlock('r1', 2, 'flat', 30, 'recovery'),
+      ];
+      const result = detectIntervalSets(blocks);
+      expect(result).toHaveLength(1);
+      expect(result[0]!.zone).toBe(6);
+      expect(result[0]!.durationSec).toBe(80);
+    });
+
+    it('recovery exactamente 90s rompe el set entre 2 macrobloques (umbral inclusivo)', () => {
+      // 2 sub-ciclos del 10-20-30 + descanso 90s + 2 sub-ciclos.
+      const blocks: SessionBlock[] = [
+        // bloque 1: 2 sub-ciclos
+        makeBlock('e1', 2, 'flat', 30, 'recovery'),
+        makeBlock('t1', 3, 'flat', 20, 'work'),
+        makeBlock('s1', 6, 'sprint', 10, 'work'),
+        makeBlock('e2', 2, 'flat', 30, 'recovery'),
+        makeBlock('t2', 3, 'flat', 20, 'work'),
+        makeBlock('s2', 6, 'sprint', 10, 'work'),
+        // descanso 90s justos — limite inclusivo
+        makeBlock('rest', 2, 'flat', 90, 'rest'),
+        // bloque 2: 2 sub-ciclos
+        makeBlock('e3', 2, 'flat', 30, 'recovery'),
+        makeBlock('t3', 3, 'flat', 20, 'work'),
+        makeBlock('s3', 6, 'sprint', 10, 'work'),
+        makeBlock('e4', 2, 'flat', 30, 'recovery'),
+        makeBlock('t4', 3, 'flat', 20, 'work'),
+        makeBlock('s4', 6, 'sprint', 10, 'work'),
+      ];
+      const result = detectIntervalSets(blocks);
+      expect(result).toHaveLength(3);
+      expect(result[0]!.zone).toBe(6);
+      expect(result[0]!.durationSec).toBe(120); // 2 × (30+20+10)
+      expect(result[1]!.id).toBe('rest');
+      expect(result[1]!.durationSec).toBe(90);
+      expect(result[2]!.zone).toBe(6);
+      expect(result[2]!.durationSec).toBe(120);
+    });
   });
 
   describe('Casos sin patron', () => {
