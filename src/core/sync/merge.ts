@@ -1,4 +1,4 @@
-import type { SyncedData } from './types';
+import type { SavedSession, SyncedData } from './types';
 import { emptySyncedData } from './schema';
 
 /**
@@ -67,10 +67,31 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
     }
   }
 
-  // Placeholder para Tarea 3 (array merge): por ahora wins remote completo.
-  merged.savedSessions = remote.savedSessions;
-  if (remote._sectionMeta.savedSessions) {
-    merged._sectionMeta.savedSessions = remote._sectionMeta.savedSessions;
+  // Array merge por id, LWW por item. Tombstones (deletedAt) participan
+  // como una version mas: gana la mas reciente. Una version sin deletedAt
+  // mas nueva que un tombstone "resucita" el item.
+  const byId = new Map<string, SavedSession>();
+  for (const item of local.savedSessions) byId.set(item.id, item);
+  for (const remoteItem of remote.savedSessions) {
+    const localItem = byId.get(remoteItem.id);
+    if (!localItem) {
+      byId.set(remoteItem.id, remoteItem);
+      continue;
+    }
+    const localTime = new Date(localItem.updatedAt).getTime();
+    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    byId.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
+  }
+  merged.savedSessions = Array.from(byId.values());
+
+  // Meta de la seccion: max de los item.updatedAt
+  const sessionTimes = merged.savedSessions
+    .map((s) => new Date(s.updatedAt).getTime())
+    .filter((t) => Number.isFinite(t));
+  if (sessionTimes.length > 0) {
+    merged._sectionMeta.savedSessions = {
+      updatedAt: new Date(Math.max(...sessionTimes)).toISOString(),
+    };
   }
 
   // updatedAt = max de los timestamps de seccion presentes
