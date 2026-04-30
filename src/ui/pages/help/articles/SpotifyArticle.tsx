@@ -13,7 +13,7 @@ const FAQS: readonly FaqItem[] = [
       'Para crear la lista en tu biblioteca, sí — Spotify exige Premium para escribir listas desde aplicaciones de terceros. Para previsualizar el emparejamiento y exportar la sesión a .zwo (Zwift, TrainerRoad, etc.) no hace falta cuenta.',
   },
   {
-    q: '¿Por qué no aparece mi cuenta de Spotify al pulsar "Crear lista"?',
+    q: '¿Por qué no aparece mi cuenta de Spotify al pulsar «Crear lista»?',
     a:
       'Cadencia usa OAuth PKCE: abre la página oficial de acceso a Spotify en una pestaña separada. Si tienes bloqueador de ventanas emergentes o el navegador en modo estricto, puede impedirlo. Permite ventanas emergentes para cadencia.movimientofuncional.app y vuelve a intentarlo.',
   },
@@ -35,17 +35,22 @@ const FAQS: readonly FaqItem[] = [
   {
     q: '¿Mis datos van a algún sitio?',
     a:
-      'No. Cadencia no tiene servidor ni base de datos. Tu peso, FC, FTP, GPX y plan de sesión viven solo en el almacenamiento de sesión de tu pestaña — se borran al cerrarla. El token de Spotify también es de sesión, expira en una hora y nunca toca disco persistente. Es la razón por la que no hay registro ni autenticación propia.',
+      'No. Cadencia no tiene servidor ni base de datos. Tu plan de sesión, tu GPX y tu progreso del asistente viven en el almacenamiento de tu pestaña y se borran al cerrarla. Tus datos duraderos (peso, FC, FTP, géneros musicales, sesiones guardadas, listas propias y entradas del calendario) se guardan en este dispositivo solo si activas «Recordar mis datos» desde Mis preferencias, y se sincronizan entre dispositivos solo si conectas tu propio Google Drive — la carpeta `drive.appdata` es privada y exclusiva de Cadencia, nosotros no la vemos. El token de Spotify es siempre de sesión y expira en una hora.',
   },
   {
     q: '¿Cómo subo mis propias listas de canciones?',
     a:
-      'En el paso "Música", elige fuente "Mías" o "Ambas" y arrastra el CSV de exportación de Spotify (con columnas Track URI, Tempo, Energy, Valence). La app deduplica por URI: las que coinciden con el catálogo nativo se cuentan una sola vez.',
+      'En el paso «Música», elige fuente «Mías» o «Ambas» y arrastra el CSV de exportación de Spotify (con columnas Track URI, Tempo, Energy, Valence). La app deduplica por URI: las que coinciden con el catálogo nativo se cuentan una sola vez. Tus listas se guardan automáticamente en este dispositivo y, si tienes Drive conectado, se sincronizan al resto. Para gestionarlas: Mis preferencias → Catálogo de música → «Editar catálogo» → pestaña «Mis listas».',
   },
   {
-    q: '¿"Regenerar lista" cambia mucho la lista?',
+    q: '¿«Regenerar lista» cambia mucho la lista?',
     a:
-      'El botón "🎲 Regenerar lista" cambia la semilla aleatoria del motor. Para cada bloque, hace un muestreo ponderado entre los 5 mejores candidatos del ranking de cadencia — así puedes hacer la misma sesión Noruego 4×4 cada martes con música distinta sin perder calidad. Si quieres reproducibilidad total, no toques el botón.',
+      'El botón «🎲 Regenerar lista» cambia la semilla aleatoria del motor. Para cada bloque, hace un muestreo ponderado entre los 5 mejores candidatos del ranking de cadencia — así puedes hacer la misma sesión Noruego 4×4 cada martes con música distinta sin perder calidad. Si quieres reproducibilidad total, no toques el botón.',
+  },
+  {
+    q: '¿Cómo descarto una canción que no me gusta?',
+    a:
+      'En el paso «A pedalear» (resultado), cada canción tiene tres botones: «Aleatorio» (sustituye por otra al azar), «Otro tema» (eliges del menú) y «No la quiero» (descarte permanente). El descarte se guarda en tu lista de canciones rechazadas y la canción no volverá a aparecer en futuras listas. Para revisarlas o recuperarlas: Mis preferencias → Catálogo de música → «Editar catálogo» → pestaña «Descartadas».',
   },
 ];
 
@@ -57,9 +62,11 @@ export function SpotifyArticle(): JSX.Element {
     >
       <Card variant="info" className="mb-6" title="Privacidad: nada va a ningún servidor" titleIcon="shield">
         <p className="text-sm text-gris-700 leading-relaxed">
-          Cadencia es 100% cliente. Tu peso, FC, FTP, GPX y plan de sesión viven en el
-          almacenamiento de sesión de tu pestaña. El token de Spotify es de sesión y
-          expira en una hora. Sin acceso, sin servidor, sin analítica de seguimiento.
+          Cadencia es 100% cliente. Tu GPX y el progreso del asistente viven en la
+          pestaña actual y se borran al cerrarla. Tus ajustes y sesiones guardadas
+          permanecen en este dispositivo solo si tú lo activas, y solo viajan a otros
+          dispositivos si conectas tu propio Google Drive. El token de Spotify es de
+          sesión y expira en una hora. Sin servidor, sin analítica de seguimiento.
         </p>
       </Card>
 

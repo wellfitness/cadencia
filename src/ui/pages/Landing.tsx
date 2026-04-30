@@ -27,6 +27,7 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
         <HowItWorks />
         <InteropZwo />
         <PersonalizedRanges />
+        <PlanningCalendar />
         <WhyItWorks />
         <Privacy />
         <Faq />
@@ -1103,6 +1104,193 @@ function Faq(): JSX.Element {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * PlanningCalendar: bloque que destaca la nueva funcionalidad de calendario de
+ * planificacion (/calendario). Patron visual hermano de InteropZwo y del bloque
+ * Intro: 2 columnas en lg+ con copy a la izquierda (H2 + lista de beneficios
+ * con MaterialIcon turquesa) y un mockup flotante a la derecha (CalendarMockup).
+ *
+ * El H2 sigue el patron "frase + span turquesa-600" usado en Intro/InteropZwo
+ * para coherencia visual. La lista de 4 beneficios cubre los 4 ejes del
+ * producto: tipos de evento, modalidad indoor/outdoor, integracion en cabecera
+ * con TodayBadge y sincronizacion con Drive.
+ *
+ * Footer pequeno reafirma la promesa "funciona local sin Drive, sincroniza si
+ * lo conectas" — alinea con el bloque Privacy de la propia landing.
+ */
+function PlanningCalendar(): JSX.Element {
+  return (
+    <section aria-labelledby="planning-calendar-title" className="bg-white">
+      <div className="mx-auto w-full max-w-6xl px-4 py-12 md:py-16">
+        <div className="grid lg:grid-cols-[1.1fr,1fr] gap-8 lg:gap-12 items-center">
+          <div className="text-center lg:text-left">
+            <h2
+              id="planning-calendar-title"
+              className="font-display text-gris-800 text-3xl md:text-4xl mb-4"
+            >
+              Tu plan, <span className="text-turquesa-600">semana a semana</span>
+            </h2>
+            <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
+              Programa tus rutas y sesiones indoor en el calendario. Cadencia te
+              las recuerda y, cuando llegue el día, las carga listas en el
+              asistente.
+            </p>
+            <ul className="space-y-3 mb-2 max-w-xl mx-auto lg:mx-0 text-left">
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="event_repeat" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Sesiones puntuales o recurrentes (todos los martes y jueves).</span>
+              </li>
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="directions_bike" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Indoor con plan completo, outdoor con enlace a Strava o Komoot.</span>
+              </li>
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="notifications_active" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Tu próximo entreno, siempre visible en la cabecera.</span>
+              </li>
+              <li className="flex gap-3 text-base md:text-lg text-gris-700">
+                <MaterialIcon name="cloud_sync" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Se sincroniza con Drive entre dispositivos.</span>
+              </li>
+            </ul>
+          </div>
+          <div className="flex justify-center w-full">
+            <div className="w-full max-w-sm sm:max-w-md">
+              <CalendarMockup />
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-gris-500 mt-6 text-center">
+          Funciona localmente sin Drive. Si lo conectas, tu calendario viaja
+          entre tu móvil y tu portátil.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Mock visual del calendario: card flotante con vista lista (3 entradas
+ * hardcodeadas) que ilustra los dos tipos de evento (indoor/outdoor) y el
+ * concepto de recurrencia. Hermano de HeroMockup y ZwoMockup en lenguaje
+ * visual: white bg, rounded-2xl, shadow-xl, border gris-200, micro-rotacion
+ * que se neutraliza en hover.
+ *
+ * Cada fila combina:
+ *   - Icono con color tematico (turquesa para indoor, tulipTree para outdoor).
+ *   - Etiqueta de dia ("Hoy" / "Mañana" / "Jueves") en font-semibold gris-800.
+ *   - Titulo del evento entre comillas tipograficas.
+ *   - Chip de tipo (indoor/outdoor) con icono auxiliar (event_repeat para
+ *     entradas recurrentes, link externo para outdoor con URL).
+ */
+function CalendarMockup(): JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      className="relative w-full max-w-md transform rotate-0 sm:-rotate-1 transition-transform duration-300 hover:rotate-0"
+    >
+      <div className="bg-white rounded-2xl shadow-xl border border-gris-200 p-5 md:p-6 space-y-4">
+        <header className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wider text-gris-500 mb-0.5">
+              Tu calendario
+            </p>
+            <p className="font-display text-lg text-gris-800 leading-tight truncate">
+              Próximos entrenos
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-bold text-turquesa-700 bg-turquesa-100 border border-turquesa-300 px-2.5 py-1 rounded-full whitespace-nowrap">
+            <MaterialIcon name="calendar_today" size="small" />
+            Esta semana
+          </span>
+        </header>
+
+        <ul className="space-y-2.5">
+          {/* Hoy: sesion indoor concreta (no recurrente) */}
+          <li className="flex items-center gap-3 p-3 rounded-lg bg-turquesa-50 border border-turquesa-100">
+            <span className="flex items-center justify-center rounded-md bg-turquesa-600 text-white w-10 h-10 flex-shrink-0">
+              <MaterialIcon name="directions_bike" size="medium" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-turquesa-700">
+                  Hoy
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-turquesa-700 bg-white border border-turquesa-200 px-1.5 py-0.5 rounded">
+                  Indoor
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-gris-800 truncate">
+                «Noruego 4×4»
+              </p>
+            </div>
+          </li>
+
+          {/* Manana: ruta outdoor con enlace a Strava */}
+          <li className="flex items-center gap-3 p-3 rounded-lg bg-gris-50 border border-gris-200">
+            <span className="flex items-center justify-center rounded-md bg-tulipTree-500 text-white w-10 h-10 flex-shrink-0">
+              <MaterialIcon name="landscape" size="medium" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-gris-700">
+                  Mañana
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-tulipTree-600 bg-white border border-tulipTree-200 px-1.5 py-0.5 rounded">
+                  Outdoor
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-gris-800 truncate">
+                «Vuelta al pantano»
+              </p>
+              <p className="text-xs text-gris-500 inline-flex items-center gap-0.5">
+                Strava
+                <MaterialIcon name="open_in_new" size="small" decorative />
+              </p>
+            </div>
+          </li>
+
+          {/* Jueves: indoor recurrente (todos los jueves) */}
+          <li className="flex items-center gap-3 p-3 rounded-lg bg-gris-50 border border-gris-200">
+            <span className="flex items-center justify-center rounded-md bg-turquesa-600 text-white w-10 h-10 flex-shrink-0">
+              <MaterialIcon name="directions_bike" size="medium" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-gris-700">
+                  Jueves
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-turquesa-700 bg-white border border-turquesa-200 px-1.5 py-0.5 rounded">
+                  Indoor
+                </span>
+                <span
+                  className="inline-flex items-center text-turquesa-600"
+                  title="Evento recurrente"
+                >
+                  <MaterialIcon name="event_repeat" size="small" />
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-gris-800 truncate">
+                «Z2 continuo»
+              </p>
+            </div>
+          </li>
+        </ul>
+
+        <div className="border-t border-gris-100 pt-3 flex items-center justify-between">
+          <p className="text-xs text-gris-500">
+            3 entradas · Esta semana
+          </p>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-turquesa-700">
+            Ver todo
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 

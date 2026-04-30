@@ -77,7 +77,9 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
-Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con tabs nativo/listas-propias y persistencia automática), `MyPreferencesPage` (`/preferencias`, vista consolidada de todos los datos guardados del usuario), `HelpRouter` (`/ayuda/*`).
+Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con pestañas nativo/listas-propias/descartadas y persistencia automática), `MyPreferencesPage` (`/preferencias`, vista consolidada de los datos guardados del usuario; alias `/cuenta` por retrocompatibilidad), `CalendarPage` (`/calendario`, planificación de entrenamientos en vista lista o mes), `HelpRouter` (`/ayuda/*`).
+
+El **header del wizard** incluye un botón directo «Mis preferencias» (icono `manage_accounts`) y un `TodayBadge` que muestra el próximo entreno planificado y permite cargarlo de un click sin pasar por el calendario.
 
 El estado **ephemeral** del wizard (paso actual, ruta procesada, lista casada, índices reemplazados, etc.) persiste en `sessionStorage` (`@ui/state/wizardStorage`) para sobrevivir al redirect del OAuth de Spotify (full page navigation a `/callback`). El estado **duradero** del usuario (inputs fisiológicos, preferencias musicales, sesiones guardadas) vive en `localStorage` vía `@ui/state/cadenciaStore` y se sincroniza opcionalmente con Google Drive (ver "Sincronización opcional con Google Drive" más abajo).
 
@@ -117,6 +119,9 @@ src/
       uploadedCsvs.ts         # createUploadedCsv (tombstones), list, get, update, delete
       dismissed.ts            # add/removeDismissedUri, isDismissed, clearAllDismissed
       nativeCatalogPrefs.ts   # set/getNativeCatalogPrefs, addExcludedUri, etc.
+    calendar/                 # Planificacion de entrenamientos
+      types.ts                # PlannedEvent (indoor|outdoor), EventInstance, recurrencia semanal
+      events.ts               # CRUD + expandRecurrences() + tombstones
 
   integrations/
     spotify/                  # OAuth PKCE + endpoints search/playlists/items
@@ -131,10 +136,15 @@ src/
       session-builder/        # BlockList, BlockEditor, TemplateGallery, RepeatGroup,
                               # SaveSessionDialog, MySavedSessionsTab
       sync/                   # GoogleSyncCard, SyncStatusBadge
+      calendar/               # CalendarListView, CalendarMonthView, EventEditorDialog
+      TodayBadge.tsx          # Badge de proximo entreno en header del wizard
       …                       # Resto: Stepper, Card, FileDropzone, ZoneBadge, Charts, etc.
+    lib/
+      loadPlannedEvent.ts     # Rehidrata un PlannedEvent en el wizard (indoor → SavedSession; outdoor → reset)
     pages/                    # Landing, SourceTypeStep, UserDataStep, RouteStep, MusicStep,
                               # ResultStep, SessionBuilder, SessionTVMode, SpotifyCallback,
-                              # CatalogEditorPage (/catalogo), MyPreferencesPage (/cuenta)
+                              # CatalogEditorPage (/catalogo), MyPreferencesPage (/preferencias),
+                              # CalendarPage (/calendario)
     state/                    # cadenciaStore (single source of truth localStorage),
                               # wizardStorage (sessionStorage para wizard ephemeral),
                               # userInputsReducer, migrateLegacyStorage
@@ -426,6 +436,7 @@ Para que el usuario pueda llevar sus datos entre el móvil y el ordenador sin re
 - `uploadedCsvs`: listas CSV propias subidas por el usuario. Persistimos el `csvText` raw (re-parseable con `parseTrackCsv` en cada device) en lugar de los tracks parseados — más compacto, source-of-truth honesta y resistente a cambios futuros del catálogo de Spotify.
 - `nativeCatalogPrefs`: denylist (`excludedUris`) de canciones del catálogo nativo desmarcadas en `CatalogEditorPage`. Modelo denylist en lugar de allowlist porque típicamente <50 URIs vs 800.
 - `dismissedTrackUris`: URIs descartadas globalmente desde el botón "X" de `ResultStep` ("A pedalear"). Aplicables a cualquier source. El livePool del wizard las filtra antes del matching.
+- `plannedEvents`: entradas del **calendario de planificación** (`/calendario`) — entrenamientos futuros que el usuario ha programado. Pueden ser puntuales o recurrentes semanales (`recurrence.daysOfWeek`), de tipo `indoor` (referencia a una `SavedSession` por id) o `outdoor` (nombre + URL externa opcional, sin GPX persistido). Borrado lógico vía `deletedAt` con expiry 30 días. Ver «Calendario de planificación» abajo.
 
 **Qué NO se sincroniza** (deliberadamente):
 
@@ -449,6 +460,7 @@ export interface SyncedData {
     uploadedCsvs?: SectionMeta;
     nativeCatalogPrefs?: SectionMeta;
     dismissedTrackUris?: SectionMeta;
+    plannedEvents?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
@@ -456,11 +468,12 @@ export interface SyncedData {
   uploadedCsvs: UploadedCsvRecord[];
   nativeCatalogPrefs: NativeCatalogPrefs | null;
   dismissedTrackUris: string[];
+  plannedEvents: PlannedEvent[];
 }
 ```
 
 - **Atomic LWW por sección** (`userInputs`, `musicPreferences`, `nativeCatalogPrefs`, `dismissedTrackUris`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
-- **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
+- **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`, `plannedEvents`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
 - **Anti-regresión**: si local está vacío y remote tiene datos, aplica remote sin merge. Si local tiene <30% de la riqueza de remote (instalación nueva), también aplica remote directo.
 - **Anti-ciclo**: flag `_applyingRemote` evita que `pull` dispare `push` tras actualizar `cadenciaStore` con datos descargados.
 
@@ -507,6 +520,49 @@ Pasos:
 
 ---
 
+## Calendario de planificación
+
+`/calendario` permite al usuario programar entrenamientos futuros sin salir de Cadencia. La entrada del calendario es un `PlannedEvent` (en [src/core/calendar/types.ts](src/core/calendar/types.ts)) y NO contiene el plan en sí — solo la metadata para localizarlo o describirlo. Esta separación entre «evento del calendario» y «contenido del entrenamiento» mantiene `plannedEvents` ligero (~200 bytes/entrada) aunque haya cientos de entradas a lo largo de los años.
+
+### Tipos de entrada
+
+| Tipo | Qué referencia | Al pulsar «Cargar» en la entrada |
+|---|---|---|
+| `indoor` | `savedSessionId` que apunta a una `SavedSession` del propio store | Rehidrata el plan completo (bloques, zonas, cadencias) en el `SessionBuilder` y salta el wizard al paso de Música |
+| `outdoor` | `name` + `externalUrl` opcional (Strava, Komoot, RideWithGPS) | Resetea el wizard a modo GPX y, si hay URL, la abre en pestaña nueva para que el usuario descargue el GPX el día del entrenamiento |
+
+El GPX **nunca** se persiste en `plannedEvents`. Razón: pueden ser MB y el usuario ya los tiene en Strava/Komoot. La planificación outdoor es solo un recordatorio con enlace.
+
+### Recurrencia
+
+```typescript
+recurrence: { daysOfWeek: number[] } | null   // null = puntual; array = recurrente semanal
+skippedDates: string[]                         // YYYY-MM-DD excluidos de la serie
+```
+
+- `null` → entrada puntual, aparece solo en `event.date`.
+- `{ daysOfWeek: [2, 4] }` → cada martes y jueves desde `event.date`. **Sin fecha de fin** (las series no expiran).
+- Para saltar una semana sin borrar la serie: añadir la fecha a `skippedDates`. La UI ofrece «Saltar este día» en cada `EventInstance`.
+- Editar la entrada modifica **toda la serie**: no hay edición por instancia. Si el usuario quiere una excepción, debe saltar la instancia y crear una entrada puntual nueva ese día.
+
+`expandRecurrences(events, from, to)` (en `events.ts`) genera el array de `EventInstance` resueltas en una ventana de fechas — usado por la vista mes y por el `TodayBadge`.
+
+### Tombstones y sincronización
+
+- Borrado lógico igual que `savedSessions`/`uploadedCsvs`: campo `deletedAt`, propagación via array merge LWW, purga automática a los 30 días con `cleanExpiredTombstones`.
+- Sincroniza vía `plannedEvents` en `SyncedData` (sección con tombstones, no atomic LWW). Si el usuario crea una entrada en el móvil y borra otra en el portátil, ambos cambios sobreviven al merge.
+
+### Acceso rápido desde el wizard
+
+El **`TodayBadge`** (`src/ui/components/TodayBadge.tsx`) se ancla en el header del wizard y muestra:
+
+- El próximo `EventInstance` (puntual o recurrente) cuya fecha sea `>= hoy`.
+- Un botón directo «Cargar este entreno» que invoca `loadPlannedEventToWizard` ([src/ui/lib/loadPlannedEvent.ts](src/ui/lib/loadPlannedEvent.ts)) — si hay progreso del wizard sin guardar, abre `ConfirmDialog` antes de sobrescribir.
+
+Si el usuario no tiene entradas, el badge se oculta. No hay notificaciones nativas (PWA) — el badge sustituye a las push, evitando complicar el flujo de permisos del navegador.
+
+---
+
 ## Diseño UI
 
 - **Estética**: light mode, design-system de Movimiento Funcional (`.claude/skills/design-system/SKILL.md`). Optimizado para legibilidad, accesibilidad WCAG 2.1 AA y zonas táctiles ≥44 px.
@@ -528,7 +584,20 @@ Pasos:
 2. **Cálculos físicos viven en `src/core/`** y no tocan React/DOM. Cada fórmula nueva entra con su test unitario.
 3. **Nada de `any`** en TypeScript. Si un tipo es genuinamente desconocido, `unknown` + narrowing explícito.
 4. **El motor de matching debe ser determinista**: misma entrada → misma salida.
-5. **Open source colaborativo**: nombres de variables, funciones y archivos en **inglés**. Comentarios y commits en **castellano** correcto (con ñ y tildes), evitando anglicismos en UI (no "setup", "default", "playlist" en copy de usuario; sí términos técnicos del dominio: FTP, GPX, Spotify).
+5. **Open source colaborativo**: nombres de variables, funciones y archivos en **inglés**. Comentarios y commits en **castellano** correcto (con ñ y tildes). En **copy de usuario** (UI, FAQs, artículos de ayuda) evitar anglicismos innecesarios — usar el equivalente castellano cuando exista:
+
+   | No usar | Usar |
+   |---|---|
+   | wizard | asistente |
+   | playlist (en narrativa) | lista / sesión |
+   | tab | pestaña |
+   | popup | ventana emergente |
+   | dropdown | menú |
+   | track (en narrativa) | tema / canción |
+   | setup | configuración |
+   | default | predeterminado / por defecto |
+
+   Excepción: términos del léxico oficial de un servicio cuando son nombres propios (ej. botón "Crear playlist en Spotify" porque Spotify llama a su entidad «playlist»). Para términos técnicos del dominio sin equivalente castellano natural se mantiene el original (FTP, GPX, BPM, OAuth, JSON, Karvonen, Coggan). Comillas tipográficas «...» en lugar de "..." cuando el texto es narrativo.
 6. **Pre-commit Husky** ejecuta `pnpm typecheck` + `pnpm lint`. **Nunca `git commit --no-verify`**: si un check falla, arreglar la causa.
 
 ---

@@ -67,11 +67,11 @@ export const HELP_ARTICLES: readonly HelpArticleMeta[] = [
   {
     slug: 'sincronizar-drive',
     path: '/ayuda/sincronizar-drive',
-    icon: 'cloud_sync',
-    title: 'Sincronizar con Google Drive',
+    icon: 'manage_accounts',
+    title: 'Mis preferencias, calendario y sincronización',
     description:
-      'Cómo conectar Drive opcionalmente para llevar tus ajustes y sesiones entre dispositivos.',
-    readTime: '4 min',
+      'Qué guarda Cadencia de ti, dónde lo edita, cómo planificar tus entrenamientos y cómo llevar todo entre dispositivos con Google Drive.',
+    readTime: '6 min',
   },
 ];
 
