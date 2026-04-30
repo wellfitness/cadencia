@@ -35,14 +35,42 @@ describe('drive-api', () => {
     expect(result?.version).toBe('7');
   });
 
-  it('readFile parsea JSON', async () => {
+  it('readFile parsea JSON valido', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          schemaVersion: 1,
+          updatedAt: new Date().toISOString(),
+          _sectionMeta: {},
+          userInputs: null,
+          musicPreferences: null,
+          savedSessions: [],
+          uploadedCsvs: [],
+          nativeCatalogPrefs: null,
+          dismissedTrackUris: [],
+          plannedEvents: [],
+        }),
+        { status: 200 },
+      ),
+    );
+    const result = await readFile('token', 'fileId');
+    expect(result.schemaVersion).toBe(1);
+  });
+
+  it('readFile devuelve blob vacio si el JSON remoto esta corrupto (regresion A4)', async () => {
+    // Falta uploadedCsvs, dismissedTrackUris, plannedEvents — guard isSyncedData
+    // deberia rechazar y readFile devolver emptySyncedData en lugar de
+    // propagar el blob malformado al merge.
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ schemaVersion: 1, savedSessions: [] }), {
         status: 200,
       }),
     );
     const result = await readFile('token', 'fileId');
-    expect(result.schemaVersion).toBe(1);
+    expect(result.savedSessions).toEqual([]);
+    expect(result.uploadedCsvs).toEqual([]);
+    expect(result.plannedEvents).toEqual([]);
+    expect(result.dismissedTrackUris).toEqual([]);
   });
 
   it('retry automatico en 401 si hay token refresher', async () => {

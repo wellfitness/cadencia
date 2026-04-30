@@ -104,13 +104,15 @@ const PROFILE_IDEAL_BY_ZONE: Record<
  * cadenceProfile devuelto es 'flat' (placeholder informativo, no usado por
  * el matcher).
  *
- * Sport default 'bike' por retrocompatibilidad: tests y callers que aun no
- * pasan sport explicito siguen recibiendo el comportamiento ciclista.
+ * `sport` es OBLIGATORIO sin default. Antes existia un default 'bike' por
+ * retrocompat que enmascaraba un bug critico: las sesiones de running se
+ * matcheaban con rangos de bike. Para que TypeScript fuerce a propagar el
+ * sport en cada call site, el parametro ahora es requerido.
  */
 export function getZoneCriteria(
   zone: HeartRateZone,
   profile: CadenceProfile,
-  sport: Sport = 'bike',
+  sport: Sport,
 ): ZoneMusicCriteria {
   const ideal = PROFILE_IDEAL_BY_ZONE[zone];
   if (sport === 'run') {
@@ -182,14 +184,16 @@ export function applyAllEnergetic(
 
 /**
  * Compatibilidad: sitios del codigo que aun referencian
- * `ZONE_MUSIC_CRITERIA[zone]`. Devolvemos los criterios del profile default
- * de cada zona.
+ * `ZONE_MUSIC_CRITERIA[zone]`. Devolvemos los criterios bike del profile
+ * default de cada zona — equivalente al comportamiento previo cuando sport
+ * tenia default 'bike'. Codigo nuevo debe llamar a `getZoneCriteria` con el
+ * sport explicito.
  */
 export const ZONE_MUSIC_CRITERIA: Record<HeartRateZone, ZoneMusicCriteria> = {
-  1: getZoneCriteria(1, defaultCadenceProfile(1)),
-  2: getZoneCriteria(2, defaultCadenceProfile(2)),
-  3: getZoneCriteria(3, defaultCadenceProfile(3)),
-  4: getZoneCriteria(4, defaultCadenceProfile(4)),
-  5: getZoneCriteria(5, defaultCadenceProfile(5)),
-  6: getZoneCriteria(6, defaultCadenceProfile(6)),
+  1: getZoneCriteria(1, defaultCadenceProfile(1), 'bike'),
+  2: getZoneCriteria(2, defaultCadenceProfile(2), 'bike'),
+  3: getZoneCriteria(3, defaultCadenceProfile(3), 'bike'),
+  4: getZoneCriteria(4, defaultCadenceProfile(4), 'bike'),
+  5: getZoneCriteria(5, defaultCadenceProfile(5), 'bike'),
+  6: getZoneCriteria(6, defaultCadenceProfile(6), 'bike'),
 };

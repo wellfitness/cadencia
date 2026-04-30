@@ -81,6 +81,10 @@ function isSpotifyPlaylist(v: unknown): v is SpotifyPlaylist {
   return typeof (urls as Record<string, unknown>)['spotify'] === 'string';
 }
 
+/** Limites duros de Spotify para name/description de playlist. */
+const MAX_PLAYLIST_NAME_CHARS = 100;
+const MAX_PLAYLIST_DESCRIPTION_CHARS = 300;
+
 /**
  * Crea una playlist en la cuenta del token.
  *
@@ -96,6 +100,10 @@ function isSpotifyPlaylist(v: unknown): v is SpotifyPlaylist {
  * ademas de `playlist-modify-private`. Mantenemos `public:false` aqui por
  * intencion documental para cuando Spotify lo respete.
  *
+ * `name` y `description` se truncan a los limites duros de Spotify (100 y
+ * 300 caracteres). Sin trunc, la API responde con un mensaje generico
+ * dificil de relacionar con el campo culpable.
+ *
  * Referencia: https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide
  */
 export async function createPlaylist(
@@ -103,9 +111,11 @@ export async function createPlaylist(
   name: string,
   description: string,
 ): Promise<{ id: string; externalUrl: string; name: string }> {
+  const safeName = name.slice(0, MAX_PLAYLIST_NAME_CHARS);
+  const safeDescription = description.slice(0, MAX_PLAYLIST_DESCRIPTION_CHARS);
   const res = await fetchSpotify(accessToken, '/me/playlists', {
     method: 'POST',
-    body: JSON.stringify({ name, description, public: false }),
+    body: JSON.stringify({ name: safeName, description: safeDescription, public: false }),
   });
   const json: unknown = await res.json();
   if (!isSpotifyPlaylist(json)) {

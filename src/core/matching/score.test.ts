@@ -24,7 +24,7 @@ describe('scoreTrack', () => {
   // Z3 flat: cadencia 70-90 rpm. Midpoint 1:1 = 80, midpoint 2:1 = 160.
   // energyIdeal = 0.70, valenceIdeal = 0.55.
   // Pesos: cadencia 0.30, energy 0.30, valence 0.20, genre 0.20.
-  const z3 = getZoneCriteria(3, 'flat');
+  const z3 = getZoneCriteria(3, 'flat', 'bike');
 
   it('track perfecto en todas las dimensiones puntua cerca de 1', () => {
     const t = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['edm'] });

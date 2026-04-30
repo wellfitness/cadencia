@@ -25,9 +25,14 @@ function track(overrides: Partial<Track> = {}): Track {
 }
 
 let segId = 0;
-function segment(zone: ClassifiedSegment['zone'], durationSec = 60): ClassifiedSegment {
+function segment(
+  zone: ClassifiedSegment['zone'],
+  durationSec = 60,
+  sport: ClassifiedSegment['sport'] = 'bike',
+): ClassifiedSegment {
   segId += 1;
   return {
+    sport,
     startSec: segId * 60,
     durationSec,
     avgPowerWatts: 200,

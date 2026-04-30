@@ -1,4 +1,5 @@
 import { GDRIVE_CONFIG } from './config';
+import { emptySyncedData, isSyncedData } from '@core/sync/schema';
 import type { SyncedData } from '@core/sync/types';
 
 /**
@@ -76,10 +77,24 @@ export async function findFile(accessToken: string): Promise<DriveFileMeta | nul
   return data.files && data.files.length > 0 ? data.files[0]! : null;
 }
 
-/** Descarga el contenido completo del archivo como SyncedData. */
+/**
+ * Descarga el contenido completo del archivo como SyncedData.
+ *
+ * Si Drive devuelve un blob malformado (corrupcion, edicion manual del archivo
+ * en appDataFolder, schema futuro), no lo aplicamos al store local: devolvemos
+ * un blob vacio + log para que el motor de sync trate la situacion como
+ * "remoto invalido" y conserve los datos locales intactos.
+ */
 export async function readFile(accessToken: string, fileId: string): Promise<SyncedData> {
   const res = await fetchWithAuth(`${API_FILES}/${fileId}?alt=media`, {}, accessToken);
-  return res.json() as Promise<SyncedData>;
+  const json: unknown = await res.json();
+  if (!isSyncedData(json)) {
+    if (typeof console !== 'undefined') {
+      console.warn('[gdrive] cadencia_data.json en Drive tiene formato invalido; se ignora.');
+    }
+    return emptySyncedData();
+  }
+  return json;
 }
 
 /**

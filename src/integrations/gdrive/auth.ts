@@ -41,6 +41,13 @@ interface TokenResponse {
 
 export interface SignInResult {
   token: string;
+  /**
+   * Email del usuario. Vacio porque el scope `drive.appdata` no autoriza el
+   * endpoint userinfo (devolveria 403). La UI muestra "tu cuenta de Google"
+   * como fallback. Para mostrar el email real haria falta anyadir scope
+   * `email`, lo que implicaria un permiso adicional en la pantalla de
+   * consent — preferimos scope minimo a cosmetica.
+   */
   email: string;
 }
 
@@ -86,7 +93,9 @@ export function signIn(): Promise<SignInResult> {
         } catch {
           // ignore — el token sigue valido en memoria via la promesa
         }
-        void fetchUserEmail(token).then((email) => resolve({ token, email }));
+        // No fetch de userinfo: el scope drive.appdata no lo autoriza y la
+        // request siempre fallaba con 403. UI usa fallback "tu cuenta de Google".
+        resolve({ token, email: '' });
       },
       error_callback: (err) => {
         reject(new Error(err.message ?? 'Error en autenticacion'));
@@ -190,17 +199,3 @@ function silentRefresh(): Promise<string> {
   });
 }
 
-async function fetchUserEmail(token: string): Promise<string> {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const info = (await res.json()) as { email?: string };
-      return info.email ?? '';
-    }
-  } catch {
-    // No critico — el email es solo para mostrarlo en la UI
-  }
-  return '';
-}

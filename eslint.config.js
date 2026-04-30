@@ -25,9 +25,16 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // exhaustive-deps a error (default warn). Solo 2 disables intencionales
+      // en todo el repo, ambos justificados; convertirla en error blinda
+      // contra regresiones futuras.
+      'react-hooks/exhaustive-deps': 'error',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/consistent-type-imports': 'warn',
+      // Antes warn: ahora error. Con verbatimModuleSyntax (ver tsconfig) y
+      // este plugin obligamos a `import type` cuando el simbolo solo se usa
+      // como tipo. Reduce overhead de imports muertos en runtime.
+      '@typescript-eslint/consistent-type-imports': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },

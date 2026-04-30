@@ -79,11 +79,16 @@ export function classifySessionPlan(
   const preprocessed = detectIntervalSets(coalesceContiguousBlocks(plan.blocks));
   const segments: ClassifiedSegment[] = [];
   let cursorSec = 0;
+  // El sport del segmento sale del plan (no de validated.sport): SavedSessions
+  // pueden ser run aunque el ultimo wizard del usuario fuera bike. Si el plan
+  // legacy no lo lleva, asumimos bike por retrocompat.
+  const sport = plan.sport ?? 'bike';
 
   for (const block of preprocessed) {
     if (block.durationSec <= 0) continue;
     const avgPowerWatts = ftp * ZONE_FTP_MIDPOINT[block.zone];
     segments.push({
+      sport,
       startSec: cursorSec,
       durationSec: block.durationSec,
       avgPowerWatts,

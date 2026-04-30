@@ -9,8 +9,15 @@ import type { SpotifyAuthFlowState, SpotifyTokens } from './types';
  * Reglas de privacidad de CLAUDE.md: ningun token vive mas alla de la pestana.
  */
 
-const FLOW_KEY = 'vatios:spotify:authFlow:v1';
-const TOKENS_KEY = 'vatios:spotify:tokens:v1';
+const FLOW_KEY = 'cadencia:spotify:authFlow:v1';
+const TOKENS_KEY = 'cadencia:spotify:tokens:v1';
+
+// Keys del rebrand previo (Vatios → Cadencia). Las leemos como fallback para
+// que un usuario con el flow OAuth a medio completar tras una actualizacion
+// de la app no pierda la sesion en curso. Despues de leer, migramos al
+// nombre nuevo y borramos la vieja.
+const LEGACY_FLOW_KEY = 'vatios:spotify:authFlow:v1';
+const LEGACY_TOKENS_KEY = 'vatios:spotify:tokens:v1';
 
 function isStringField(v: unknown): v is string {
   return typeof v === 'string' && v.length > 0;
@@ -64,8 +71,21 @@ export function saveAuthFlow(flow: SpotifyAuthFlowState): void {
   safeSet(FLOW_KEY, JSON.stringify(flow));
 }
 
+/**
+ * Lee la key actual; si esta vacia, intenta la legacy y migra.
+ */
+function readAndMigrate(currentKey: string, legacyKey: string): string | null {
+  const current = safeGet(currentKey);
+  if (current !== null) return current;
+  const legacy = safeGet(legacyKey);
+  if (legacy === null) return null;
+  safeSet(currentKey, legacy);
+  safeRemove(legacyKey);
+  return legacy;
+}
+
 export function loadAuthFlow(): SpotifyAuthFlowState | null {
-  const raw = safeGet(FLOW_KEY);
+  const raw = readAndMigrate(FLOW_KEY, LEGACY_FLOW_KEY);
   if (raw === null) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -77,6 +97,7 @@ export function loadAuthFlow(): SpotifyAuthFlowState | null {
 
 export function clearAuthFlow(): void {
   safeRemove(FLOW_KEY);
+  safeRemove(LEGACY_FLOW_KEY);
 }
 
 export function saveTokens(tokens: SpotifyTokens): void {
@@ -84,7 +105,7 @@ export function saveTokens(tokens: SpotifyTokens): void {
 }
 
 export function loadTokens(): SpotifyTokens | null {
-  const raw = safeGet(TOKENS_KEY);
+  const raw = readAndMigrate(TOKENS_KEY, LEGACY_TOKENS_KEY);
   if (raw === null) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -96,6 +117,7 @@ export function loadTokens(): SpotifyTokens | null {
 
 export function clearTokens(): void {
   safeRemove(TOKENS_KEY);
+  safeRemove(LEGACY_TOKENS_KEY);
 }
 
 /**

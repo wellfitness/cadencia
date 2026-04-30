@@ -162,7 +162,7 @@ export function CalendarPage({ onClose }: CalendarPageProps): JSX.Element {
         onCancel={() => setPendingLoad(null)}
         message={
           <p>
-            Tienes un plan en curso en el wizard. Si cargas esta entrada, perderás el progreso
+            Tienes un plan en curso en el asistente. Si cargas esta entrada, perderás el progreso
             actual.
           </p>
         }

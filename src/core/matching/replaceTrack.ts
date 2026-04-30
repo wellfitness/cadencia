@@ -56,7 +56,7 @@ function rankAvailableCandidates(
   const target = matched[index];
   if (!target) return null;
 
-  const baseCriteria = getZoneCriteria(target.zone, target.cadenceProfile);
+  const baseCriteria = getZoneCriteria(target.zone, target.cadenceProfile, target.sport);
   const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
 
   // URIs prohibidas: TODAS las que ya estan en la playlist (no solo vecinos).

@@ -1,12 +1,21 @@
 import type { HeartRateZone } from '../physiology/karvonen';
+import type { Sport } from '../user/userInputs';
 import type { CadenceProfile } from './sessionPlan';
 
 /**
  * Bloque de ~60 segundos del recorrido, ya clasificado a una zona de
  * intensidad. Es la unidad sobre la que el matching musical (fase 3) elegira
  * tracks.
+ *
+ * `sport` es OBLIGATORIO (no opcional): el motor de matching usa rangos de
+ * cadencia distintos por deporte (rpm en bike, spm en run); un default
+ * silencioso causaria que sesiones de running se filtraran como bike sin que
+ * TypeScript avise. Productores: blocks.ts (GPX) y fromSessionBlocks.ts
+ * (sesion indoor).
  */
 export interface ClassifiedSegment {
+  /** Deporte del segmento. Determina rangos de cadencia musical. */
+  sport: Sport;
   /** Segundo desde el inicio del recorrido en el que arranca el bloque. */
   startSec: number;
   /** Duracion real (puede ser <60s en el ultimo bloque). */
@@ -14,8 +23,9 @@ export interface ClassifiedSegment {
   avgPowerWatts: number;
   zone: HeartRateZone;
   /**
-   * Perfil de cadencia. En GPX se infiere por pendiente (>6% → climb, resto
-   * → flat). En sesion indoor se hereda directamente del SessionBlock.
+   * Perfil de cadencia. En bike+gpx se infiere por pendiente (>6% → climb,
+   * resto → flat). En sesion indoor se hereda del SessionBlock. En running
+   * es informativo (placeholder 'flat'); el matcher lo ignora.
    */
   cadenceProfile: CadenceProfile;
   startDistanceMeters: number;

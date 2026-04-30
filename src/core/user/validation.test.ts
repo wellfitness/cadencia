@@ -466,6 +466,140 @@ describe('validateUserInputs', () => {
       }
     });
   });
+
+  // === Cobertura validateRun (sport: 'run') ===
+  // Antes 0% cubierto; subimos validation.ts a >90% stmts. Reglas:
+  //  - peso opcional (Cr de Minetti normaliza por kg)
+  //  - FTP descartado (no aplica en running)
+  //  - FC max O (birthYear + sex) obligatorios
+  //  - bike fields irrelevantes pero defaulteados en el output
+  describe("sport: 'run' (validateRun)", () => {
+    const baseRun: UserInputsRaw = {
+      sport: 'run',
+      weightKg: null,
+      ftpWatts: null,
+      maxHeartRate: 185,
+      restingHeartRate: null,
+      birthYear: null,
+      sex: null,
+      bikeWeightKg: null,
+      bikeType: null,
+    };
+
+    it('happy path con FC max directa: ok, peso default 70 kg', () => {
+      const result = validateUserInputs(baseRun, 2026);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.sport).toBe('run');
+        expect(result.data.weightKg).toBe(70);
+        expect(result.data.ftpWatts).toBeNull();
+        expect(result.data.effectiveMaxHr).toBe(185);
+        expect(result.data.hasFtp).toBe(false);
+      }
+    });
+
+    it('happy path con birthYear+sex: estima FC max via Gulati', () => {
+      const result = validateUserInputs(
+        { ...baseRun, maxHeartRate: null, birthYear: 1985, sex: 'female' },
+        2026,
+      );
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        // Gulati: 206 - 0.88 * 41 = 169.92
+        expect(result.data.effectiveMaxHr).toBeCloseTo(169.92, 1);
+      }
+    });
+
+    it('FTP se descarta aunque venga rellenado (running no usa potencia)', () => {
+      const result = validateUserInputs({ ...baseRun, ftpWatts: 250 }, 2026);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.ftpWatts).toBeNull();
+        expect(result.data.hasFtp).toBe(false);
+      }
+    });
+
+    it('sin FC max ni birthYear+sex falla con NEED_HR_DATA', () => {
+      const result = validateUserInputs(
+        { ...baseRun, maxHeartRate: null, birthYear: null },
+        2026,
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'NEED_HR_DATA')).toBe(true);
+      }
+    });
+
+    it('birthYear sin sex falla con NEED_HR_DATA (no podemos estimar)', () => {
+      const result = validateUserInputs(
+        { ...baseRun, maxHeartRate: null, birthYear: 1985, sex: null },
+        2026,
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'NEED_HR_DATA')).toBe(true);
+      }
+    });
+
+    it('peso fuera de rango falla con WEIGHT_OUT_OF_RANGE', () => {
+      const result = validateUserInputs({ ...baseRun, weightKg: 500 }, 2026);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'WEIGHT_OUT_OF_RANGE')).toBe(true);
+      }
+    });
+
+    it('birthYear fuera de rango falla con BIRTH_YEAR_OUT_OF_RANGE', () => {
+      const result = validateUserInputs({ ...baseRun, birthYear: 1900 }, 2026);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'BIRTH_YEAR_OUT_OF_RANGE')).toBe(true);
+      }
+    });
+
+    it('FC max fuera de rango falla con MAX_HR_OUT_OF_RANGE', () => {
+      const result = validateUserInputs({ ...baseRun, maxHeartRate: 50 }, 2026);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'MAX_HR_OUT_OF_RANGE')).toBe(true);
+      }
+    });
+
+    it('FC reposo fuera de rango falla con RESTING_HR_OUT_OF_RANGE', () => {
+      const result = validateUserInputs({ ...baseRun, restingHeartRate: 200 }, 2026);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.errors.some((e) => e.code === 'RESTING_HR_OUT_OF_RANGE')).toBe(true);
+      }
+    });
+
+    it('FC reposo >= FC max falla con RESTING_GE_MAX_HR', () => {
+      const result = validateUserInputs(
+        { ...baseRun, maxHeartRate: 185, restingHeartRate: 90 },
+        2026,
+      );
+      // 90 esta en rango, 185 esta en rango, pero la combinacion no.
+      // Wait: 90 < 185, deberia ser ok. Probemos uno claramente >=.
+      expect(result.ok).toBe(true);
+      const r2 = validateUserInputs(
+        { ...baseRun, maxHeartRate: 100, restingHeartRate: 100 },
+        2026,
+      );
+      expect(r2.ok).toBe(false);
+      if (!r2.ok) {
+        expect(r2.errors).toEqual([{ code: 'RESTING_GE_MAX_HR' }]);
+      }
+    });
+
+    it('output incluye bike defaults aunque sean irrelevantes en running', () => {
+      const result = validateUserInputs(baseRun, 2026);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.data.bikeType).toBeDefined();
+        expect(result.data.bikeWeightKg).toBeGreaterThan(0);
+      }
+    });
+  });
 });
 
 describe('describeValidationError', () => {

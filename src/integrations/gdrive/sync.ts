@@ -46,7 +46,17 @@ let _pollTimer: ReturnType<typeof setInterval> | null = null;
 let _syncing = false;
 let _applyingRemote = false;
 let _lastSyncAt = 0;
-let _initialized = false;
+/**
+ * Promise cacheada de init: garantiza idempotencia incluso bajo doble llamada
+ * concurrente (HMR de Vite, futuro StrictMode). Antes existia una flag boolean
+ * que se asignaba antes del await: dos llamadas paralelas pasaban el guard
+ * antes de que la primera marcara, registrando listeners por duplicado.
+ */
+let _initPromise: Promise<void> | null = null;
+
+/** Handlers nombrados para poder removerlos en disconnect (evita leaks). */
+let _onDataSaved: (() => void) | null = null;
+let _onVisibilityChange: (() => void) | null = null;
 
 function getSyncState(): SyncState {
   try {
@@ -83,13 +93,16 @@ function notify(status: SyncStatus): void {
 
 /**
  * Inicializa el motor de sync. Debe llamarse al arrancar la app. Si el
- * usuario ya estaba conectado, intenta sync silencioso. Idempotente:
- * llamadas repetidas son no-op.
+ * usuario ya estaba conectado, intenta sync silencioso. Idempotente: llamadas
+ * concurrentes o repetidas devuelven la misma promesa y no apilan listeners.
  */
-export async function init(): Promise<void> {
-  if (_initialized) return;
-  _initialized = true;
+export function init(): Promise<void> {
+  if (_initPromise) return _initPromise;
+  _initPromise = doInit();
+  return _initPromise;
+}
 
+async function doInit(): Promise<void> {
   setTokenRefresher(() => refreshToken());
 
   if (isConnected()) {
@@ -109,18 +122,24 @@ export async function init(): Promise<void> {
     }
   }
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('cadencia-data-saved', () => {
+  // Listeners con referencia nombrada: disconnect los desregistra. Sin esto,
+  // connect→disconnect→connect dejaba listeners "muertos" anteriores que
+  // seguian ejecutandose (gastando ciclos por cada cambio aunque ignorasen
+  // por el guard interno).
+  if (typeof window !== 'undefined' && _onDataSaved === null) {
+    _onDataSaved = (): void => {
       if (isConnected() && !_applyingRemote) debouncedPush();
-    });
+    };
+    window.addEventListener('cadencia-data-saved', _onDataSaved);
   }
 
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
+  if (typeof document !== 'undefined' && _onVisibilityChange === null) {
+    _onVisibilityChange = (): void => {
       if (document.visibilityState === 'visible' && isConnected() && !_syncing) {
         void checkRemote();
       }
-    });
+    };
+    document.addEventListener('visibilitychange', _onVisibilityChange);
   }
 }
 
@@ -148,6 +167,19 @@ export async function connect(): Promise<{ email: string }> {
 /** Revoca token, limpia estado de sync. NO toca cadenciaStore — los datos locales se conservan. */
 export async function disconnect(): Promise<void> {
   stopPolling();
+  // Quitamos listeners para que un futuro `init()` los registre frescos. Si
+  // los dejamos colgados, su guard interno los neutraliza pero gastamos un
+  // dispatch en cada cambio, y cualquier reconnect duplicaria handlers.
+  if (typeof window !== 'undefined' && _onDataSaved !== null) {
+    window.removeEventListener('cadencia-data-saved', _onDataSaved);
+    _onDataSaved = null;
+  }
+  if (typeof document !== 'undefined' && _onVisibilityChange !== null) {
+    document.removeEventListener('visibilitychange', _onVisibilityChange);
+    _onVisibilityChange = null;
+  }
+  // Permitir que el siguiente connect llame a init() de nuevo.
+  _initPromise = null;
   await signOut();
   try {
     localStorage.removeItem(SYNC_STATE_KEY);

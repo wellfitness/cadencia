@@ -7,6 +7,7 @@ import type { HeartRateZone } from '../physiology/karvonen';
 
 function seg(zone: HeartRateZone, cadence: CadenceProfile, durationSec: number): ClassifiedSegment {
   return {
+    sport: 'bike',
     startSec: 0,
     durationSec,
     avgPowerWatts: 200,

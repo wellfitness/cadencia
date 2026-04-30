@@ -98,6 +98,7 @@ export function segmentInto60SecondBlocks(
     const cadenceProfile = inferCadenceProfileFromSlopePct(slopePct);
 
     blocks.push({
+      sport: isRun ? 'run' : 'bike',
       startSec: blockStartTimeSec,
       durationSec: blockDuration,
       avgPowerWatts: isRun ? 0 : avgPower,

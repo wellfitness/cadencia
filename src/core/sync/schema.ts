@@ -15,6 +15,14 @@ export function emptySyncedData(): SyncedData {
   };
 }
 
+/**
+ * Guard estricto para datos descargados (Drive) o cargados desde almacenamiento.
+ *
+ * Antes solo verificaba schemaVersion, updatedAt, _sectionMeta y savedSessions.
+ * Si el blob tenia `uploadedCsvs: null` o `dismissedTrackUris: undefined`, el
+ * guard pasaba y el merge crasheaba con `Cannot read properties of null`. Ahora
+ * exige que TODOS los arrays sean Array.isArray.
+ */
 export function isSyncedData(value: unknown): value is SyncedData {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -23,6 +31,9 @@ export function isSyncedData(value: unknown): value is SyncedData {
     typeof v['updatedAt'] === 'string' &&
     typeof v['_sectionMeta'] === 'object' &&
     v['_sectionMeta'] !== null &&
-    Array.isArray(v['savedSessions'])
+    Array.isArray(v['savedSessions']) &&
+    Array.isArray(v['uploadedCsvs']) &&
+    Array.isArray(v['dismissedTrackUris']) &&
+    Array.isArray(v['plannedEvents'])
   );
 }

@@ -4,10 +4,37 @@ import { findCandidates } from './candidates';
 import { hashSeed, mulberry32, pickWeightedFromTopK } from './random';
 import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment, ZoneMusicCriteria } from './types';
-import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
+import { applyAllEnergetic, getZoneCriteria, getAlternativeBpmRange } from './zoneCriteria';
 
 /** Tamaño del top-K para el sampling ponderado cuando hay seed. */
 const RANDOM_TOP_K = 5;
+
+/**
+ * Distancia maxima en BPM al midpoint mas cercano (1:1 o alternativa) que se
+ * tolera al caer al pool best-effort cross-zone. Si el unico track libre tiene
+ * tempoBpm a mas de este margen del rango natural de la zona, lo descartamos
+ * y la UI marca el slot como 'repeated' (mejor un track conocido repetido que
+ * Z1 con 220 BPM hardcore o Z6 con 60 BPM balada).
+ */
+const BEST_EFFORT_BPM_TOLERANCE = 30;
+
+/**
+ * Distancia minima del tempoBpm al rango {1:1, alternativa} de la criteria.
+ * Si el track encaja en alguno de los dos rangos devuelve 0. Si no, devuelve
+ * los BPM que faltan para alcanzar el rango mas cercano.
+ */
+function bpmDistanceToCriteria(tempoBpm: number, criteria: ZoneMusicCriteria): number {
+  const inOne = tempoBpm >= criteria.cadenceMin && tempoBpm <= criteria.cadenceMax;
+  if (inOne) return 0;
+  const alt = getAlternativeBpmRange(criteria);
+  const inAlt = tempoBpm >= alt.min && tempoBpm <= alt.max;
+  if (inAlt) return 0;
+  const distOne = tempoBpm < criteria.cadenceMin
+    ? criteria.cadenceMin - tempoBpm
+    : tempoBpm - criteria.cadenceMax;
+  const distAlt = tempoBpm < alt.min ? alt.min - tempoBpm : tempoBpm - alt.max;
+  return Math.min(distOne, distAlt);
+}
 
 /**
  * Modo de asignacion de tracks frente a la estructura de zonas:
@@ -76,19 +103,31 @@ function chooseTrack(
     }
   }
 
-  // 2. Best-effort cross-zone: cualquier track no usado, aunque cadencia no encaje.
+  // 2. Best-effort cross-zone: cualquier track no usado, aunque cadencia no
+  //    encaje exactamente. Aplicamos un FLOOR de tolerancia BPM: si el "mejor"
+  //    candidato libre esta a >30 BPM del rango de la zona (ej. Z1 ideal 70-90
+  //    o 140-180 BPM, track 220 BPM esta a 40 fuera), preferimos repetir un
+  //    track conocido del ranking de cadencia antes que asignar algo
+  //    musicalmente absurdo. La UI sigue marcandolo 'best-effort' o 'repeated'
+  //    para que el usuario sepa que mejorara subiendo mas listas.
   const allFresh = allTracks.filter((t) => !used.has(t.uri));
   if (allFresh.length > 0) {
     const ranked = allFresh
-      .map((t) => ({ track: t, score: scoreTrack(t, effectiveCriteria, preferredGenres) }))
+      .map((t) => ({
+        track: t,
+        score: scoreTrack(t, effectiveCriteria, preferredGenres),
+        bpmDistance: bpmDistanceToCriteria(t.tempoBpm, effectiveCriteria),
+      }))
       .sort((a, b) => b.score - a.score);
     const best = ranked[0]!;
-    return { track: best.track, score: best.score, quality: 'best-effort' };
+    if (best.bpmDistance <= BEST_EFFORT_BPM_TOLERANCE) {
+      return { track: best.track, score: best.score, quality: 'best-effort' };
+    }
+    // El mejor candidato libre esta demasiado lejos: caer a 'repeated'.
   }
 
-  // 3. Repeated: catalogo entero usado. Devolvemos el mejor del ranking
-  //    original (puede ser null si el ranking estaba vacio, pero entonces
-  //    allTracks tampoco tendría tracks usables — caso degenerado).
+  // 3. Repeated: catalogo entero usado o todos los frescos cayeron del floor.
+  //    Devolvemos el mejor del ranking original de cadencia.
   const fallback = scoredCadenceCandidates[0];
   if (fallback) {
     return { track: fallback.track, score: fallback.score, quality: 'repeated' };
@@ -130,7 +169,7 @@ function matchOverlap(
   let i = 0;
   while (i < segments.length) {
     const seg = segments[i]!;
-    const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile);
+    const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile, seg.sport);
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
     const { candidates, quality } = findCandidates(tracks, effective);
 
@@ -192,7 +231,7 @@ function matchDiscrete(
   let slotIndex = 0;
 
   for (const seg of segments) {
-    const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile);
+    const baseCriteria = getZoneCriteria(seg.zone, seg.cadenceProfile, seg.sport);
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
     const { candidates, quality } = findCandidates(tracks, effective);
 

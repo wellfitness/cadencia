@@ -241,7 +241,7 @@ Aplicable solo a ciclismo outdoor. En running outdoor se usa el polinomio de Min
 P_total = P_gravedad + P_rodadura + P_aerodinámica
 
 P_gravedad     = masa_total × g × velocidad × sin(atan(pendiente / 100))
-P_rodadura     = Crr × masa_total × g × velocidad
+P_rodadura     = Crr × masa_total × g × velocidad × cos(atan(pendiente / 100))
 P_aerodinámica = 0.5 × rho × CdA × velocidad³
 
 Constantes por defecto:
@@ -251,6 +251,8 @@ Constantes por defecto:
   rho        = 1.225 kg/m³  (aire a nivel del mar)
   CdA        = 0.36 m²      (posición gravel estándar)
 ```
+
+El `cos(atan(pendiente))` en `P_rodadura` proyecta la fuerza normal sobre la superficie inclinada — en pendientes ciclistas (≤30 %) la diferencia con el modelo simplificado «sin cos» es ≤4 %, pero la formulación completa es la que implementa `src/core/power/equation.ts`.
 
 **Velocidad**: si el GPX trae timestamps reales se calcula entre puntos; si no, se estima por pendiente:
 

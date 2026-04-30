@@ -31,9 +31,15 @@ export function mulberry32(seed: number): Prng {
 /**
  * Mezcla seed + slotIndex en una sub-semilla descorrelada. Constante
  * 2654435761 = 0x9E3779B1, golden-ratio hash de Knuth, distribuye bien.
+ *
+ * Con seed=0, `seed ^ slotIndex = slotIndex` y la sub-semilla pierde su primer
+ * termino, degradando la calidad del hash. La probabilidad de seed=0 saliendo
+ * de Math.random() es ~2^-32, pero el `| 1` cuesta cero ciclos y elimina el
+ * caso degenerado.
  */
 export function hashSeed(seed: number, slotIndex: number): number {
-  return (Math.imul(seed ^ slotIndex, 2654435761) ^ (slotIndex << 13)) >>> 0;
+  const safeSeed = seed === 0 ? 1 : seed;
+  return (Math.imul(safeSeed ^ slotIndex, 2654435761) ^ (slotIndex << 13)) >>> 0;
 }
 
 /**

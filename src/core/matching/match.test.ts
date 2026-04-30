@@ -26,9 +26,13 @@ function track(overrides: Partial<Track> = {}): Track {
 }
 
 let segId = 0;
-function segment(zone: ClassifiedSegment['zone']): ClassifiedSegment {
+function segment(
+  zone: ClassifiedSegment['zone'],
+  sport: ClassifiedSegment['sport'] = 'bike',
+): ClassifiedSegment {
   segId += 1;
   return {
+    sport,
     startSec: segId * 60,
     durationSec: 60,
     avgPowerWatts: 200,
@@ -202,9 +206,14 @@ describe('matchTracksToSegments', () => {
   });
 
   describe("modo 'discrete' (sesion indoor)", () => {
-    function sessionSeg(zone: ClassifiedSegment['zone'], durationSec: number): ClassifiedSegment {
+    function sessionSeg(
+      zone: ClassifiedSegment['zone'],
+      durationSec: number,
+      sport: ClassifiedSegment['sport'] = 'bike',
+    ): ClassifiedSegment {
       segId += 1;
       return {
+        sport,
         startSec: segId * 1000,
         durationSec,
         avgPowerWatts: 200,
@@ -445,5 +454,55 @@ describe('matchTracksToSegments', () => {
       expect(uris(a)).not.toEqual(uris(b));
     });
 
+  });
+
+  // === REGRESION C1: el sport del segmento debe llegar al matcher ===
+  // Antes de fix, ClassifiedSegment no llevaba sport y getZoneCriteria caia
+  // siempre al default 'bike'. Las sesiones de running terminaban filtrando
+  // por rangos rpm en vez de spm. Estos tests vigilan que NO vuelva a pasar.
+  describe('multisport: sport del segmento dirige el filtro de cadencia', () => {
+    it('run + Z3 acepta tracks 165-178 BPM (rango spm 1:1) y rechaza 80 BPM (rango bike)', () => {
+      // Track de bike (80 BPM, midpoint cadencia bike Z3 flat) y track de run
+      // (170 BPM, midpoint cadencia run Z3) — ambos disponibles. En run, solo
+      // el de 170 debe encajar como strict.
+      const trackBike = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 70_000 });
+      const trackRun = track({ tempoBpm: 170, energy: 0.7, valence: 0.55, durationMs: 70_000 });
+      const segs: ClassifiedSegment[] = [
+        { ...segment(3, 'run'), durationSec: 60 },
+      ];
+      const matched = matchTracksToSegments(segs, [trackBike, trackRun], EMPTY_PREFERENCES);
+      expect(matched).toHaveLength(1);
+      // El run-track gana: cae dentro del rango 165-178 spm 1:1.
+      expect(matched[0]?.track?.uri).toBe(trackRun.uri);
+      expect(matched[0]?.matchQuality).toBe('strict');
+    });
+
+    it('bike + Z3 acepta 80 BPM y rechaza el de 170 spm como strict', () => {
+      const trackBike = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 70_000 });
+      const trackRun = track({ tempoBpm: 170, energy: 0.7, valence: 0.55, durationMs: 70_000 });
+      const segs: ClassifiedSegment[] = [
+        { ...segment(3, 'bike'), durationSec: 60 },
+      ];
+      const matched = matchTracksToSegments(segs, [trackBike, trackRun], EMPTY_PREFERENCES);
+      expect(matched).toHaveLength(1);
+      // Bike Z3 flat: 70-90 BPM (1:1) o 140-180 BPM (2:1). 170 BPM cae en 2:1
+      // y 80 BPM cae en 1:1 — ambos pasan filtro. El que mas se acerca al
+      // midpoint de su rango respectivo gana. 80 (=midpoint 1:1) puntua mas.
+      expect(matched[0]?.track?.uri).toBe(trackBike.uri);
+    });
+
+    it('run + Z6 (180-200 spm) NO acepta 90 BPM (cadencia sprint bike)', () => {
+      // Track BPM 90: en bike Z6 sprint encaja (90-115 1:1). En run Z6 NO
+      // encaja (180-200 1:1, ni half-cadence 90-100). Si el bug regresara,
+      // matchearia como bike erroneamente.
+      const trackSprintBike = track({ tempoBpm: 90, energy: 0.95, valence: 0.7, durationMs: 70_000 });
+      const trackSprintRun = track({ tempoBpm: 185, energy: 0.95, valence: 0.7, durationMs: 70_000 });
+      const segs: ClassifiedSegment[] = [
+        { ...segment(6, 'run'), durationSec: 60, cadenceProfile: 'flat' },
+      ];
+      const matched = matchTracksToSegments(segs, [trackSprintBike, trackSprintRun], EMPTY_PREFERENCES);
+      // El track de 185 BPM gana (cadencia run Z6 1:1 lo acepta).
+      expect(matched[0]?.track?.uri).toBe(trackSprintRun.uri);
+    });
   });
 });

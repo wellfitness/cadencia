@@ -1139,7 +1139,13 @@ function Faq(): JSX.Element {
         type="application/ld+json"
         // Inline JSON-LD: dangerouslySetInnerHTML evita escape de comillas que
         // rompe el parsing del crawler.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        // El .replace de "<" a "\\u003c" es defensa en profundidad: sin el,
+        // un texto del FAQ que contenga "</script>" cierra el script antes
+        // de tiempo y abre vector XSS. Hoy el contenido es hardcoded y seguro,
+        // pero es el patron estandar para JSON-LD inline.
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(faqJsonLd).replace(/</g, '\\u003c'),
+        }}
       />
       <div className="mx-auto w-full max-w-3xl px-4 py-12 md:py-16">
         <h2

@@ -7,6 +7,44 @@ import type {
 import { emptySyncedData } from './schema';
 
 /**
+ * `Math.max` aceptable para arrays grandes. El spread `Math.max(...arr)` puede
+ * dar stack overflow con cientos de miles de elementos y nunca es necesario
+ * — reduce equivale y es estable. Asume `arr.length > 0`.
+ */
+function maxOf(arr: readonly number[]): number {
+  let m = arr[0]!;
+  for (let i = 1; i < arr.length; i++) {
+    const v = arr[i]!;
+    if (v > m) m = v;
+  }
+  return m;
+}
+
+/**
+ * Comparacion estructural recursiva. Sustituye al `JSON.stringify(a) !== JSON.stringify(b)`
+ * que daba falsos positivos cuando dos blobs equivalentes tenian las claves
+ * en distinto orden tras un round-trip por motores JS distintos.
+ */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (a === null || b === null) return a === b;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, i) => deepEqual(item, b[i]));
+  }
+  const keysA = Object.keys(a as Record<string, unknown>).sort();
+  const keysB = Object.keys(b as Record<string, unknown>).sort();
+  if (keysA.length !== keysB.length) return false;
+  if (!keysA.every((k, i) => k === keysB[i])) return false;
+  return keysA.every((k) =>
+    deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]),
+  );
+}
+
+/**
  * Conflicto registrado durante el merge: el lado perdedor tenia un valor
  * distinto al ganador y su timestamp era igual o menor. Se almacena para
  * que el usuario pueda revisar versiones descartadas si lo desea.
@@ -64,7 +102,7 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
       if (localTime === remoteTime && localTime !== -Infinity) {
         const lv = local[section];
         const rv = remote[section];
-        if (JSON.stringify(lv) !== JSON.stringify(rv)) {
+        if (!deepEqual(lv, rv)) {
           conflicts.push({
             section,
             loserValue: lv,
@@ -99,7 +137,7 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
     .filter((t) => Number.isFinite(t));
   if (sessionTimes.length > 0) {
     merged._sectionMeta.savedSessions = {
-      updatedAt: new Date(Math.max(...sessionTimes)).toISOString(),
+      updatedAt: new Date(maxOf(sessionTimes)).toISOString(),
     };
   }
 
@@ -123,7 +161,7 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
     .filter((t) => Number.isFinite(t));
   if (csvTimes.length > 0) {
     merged._sectionMeta.uploadedCsvs = {
-      updatedAt: new Date(Math.max(...csvTimes)).toISOString(),
+      updatedAt: new Date(maxOf(csvTimes)).toISOString(),
     };
   }
 
@@ -147,7 +185,7 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
     .filter((t) => Number.isFinite(t));
   if (eventTimes.length > 0) {
     merged._sectionMeta.plannedEvents = {
-      updatedAt: new Date(Math.max(...eventTimes)).toISOString(),
+      updatedAt: new Date(maxOf(eventTimes)).toISOString(),
     };
   }
 
@@ -156,7 +194,7 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
     .filter((m): m is { updatedAt: string } => m !== undefined)
     .map((m) => new Date(m.updatedAt).getTime());
   merged.updatedAt = allTimes.length
-    ? new Date(Math.max(...allTimes)).toISOString()
+    ? new Date(maxOf(allTimes)).toISOString()
     : new Date(0).toISOString();
 
   return { merged, conflicts };

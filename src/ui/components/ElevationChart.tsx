@@ -13,6 +13,7 @@ import type { HeartRateZone, KarvonenZoneRange } from '@core/physiology/karvonen
 import type { ClassifiedSegment } from '@core/segmentation';
 import { ZoneBadge } from './ZoneBadge';
 import { ZONE_LABEL_SHORT } from './zoneLabels';
+import { formatBpmRange } from './session-builder/zoneRangeFormat';
 
 export interface ElevationChartProps {
   segments: readonly ClassifiedSegment[];
@@ -163,7 +164,9 @@ export function ElevationChart({
             </thead>
             <tbody>
               {segments.map((s, i) => {
-                const bpm = karvonenZones?.find((r) => r.zone === s.zone);
+                // formatBpmRange devuelve null en Z6 (FC saturada) y cuando
+                // no hay datos Karvonen, evitando renderizar "196-196 bpm".
+                const bpm = formatBpmRange(s.zone, karvonenZones ?? null);
                 return (
                   <tr
                     key={s.startSec}
@@ -186,9 +189,7 @@ export function ElevationChart({
                     </td>
                     {karvonenZones !== undefined && (
                       <td className="px-2 py-1.5 tabular-nums">
-                        {bpm !== undefined
-                          ? `${Math.round(bpm.minBpm)}–${Math.round(bpm.maxBpm)}`
-                          : '—'}
+                        {bpm !== null ? bpm.replace(' bpm', '') : '—'}
                       </td>
                     )}
                   </tr>
@@ -244,10 +245,13 @@ function ChartTooltip({
               {Math.round(segment.avgPowerWatts)} W
             </span>
           </div>
-          {bpmRange && (
+          {bpmRange && segment.zone !== 6 && (
             <div className="text-xs text-gris-500 tabular-nums">
               {Math.round(bpmRange.minBpm)}–{Math.round(bpmRange.maxBpm)} bpm esperados
             </div>
+          )}
+          {segment.zone === 6 && karvonenZones !== undefined && (
+            <div className="text-xs text-gris-500">FC saturada</div>
           )}
         </div>
       )}

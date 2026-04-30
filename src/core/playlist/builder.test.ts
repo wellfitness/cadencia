@@ -50,6 +50,7 @@ describe('buildPlaylistDescription', () => {
 describe('extractUris', () => {
   function fakeMatched(uri: string | null): MatchedSegment {
     return {
+      sport: 'bike',
       startSec: 0,
       durationSec: 60,
       avgPowerWatts: 200,

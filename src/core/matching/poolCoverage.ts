@@ -2,6 +2,7 @@ import type { HeartRateZone } from '../physiology/karvonen';
 import type { CadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
+import type { Sport } from '../user/userInputs';
 import { findCandidates } from './candidates';
 import type { MatchPreferences } from './types';
 import { applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
@@ -98,10 +99,15 @@ export function analyzePoolCoverage(
     return profileOrder[a.profile] - profileOrder[b.profile];
   });
 
+  // Sesiones son homogeneas en sport (no se mezclan run y bike), asi que el
+  // sport del primer segmento sirve para todas las combos. Default 'bike' si
+  // segments esta vacio (no deberia llegar aqui pero es defensivo).
+  const sport: Sport = segments[0]?.sport ?? 'bike';
+
   const byZone: ZoneCoverage[] = [];
   for (const combo of sortedCombos) {
     if (combo.durationSec === 0) continue;
-    const baseCriteria = getZoneCriteria(combo.zone, combo.profile);
+    const baseCriteria = getZoneCriteria(combo.zone, combo.profile, sport);
     const effective = applyAllEnergetic(baseCriteria, preferences.allEnergetic);
     const { candidates } = findCandidates(tracks, effective);
     const available = new Set(candidates.map((t) => t.uri)).size;
