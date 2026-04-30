@@ -27,6 +27,7 @@ import type { RouteSourceChoice } from '@ui/components/SourceSelector';
 import { CatalogEditorPage } from '@ui/pages/CatalogEditorPage';
 import { HelpRouter } from '@ui/pages/help/HelpRouter';
 import { Landing } from '@ui/pages/Landing';
+import { MyAccountPage } from '@ui/pages/MyAccountPage';
 import { SourceTypeStep } from '@ui/pages/SourceTypeStep';
 import { UserDataStep } from '@ui/pages/UserDataStep';
 import { RouteStep } from '@ui/pages/RouteStep';
@@ -74,6 +75,9 @@ export function App(): JSX.Element {
   }
   if (pathname === '/catalogo') {
     return <CatalogEditorPage onClose={() => navigateBack('/')} />;
+  }
+  if (pathname === '/cuenta') {
+    return <MyAccountPage onClose={() => navigateBack('/')} />;
   }
   if (pathname.startsWith('/ayuda')) {
     return <HelpRouter pathname={pathname} />;

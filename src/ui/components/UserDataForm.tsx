@@ -23,7 +23,7 @@ import {
 import { BIKE_TYPE_ICONS, BIKE_TYPE_LABELS } from '@core/power';
 import { calculateMaxHeartRate } from '@core/physiology';
 import { Card } from './Card';
-import { GoogleSyncCard } from './sync/GoogleSyncCard';
+import { navigateInApp } from '@ui/utils/navigation';
 import { Input } from './Input';
 import { MaterialIcon } from './MaterialIcon';
 import { SexSelector } from './SexSelector';
@@ -529,13 +529,39 @@ export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
               enabled={persistentStorage}
               onChange={onPersistentStorageChange}
             />
-            <GoogleSyncCard />
+            {persistentStorage && <SyncMiniBadge />}
           </>
         )}
       </div>
     );
   },
 );
+
+/**
+ * Mini-indicador discreto sobre la sincronizacion con Drive. La card
+ * completa con boton conectar/desconectar vive en /cuenta — aqui solo
+ * referenciamos para que el usuario sepa que existe esa opcion.
+ */
+function SyncMiniBadge(): JSX.Element {
+  return (
+    <p className="text-xs text-gris-600 mt-2 flex items-center gap-1.5">
+      <MaterialIcon name="cloud_sync" size="small" className="text-gris-500" />
+      <span>
+        Tus datos se guardan en este dispositivo.{' '}
+        <a
+          href="/cuenta"
+          onClick={(e) => {
+            e.preventDefault();
+            navigateInApp('/cuenta');
+          }}
+          className="text-turquesa-600 hover:underline font-semibold"
+        >
+          Sincronizar entre dispositivos →
+        </a>
+      </span>
+    </p>
+  );
+}
 
 interface RememberMeBlockProps {
   enabled: boolean;

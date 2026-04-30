@@ -237,6 +237,16 @@ export function SiteFooter(): JSX.Element {
           >
             Plantillas y cuándo usarlas
           </a>
+          <a
+            href="/cuenta"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/cuenta');
+            }}
+            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
+          >
+            Mi cuenta
+          </a>
 
           <h4 className="text-white text-base font-semibold mt-4 mb-2">Legal</h4>
           <a
