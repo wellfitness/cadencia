@@ -57,15 +57,9 @@ export function MyAccountPage({ onClose }: MyAccountPageProps): JSX.Element {
 
           <UserDataSection data={data} />
 
-          <MusicPreferencesSection data={data} />
-
           <SavedSessionsSection />
 
-          <UploadedCsvsSection data={data} />
-
-          <DismissedTracksSection data={data} />
-
-          <NativeCatalogSection data={data} />
+          <CatalogSection data={data} />
 
           <DangerZoneSection
             onWipe={() => setConfirmWipe(true)}
@@ -155,58 +149,6 @@ function UserDataSection({ data }: SectionProps): JSX.Element {
   );
 }
 
-function MusicPreferencesSection({ data }: SectionProps): JSX.Element {
-  const p = data.musicPreferences;
-  const isEmpty =
-    p === null ||
-    (p.preferredGenres.length === 0 &&
-      p.allEnergetic === false &&
-      p.seed === undefined);
-  return (
-    <Card title="Mis preferencias musicales" titleIcon="music_note">
-      {isEmpty ? (
-        <EmptyHint
-          icon="info"
-          text="Aún no has fijado preferencias musicales. Las verás aquí cuando elijas géneros en el paso «Música»."
-        />
-      ) : (
-        <div className="space-y-2 text-sm text-gris-700">
-          <p>
-            <strong>Géneros preferidos:</strong>{' '}
-            {p.preferredGenres.length > 0 ? (
-              <span className="inline-flex flex-wrap gap-1 align-middle">
-                {p.preferredGenres.map((g) => (
-                  <span
-                    key={g}
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-turquesa-100 text-turquesa-800"
-                  >
-                    {g}
-                  </span>
-                ))}
-              </span>
-            ) : (
-              <span className="text-gris-500">ninguno</span>
-            )}
-          </p>
-          <p>
-            <strong>Todo con energía:</strong>{' '}
-            {p.allEnergetic ? 'sí' : 'no'}
-          </p>
-          {p.seed !== undefined && (
-            <p>
-              <strong>Semilla actual:</strong>{' '}
-              <code className="text-xs">{p.seed}</code>
-              <span className="text-gris-500 text-xs ml-1">
-                · cambia con el botón "🎲 Regenerar lista"
-              </span>
-            </p>
-          )}
-        </div>
-      )}
-    </Card>
-  );
-}
-
 function SavedSessionsSection(): JSX.Element {
   const data = useCadenciaData();
   // Re-deriva al cambiar el store
@@ -280,103 +222,130 @@ function SavedSessionsSection(): JSX.Element {
   );
 }
 
-function UploadedCsvsSection({ data }: SectionProps): JSX.Element {
+/**
+ * Resumen único del catálogo de música del usuario:
+ *   - Listas propias subidas (uploadedCsvs)
+ *   - Canciones descartadas globalmente (dismissedTrackUris)
+ *   - Personalizaciones del catálogo nativo (nativeCatalogPrefs)
+ *
+ * Todo gestionable desde un único botón «Editar catálogo» que abre
+ * el editor con sus tres pestañas.
+ */
+function CatalogSection({ data }: SectionProps): JSX.Element {
   const lists = useMemo(
     () => hydrateUploadedCsvs(data.uploadedCsvs),
     [data.uploadedCsvs],
   );
+  const dismissedCount = data.dismissedTrackUris.length;
+  const excludedCount = data.nativeCatalogPrefs?.excludedUris.length ?? 0;
+  const prefs = data.musicPreferences;
+  const hasPrefs =
+    prefs !== null &&
+    (prefs.preferredGenres.length > 0 || prefs.allEnergetic === true);
+  const nothingAtAll =
+    lists.length === 0 &&
+    dismissedCount === 0 &&
+    excludedCount === 0 &&
+    !hasPrefs;
+
   return (
-    <Card title="Mis listas de música" titleIcon="library_music">
-      {lists.length === 0 ? (
+    <Card title="Catálogo de música" titleIcon="library_music">
+      {nothingAtAll ? (
         <EmptyHint
-          icon="upload_file"
-          text="No has subido ninguna lista. Súbelas desde el editor de catálogo o desde el paso «Música» de una sesión."
+          icon="info"
+          text="Aún no has personalizado tu música. En el paso «Música» de una sesión eliges géneros y subes tus listas; en el editor del catálogo decides qué canciones del catálogo predefinido quieres conservar."
         />
       ) : (
-        <ul className="space-y-2">
-          {lists.map((l) => (
-            <li
-              key={l.id}
-              className="flex items-center justify-between gap-2 p-2.5 rounded-md border border-gris-200"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gris-800 truncate">
-                  {l.name}
-                </p>
-                <p className="text-xs text-gris-500">
-                  {l.trackCount} {l.trackCount === 1 ? 'canción' : 'canciones'}
-                </p>
+        <ul className="space-y-2 text-sm text-gris-700">
+          {hasPrefs && prefs !== null && (
+            <li className="flex items-start gap-2">
+              <MaterialIcon
+                name="music_note"
+                size="small"
+                className="text-turquesa-600 mt-0.5 shrink-0"
+              />
+              <div className="flex-1 min-w-0 space-y-1">
+                {prefs.preferredGenres.length > 0 && (
+                  <p>
+                    <strong>Géneros preferidos:</strong>{' '}
+                    <span className="inline-flex flex-wrap gap-1 align-middle">
+                      {prefs.preferredGenres.map((g) => (
+                        <span
+                          key={g}
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-turquesa-100 text-turquesa-800"
+                        >
+                          {g}
+                        </span>
+                      ))}
+                    </span>
+                  </p>
+                )}
+                {prefs.allEnergetic && (
+                  <p className="text-xs text-gris-600">
+                    «Todo con energía» activado
+                  </p>
+                )}
               </div>
             </li>
-          ))}
+          )}
+          {lists.length > 0 && (
+            <li className="flex items-start gap-2">
+              <MaterialIcon
+                name="upload_file"
+                size="small"
+                className="text-turquesa-600 mt-0.5 shrink-0"
+              />
+              <span>
+                <strong>
+                  {lists.length} {lists.length === 1 ? 'lista subida' : 'listas subidas'}
+                </strong>
+                {': '}
+                <span className="text-gris-500">
+                  {lists
+                    .slice(0, 3)
+                    .map((l) => l.name)
+                    .join(', ')}
+                  {lists.length > 3 && ` y ${lists.length - 3} más`}
+                </span>
+              </span>
+            </li>
+          )}
+          {dismissedCount > 0 && (
+            <li className="flex items-start gap-2">
+              <MaterialIcon
+                name="block"
+                size="small"
+                className="text-rosa-600 mt-0.5 shrink-0"
+              />
+              <span>
+                <strong>
+                  {dismissedCount}{' '}
+                  {dismissedCount === 1 ? 'canción descartada' : 'canciones descartadas'}
+                </strong>
+                <span className="text-gris-500"> · no aparecerán en futuras listas</span>
+              </span>
+            </li>
+          )}
+          {excludedCount > 0 && (
+            <li className="flex items-start gap-2">
+              <MaterialIcon
+                name="tune"
+                size="small"
+                className="text-tulipTree-600 mt-0.5 shrink-0"
+              />
+              <span>
+                <strong>
+                  {excludedCount}{' '}
+                  {excludedCount === 1
+                    ? 'canción desmarcada'
+                    : 'canciones desmarcadas'}{' '}
+                  del catálogo predefinido
+                </strong>
+              </span>
+            </li>
+          )}
         </ul>
       )}
-      <div className="mt-3 flex justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
-          iconRight="arrow_forward"
-          onClick={() => navigateInApp('/catalogo?tab=mine')}
-        >
-          Gestionar mis listas
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-function DismissedTracksSection({ data }: SectionProps): JSX.Element {
-  const dismissed = data.dismissedTrackUris;
-  return (
-    <Card title="Canciones descartadas" titleIcon="block">
-      <p className="text-sm text-gris-700">
-        {dismissed.length === 0 ? (
-          <span className="text-gris-500">
-            No has descartado ninguna canción todavía. Si una canción no te
-            gusta, puedes descartarla desde el paso «A pedalear» con el botón
-            «No la quiero».
-          </span>
-        ) : (
-          <>
-            Tienes <strong>{dismissed.length}</strong>{' '}
-            {dismissed.length === 1 ? 'canción descartada' : 'canciones descartadas'}.
-            Las gestionas (revisar y recuperar) desde el editor del catálogo.
-          </>
-        )}
-      </p>
-      {dismissed.length > 0 && (
-        <div className="mt-3 flex justify-end">
-          <Button
-            variant="secondary"
-            size="sm"
-            iconRight="arrow_forward"
-            onClick={() => navigateInApp('/catalogo?tab=dismissed')}
-          >
-            Revisar canciones descartadas
-          </Button>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function NativeCatalogSection({ data }: SectionProps): JSX.Element {
-  const excludedCount = data.nativeCatalogPrefs?.excludedUris.length ?? 0;
-  return (
-    <Card title="Personalización del catálogo nativo" titleIcon="tune">
-      <p className="text-sm text-gris-700">
-        {excludedCount === 0 ? (
-          <span className="text-gris-500">
-            No has personalizado el catálogo nativo. Todas sus canciones están
-            disponibles para tus listas.
-          </span>
-        ) : (
-          <>
-            Has descartado <strong>{excludedCount}</strong> canciones del
-            catálogo nativo en el editor.
-          </>
-        )}
-      </p>
       <div className="mt-3 flex justify-end">
         <Button
           variant="secondary"
