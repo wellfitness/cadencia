@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import {
   calculateTotalDurationSec,
-  SESSION_TEMPLATES,
+  templatesForSport,
   type EditableSessionPlan,
   type SessionTemplate,
 } from '@core/segmentation';
+import type { Sport } from '@core/user';
 import { MaterialIcon } from '../MaterialIcon';
 import { Button } from '../Button';
 import { buildIntensityBars, ZONE_BG_BAR } from '../help/intensityBars';
@@ -14,6 +15,12 @@ import { MySavedSessionsTab } from './MySavedSessionsTab';
 export interface TemplateGalleryProps {
   /** ID de la plantilla actualmente cargada (para resaltarla). */
   activeTemplateId: string | null;
+  /**
+   * Deporte para filtrar las plantillas que se muestran. Solo se renderizan
+   * plantillas cuyo `sport` coincida (las legacy sin `sport` cuentan como 'bike'
+   * por retrocompat). Default 'bike'.
+   */
+  sport?: Sport;
   onSelect: (template: SessionTemplate) => void;
   onStartFromScratch: () => void;
   /**
@@ -24,7 +31,9 @@ export interface TemplateGalleryProps {
   /**
    * Importar un workout desde archivo .zwo (Zwift, TrainingPeaks Virtual,
    * TrainerRoad, Wahoo SYSTM, MyWhoosh). Si se proporciona, aparece un
-   * tercer botón "Importar (.zwo)" en el header de la galería.
+   * tercer botón "Importar (.zwo)" en el header de la galería. NO aplica
+   * a running (Zwift es solo cycling): el padre debe omitir el callback
+   * cuando sport === 'run'.
    */
   onImportFile?: (file: File) => void;
 }
@@ -32,6 +41,7 @@ export interface TemplateGalleryProps {
 type Tab = 'templates' | 'mine';
 
 const TEMPLATE_ICONS: Record<string, string> = {
+  // Cycling
   sit: 'bolt',
   'hiit-10-20-30': 'local_fire_department',
   'noruego-4x4': 'trending_up',
@@ -40,6 +50,13 @@ const TEMPLATE_ICONS: Record<string, string> = {
   'umbral-progresivo': 'show_chart',
   'vo2max-cortos': 'rocket_launch',
   'recuperacion-activa': 'self_improvement',
+  // Running
+  'run-easy-long': 'self_improvement',
+  'run-tempo': 'speed',
+  'run-yasso-800': 'flag',
+  'run-daniels-intervals': 'rocket_launch',
+  'run-hiit-30-30': 'local_fire_department',
+  'run-threshold-cruise': 'show_chart',
 };
 
 /**
@@ -48,6 +65,7 @@ const TEMPLATE_ICONS: Record<string, string> = {
  */
 export function TemplateGallery({
   activeTemplateId,
+  sport = 'bike',
   onSelect,
   onStartFromScratch,
   onLoadSavedPlan,
@@ -55,6 +73,7 @@ export function TemplateGallery({
 }: TemplateGalleryProps): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>('templates');
+  const templates = templatesForSport(sport);
 
   const handleImportClick = (): void => {
     fileInputRef.current?.click();
@@ -154,7 +173,7 @@ export function TemplateGallery({
             <MaterialIcon name="arrow_forward" size="small" decorative />
           </a>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-            {SESSION_TEMPLATES.map((template) => (
+            {templates.map((template) => (
               <TemplateCard
                 key={template.id}
                 template={template}

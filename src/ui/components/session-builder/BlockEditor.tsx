@@ -10,12 +10,17 @@ import {
   type Phase,
   type SessionBlock,
 } from '@core/segmentation';
+import type { Sport } from '@core/user';
 import { Button } from '../Button';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
 import { ZONE_LABEL_WITH_CODE } from '../zoneLabels';
 import type { PhysioContext } from './BlockList';
-import { formatBpmRange, formatWattsRange } from './zoneRangeFormat';
+import {
+  formatBpmRange,
+  formatRecommendedCadenceRun,
+  formatWattsRange,
+} from './zoneRangeFormat';
 
 export interface BlockEditorProps {
   block: SessionBlock;
@@ -23,6 +28,8 @@ export interface BlockEditorProps {
   onCancel: () => void;
   /** Bandas bpm/W del usuario; si se pasan, se muestran junto a la zona seleccionada. */
   physioContext?: PhysioContext;
+  /** Deporte. En 'run' se oculta el selector de cadenceProfile y los hints de W. */
+  sport?: Sport;
 }
 
 const PHASE_LABELS: Record<Phase, string> = {
@@ -59,7 +66,14 @@ const PROFILE_LABELS: Record<CadenceProfile, string> = {
  * El editor mantiene su propio state para que el usuario pueda cancelar
  * sin perder el bloque original.
  */
-export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEditorProps): JSX.Element {
+export function BlockEditor({
+  block,
+  onSave,
+  onCancel,
+  physioContext,
+  sport = 'bike',
+}: BlockEditorProps): JSX.Element {
+  const isRun = sport === 'run';
   const [phase, setPhase] = useState<Phase>(block.phase);
   const [zone, setZone] = useState<HeartRateZone>(block.zone);
   const [cadenceProfile, setCadenceProfile] = useState<CadenceProfile>(
@@ -85,11 +99,20 @@ export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEdi
     }
   }, [zone, validProfiles, cadenceProfile]);
 
-  const recommended = getRecommendedCadence(zone, cadenceProfile);
-  const cadenceHint = `${recommended.min}-${recommended.max} rpm`;
+  // En running: cadencia depende solo de la zona (no del terreno), unidad spm.
+  // En bici: cadencia depende de zona + profile, unidad rpm.
+  const cadenceHint = isRun
+    ? formatRecommendedCadenceRun(zone)
+    : (() => {
+        const r = getRecommendedCadence(zone, cadenceProfile);
+        return `${r.min}-${r.max} rpm`;
+      })();
 
   const bpmHint = formatBpmRange(zone, physioContext?.karvonen ?? null);
-  const wattsHint = formatWattsRange(zone, physioContext?.power ?? null);
+  // Watts solo aplican a ciclismo (ver memoria sobre no-potenciometro a runners).
+  const wattsHint = isRun
+    ? null
+    : formatWattsRange(zone, physioContext?.power ?? null);
 
   const totalSec = Math.max(1, minutes * 60 + seconds);
   const isValid = totalSec > 0;
@@ -159,30 +182,39 @@ export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEdi
         </label>
       </div>
 
-      <label className="block">
-        <span className="text-xs font-semibold text-gris-700 mb-1 block">
-          Tipo de bloque{' '}
-          {profileLocked && (
-            <span className="text-gris-400 font-normal">(fijo para esta zona)</span>
-          )}
-        </span>
-        <select
-          value={cadenceProfile}
-          onChange={(e) => setCadenceProfile(e.target.value as CadenceProfile)}
-          disabled={profileLocked}
-          className="w-full rounded-md border-2 border-gris-300 bg-white px-2 py-2 text-sm focus:border-turquesa-500 focus:outline-none min-h-[40px] disabled:bg-gris-100 disabled:text-gris-600"
-        >
-          {validProfiles.map((p) => (
-            <option key={p} value={p}>
-              {PROFILE_LABELS[p]}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-gris-500 mt-1 flex items-center gap-1.5">
+      {isRun ? (
+        // En running el bloque no tiene "tipo de pedaleo": la cadencia se acopla
+        // a la zona/velocidad. Mostramos solo el hint de cadencia objetivo (spm).
+        <p className="text-xs text-gris-500 flex items-center gap-1.5">
           <MaterialIcon name="speed" size="small" className="text-turquesa-600" />
           Cadencia recomendada: {cadenceHint}
         </p>
-      </label>
+      ) : (
+        <label className="block">
+          <span className="text-xs font-semibold text-gris-700 mb-1 block">
+            Tipo de bloque{' '}
+            {profileLocked && (
+              <span className="text-gris-400 font-normal">(fijo para esta zona)</span>
+            )}
+          </span>
+          <select
+            value={cadenceProfile}
+            onChange={(e) => setCadenceProfile(e.target.value as CadenceProfile)}
+            disabled={profileLocked}
+            className="w-full rounded-md border-2 border-gris-300 bg-white px-2 py-2 text-sm focus:border-turquesa-500 focus:outline-none min-h-[40px] disabled:bg-gris-100 disabled:text-gris-600"
+          >
+            {validProfiles.map((p) => (
+              <option key={p} value={p}>
+                {PROFILE_LABELS[p]}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gris-500 mt-1 flex items-center gap-1.5">
+            <MaterialIcon name="speed" size="small" className="text-turquesa-600" />
+            Cadencia recomendada: {cadenceHint}
+          </p>
+        </label>
+      )}
 
       <div>
         <span className="text-xs font-semibold text-gris-700 mb-1 block">Duración</span>
@@ -226,7 +258,9 @@ export function BlockEditor({ block, onSave, onCancel, physioContext }: BlockEdi
           <MaterialIcon name={PHASE_ICONS[phase]} size="small" className="text-gris-500" />
           <span>{PHASE_LABELS[phase]}</span>
           <ZoneBadge zone={zone} size="sm" />
-          <span className="text-gris-500">· {PROFILE_LABELS[cadenceProfile]}</span>
+          {!isRun && (
+            <span className="text-gris-500">· {PROFILE_LABELS[cadenceProfile]}</span>
+          )}
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <Button variant="secondary" size="sm" onClick={onCancel}>

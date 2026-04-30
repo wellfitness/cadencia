@@ -1,9 +1,11 @@
+import { getZoneCriteria } from '@core/matching';
 import type {
   HeartRateZone,
   KarvonenZoneRange,
   PowerZoneRange,
 } from '@core/physiology';
 import { getRecommendedCadence, type CadenceProfile } from '@core/segmentation';
+import type { Sport } from '@core/user';
 
 /**
  * Devuelve "min-max bpm" para la zona pedida, o null si no hay datos Karvonen
@@ -49,4 +51,27 @@ export function formatRecommendedCadence(
 ): string {
   const range = getRecommendedCadence(zone, profile);
   return `${range.min}-${range.max} rpm`;
+}
+
+/**
+ * Devuelve "min-max spm" para la cadencia de zancada recomendada al runner
+ * en la zona. En carrera la cadencia depende solo de la zona (no del terreno
+ * como en bici), asi que `profile` no se usa.
+ */
+export function formatRecommendedCadenceRun(zone: HeartRateZone): string {
+  const c = getZoneCriteria(zone, 'flat', 'run');
+  return `${c.cadenceMin}-${c.cadenceMax} spm`;
+}
+
+/**
+ * Helper unico que bifurca por sport y devuelve la cadencia formateada con
+ * la unidad correcta (rpm para bici, spm para carrera). Default sport 'bike'.
+ */
+export function formatRecommendedCadenceForSport(
+  zone: HeartRateZone,
+  profile: CadenceProfile,
+  sport: Sport = 'bike',
+): string {
+  if (sport === 'run') return formatRecommendedCadenceRun(zone);
+  return formatRecommendedCadence(zone, profile);
 }

@@ -57,7 +57,7 @@ interface BuilderState {
 type BuilderAction =
   | { type: 'loadTemplate'; template: SessionTemplate }
   | { type: 'loadPlan'; plan: EditableSessionPlan }
-  | { type: 'startFromScratch' }
+  | { type: 'startFromScratch'; name: string }
   | { type: 'setItems'; items: SessionItem[] }
   | { type: 'addBlock' }
   | { type: 'setName'; name: string };
@@ -86,7 +86,7 @@ function reducer(state: BuilderState, action: BuilderAction): BuilderState {
     }
     case 'startFromScratch':
       return {
-        plan: { name: defaultName(), items: [] },
+        plan: { name: action.name, items: [] },
         activeTemplateId: null,
         nextId: state.nextId,
       };
@@ -131,12 +131,13 @@ function cloneItem(item: SessionItem): SessionItem {
   };
 }
 
-function defaultName(): string {
+function defaultName(sport: 'bike' | 'run' = 'bike'): string {
   const now = new Date();
   const day = now.getDate();
   const month = now.toLocaleString('es-ES', { month: 'short' });
   const time = now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-  return `Sesión indoor — ${day} ${month}, ${time}`;
+  const prefix = sport === 'run' ? 'Sesión de carrera' : 'Sesión indoor';
+  return `${prefix} — ${day} ${month}, ${time}`;
 }
 
 /**
@@ -155,11 +156,12 @@ export function SessionBuilder({
   onBack,
   onNext,
 }: SessionBuilderProps): JSX.Element {
+  const sport = validatedInputs.sport ?? 'bike';
   const [state, dispatch] = useReducer(
     reducer,
-    { plan: initialPlan, templateId: initialActiveTemplateId },
+    { plan: initialPlan, templateId: initialActiveTemplateId, sport },
     (init): BuilderState => ({
-      plan: init.plan ?? { name: defaultName(), items: [] },
+      plan: init.plan ?? { name: defaultName(init.sport), items: [] },
       activeTemplateId: init.templateId,
       nextId: 1,
     }),
@@ -193,11 +195,12 @@ export function SessionBuilder({
   );
 
   const handleStartFromScratch = useCallback((): void => {
-    dispatch({ type: 'startFromScratch' });
-    onChange({ name: defaultName(), items: [] });
+    const name = defaultName(sport);
+    dispatch({ type: 'startFromScratch', name });
+    onChange({ name, items: [] });
     if (onActiveTemplateIdChange !== undefined) onActiveTemplateIdChange(null);
     setError(null);
-  }, [onChange, onActiveTemplateIdChange]);
+  }, [sport, onChange, onActiveTemplateIdChange]);
 
   /**
    * Carga una sesion guardada por el usuario (tab "Mis sesiones").
@@ -383,7 +386,10 @@ export function SessionBuilder({
           <MaterialIcon name="help_outline" size="medium" decorative />
         </a>
       </div>
-      <Card title="Tu sesión indoor" titleIcon="fitness_center">
+      <Card
+        title={sport === 'run' ? 'Tu sesión de carrera' : 'Tu sesión indoor'}
+        titleIcon="fitness_center"
+      >
         <label className="block mb-4">
           <span className="text-xs font-semibold text-gris-700 mb-1 block">Nombre de la sesión</span>
           <input
@@ -397,10 +403,13 @@ export function SessionBuilder({
 
         <TemplateGallery
           activeTemplateId={state.activeTemplateId}
+          sport={validatedInputs.sport ?? 'bike'}
           onSelect={handleLoadTemplate}
           onStartFromScratch={handleStartFromScratch}
           onLoadSavedPlan={handleLoadSavedPlan}
-          onImportFile={handleImportZwo}
+          {...((validatedInputs.sport ?? 'bike') === 'bike'
+            ? { onImportFile: handleImportZwo }
+            : {})}
         />
         {importNotice !== null && (
           <p
@@ -438,6 +447,7 @@ export function SessionBuilder({
           }}
           onStartFromScratch={handleAddBlock}
           physioContext={physioContext}
+          sport={sport}
         />
 
         {error !== null && (

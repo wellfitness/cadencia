@@ -22,7 +22,7 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
   return (
     <div className="min-h-full flex flex-col bg-white">
       <main className="flex-1">
-        <HeroVisual onTry={openModal} />
+        <HeroVisual />
         <Intro />
         <HowItWorks />
         <InteropZwo />
@@ -44,27 +44,25 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
 }
 
 /**
- * HeroVisual: imagen full-bleed (panorámica en md+, vertical en <md) con un
- * H1 sr-only para SEO/lectores de pantalla y un único CTA "Probar aplicación"
- * superpuesto. La imagen ya contiene texto pintado ("Cadencia / para ciclistas
- * con ritmo / Tu plan / Tu intensidad / Tu música") y el mockup holográfico
- * sobre el manillar; ese contenido NO se duplica en HTML.
+ * HeroVisual: imagen full-bleed (panorámica en md+, vertical en <md). La
+ * imagen ya contiene todo el copy de cabecera pintado ("Cadencia / disfruta
+ * del cardio a tu ritmo / Tu plan. Tu intensidad. Tu música.") junto con la
+ * escena multisport (corredor + ciclista) y el mockup del reproductor; ese
+ * contenido NO se duplica en HTML.
+ *
+ * Diferencia respecto a versiones anteriores: aquí no hay overlays (ni CTA,
+ * ni chips, ni gradient). El nuevo hero está visualmente lleno y los
+ * elementos interactivos quedarían apretados sobre el copy pintado. El CTA
+ * "Probar aplicación" y los chips de beneficios viven en la sección Intro
+ * inmediatamente debajo, donde tienen aire y contraste sobre fondo blanco.
  *
  * Art-direction con <picture>: cada breakpoint descarga solo su variante.
  * El <img> es decoración (alt="" + aria-hidden), eager + fetchpriority="high"
- * + decoding="async" para optimizar LCP.
- *
- * Posición del botón:
- * - Mobile (vertical 9:16): mitad inferior, centrado horizontal — encaja con
- *   el espacio bajo el texto pintado.
- * - Desktop (panorámica 16:9): inferior izquierda, alineado con la columna
- *   donde está el texto pintado.
- *
- * Ajuste fino (porcentajes) puede requerir tuning visual una vez se ve la
- * página renderizada — los valores de partida están calibrados para que el
- * CTA caiga sobre la zona despejada de las imágenes.
+ * + decoding="async" para optimizar LCP. El único anclaje semántico de la
+ * página es el H1 sr-only — Google y lectores de pantalla lo leen aunque
+ * la imagen sea decorativa.
  */
-function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
+function HeroVisual(): JSX.Element {
   return (
     <section
       aria-labelledby="hero-title"
@@ -73,7 +71,7 @@ function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
       {/* H1 real, oculto visualmente (la imagen ya muestra la marca pintada).
           Único H1 de la página: SEO + lectores de pantalla. */}
       <h1 id="hero-title" className="sr-only">
-        Cadencia: listas de Spotify sincronizadas con tu ruta GPX o sesión de ciclo indoor
+        Cadencia: música de Spotify sincronizada con tu carrera o ruta en bici, outdoor desde GPX o indoor desde sesiones por bloques
       </h1>
 
       {/* Imagen responsive con art-direction.
@@ -98,67 +96,6 @@ function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
             className="absolute inset-0 w-full h-full object-cover"
           />
         </picture>
-
-        {/* Chips de beneficios SOLO en desktop (lg+ ≥1024px): cápsulas
-            con fondo blanco translúcido + backdrop-blur para legibilidad
-            sobre cualquier zona de la imagen. Anclados en la esquina
-            inferior derecha; el CTA vive en la inferior izquierda con
-            simétrico padding, así ambos cierran la composición a la misma
-            altura vertical en bordes opuestos y liberan la franja superior
-            para el texto pintado de la imagen.
-
-            En mobile y tablet (<lg) los chips no caben limpios sobre la
-            imagen — en mobile la imagen vertical compite con el texto
-            pintado, y en tablet la panorámica reduce el aire útil para
-            overlay (HUD holográfico + manillar comen casi todo el ancho).
-            En esos breakpoints los chips se renderizan al inicio de la
-            sección Intro como tira contigua a la imagen. */}
-        <ul
-          aria-label="Beneficios de Cadencia"
-          className="absolute hidden lg:flex right-[10%] bottom-[10%] flex-nowrap justify-end gap-2"
-        >
-          <li className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-md">
-            <MaterialIcon name="favorite" size="small" className="text-turquesa-600" />
-            <span className="text-xs sm:text-sm font-semibold text-gris-800">Más adherencia</span>
-          </li>
-          <li className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-md">
-            <MaterialIcon name="mood" size="small" className="text-turquesa-600" />
-            <span className="text-xs sm:text-sm font-semibold text-gris-800">Más disfrute</span>
-          </li>
-          <li className="flex items-center gap-1 sm:gap-1.5 rounded-full bg-white/85 backdrop-blur-sm px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-md">
-            <MaterialIcon name="trending_up" size="small" className="text-turquesa-600" />
-            <span className="text-xs sm:text-sm font-semibold text-gris-800">Más rendimiento</span>
-          </li>
-        </ul>
-
-        {/* Overlay gradient sutil sobre la mitad inferior de la imagen para
-            garantizar contraste WCAG AA del CTA + microcopy con independencia
-            del recorte de `object-cover` en cada viewport. No afecta a los
-            chips top (cielo, sin overlay) ni intercepta clicks. */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none"
-        />
-
-        {/* CTA + microcopy en bloque inferior. Microcopy debajo del botón
-            como reaffirmation de bajo coste de entrada. Texto en blanco con
-            drop-shadow porque el fondo (manillar / paisaje en sombra) varía,
-            reforzado por el overlay gradient anterior. */}
-        <div className="absolute inset-x-0 bottom-[8%] flex flex-col items-center gap-3 md:bottom-[10%] md:items-start md:pl-[8%] lg:pl-[10%]">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={onTry}
-            iconRight="arrow_forward"
-            aria-label="Probar aplicación de Cadencia"
-            className="shadow-2xl ring-2 ring-white/60"
-          >
-            Probar aplicación
-          </Button>
-          <p className="text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
-            Gratis. Sin registro. Sin servidor.
-          </p>
-        </div>
       </div>
     </section>
   );

@@ -6,6 +6,7 @@ import { buildPowerConstants, type PowerConstants } from '../power/types';
 import type { ValidatedUserInputs } from '../user/userInputs';
 import { classifyZone } from './classifyZone';
 import { calculateNormalizedPower, type PowerSample } from './normalizedPower';
+import { slopeToRunZone } from './runMetabolic';
 import type { CadenceProfile } from './sessionPlan';
 import type { ClassifiedSegment, RouteMeta } from './types';
 
@@ -32,20 +33,27 @@ export interface SegmentationResult {
  * Pipeline completo: GPX track -> bloques de ~60s clasificados por zona,
  * mas metadata agregada del recorrido completo.
  *
- * Algoritmo:
+ * Algoritmo (ciclismo, sport === 'bike'):
  *   1. computeSegments(track) para obtener DistanceSegment[] punto-a-punto.
  *   2. Acumular segmentos consecutivos hasta sumar >= 60s (o agotar la ruta).
  *   3. Por cada bloque calcular potencia media ponderada por duracion.
- *   4. Clasificar en zona Coggan.
+ *   4. Clasificar en zona Coggan via classifyZone(avgPower, validated).
  *   5. Agregar metadata: distancia total, desnivel, NP = (mean(P^4))^(1/4),
  *      tiempo en cada zona.
+ *
+ * Algoritmo (running, sport === 'run'):
+ *   Idem pasos 1-2, pero la zona se infiere directamente de la pendiente del
+ *   bloque via `slopeToRunZone` (curva de Minetti, ver `runMetabolic.ts`).
+ *   La potencia no se calcula (avgPowerWatts = 0). El runner promedio no
+ *   entrena por potencia, ver memoria sobre no-potenciometro a runners.
  */
 export function segmentInto60SecondBlocks(
   track: GpxTrack,
   validated: ValidatedUserInputs,
-  /** Override opcional de constantes (testing o configuracion avanzada). Por defecto deriva del tipo+peso de bici. */
+  /** Override opcional de constantes (testing o configuracion avanzada). Por defecto deriva del tipo+peso de bici. Ignorado en running. */
   constants: PowerConstants = buildPowerConstants(validated.bikeWeightKg, validated.bikeType),
 ): SegmentationResult {
+  const isRun = validated.sport === 'run';
   const distSegments = computeSegments(track);
   // Un track GPX con un solo trackpoint (o todos los puntos en exactamente la
   // misma coordenada) no produce segmentos consumibles. Falla explícitamente
@@ -82,14 +90,17 @@ export function segmentInto60SecondBlocks(
     if (!startPoint || !endPoint) return;
 
     const avgPower = blockDuration > 0 ? blockEnergyJoules / blockDuration : 0;
-    const zone = classifyZone(avgPower, validated);
     const slopePct = blockDistance > 0 ? ((endPoint.ele - startPoint.ele) / blockDistance) * 100 : 0;
+    // Bike: zona derivada de potencia media (Coggan).
+    // Run: zona derivada de pendiente (Minetti). El runner promedio no entrena
+    // por potencia y la app no la calcula.
+    const zone = isRun ? slopeToRunZone(slopePct) : classifyZone(avgPower, validated);
     const cadenceProfile = inferCadenceProfileFromSlopePct(slopePct);
 
     blocks.push({
       startSec: blockStartTimeSec,
       durationSec: blockDuration,
-      avgPowerWatts: avgPower,
+      avgPowerWatts: isRun ? 0 : avgPower,
       zone,
       cadenceProfile,
       startDistanceMeters: totalDistance - blockDistance,
@@ -116,8 +127,10 @@ export function segmentInto60SecondBlocks(
       blockStartTimeSec = totalDuration;
     }
 
-    const power = estimatePowerWatts(ds, validated.weightKg, constants);
-    powerSamples.push({ powerWatts: power, durationSec: ds.durationSeconds });
+    // Bike: estimamos potencia ciclista (gravedad + rodadura + aero) por
+    // segmento. Run: skip (sport='run' no calcula potencia, ver doc del modulo).
+    const power = isRun ? 0 : estimatePowerWatts(ds, validated.weightKg, constants);
+    if (!isRun) powerSamples.push({ powerWatts: power, durationSec: ds.durationSeconds });
     blockDuration += ds.durationSeconds;
     blockDistance += ds.distanceMeters;
     blockEnergyJoules += power * ds.durationSeconds;

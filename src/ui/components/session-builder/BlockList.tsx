@@ -1,11 +1,16 @@
 import { useState, type DragEvent } from 'react';
 import type { KarvonenZoneRange, PowerZoneRange } from '@core/physiology';
 import type { CadenceProfile, SessionBlock, SessionItem } from '@core/segmentation';
+import type { Sport } from '@core/user';
 import { MaterialIcon } from '../MaterialIcon';
 import { ZoneBadge } from '../ZoneBadge';
 import { BlockEditor } from './BlockEditor';
 import { RepeatGroup } from './RepeatGroup';
-import { formatBpmRange, formatRecommendedCadence, formatWattsRange } from './zoneRangeFormat';
+import {
+  formatBpmRange,
+  formatRecommendedCadenceForSport,
+  formatWattsRange,
+} from './zoneRangeFormat';
 
 /**
  * Bandas de FC y vatios precalculadas a partir de los inputs validados del
@@ -26,6 +31,11 @@ export interface BlockListProps {
   onStartFromScratch?: () => void;
   /** Bandas bpm/W del usuario. Si se pasan, cada bloque muestra el rango de su zona. */
   physioContext?: PhysioContext;
+  /**
+   * Deporte de la sesion. En 'run' el editor oculta el selector de cadenceProfile
+   * y los bloques muestran spm en lugar de rpm. Default 'bike'.
+   */
+  sport?: Sport;
 }
 
 const PHASE_ICONS: Record<string, string> = {
@@ -66,6 +76,7 @@ export function BlockList({
   onLoadSitTemplate,
   onStartFromScratch,
   physioContext,
+  sport = 'bike',
 }: BlockListProps): JSX.Element {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   // Drag&drop nativo: el indice arrastrado vive en estado para poder hacer
@@ -228,6 +239,7 @@ export function BlockList({
                   block={block}
                   onSave={handleSaveEdit(itemIndex, null)}
                   onCancel={() => setEditingKey(null)}
+                  sport={sport}
                   {...(physioContext !== undefined ? { physioContext } : {})}
                 />
               </li>
@@ -242,6 +254,7 @@ export function BlockList({
                 {...(canMoveUp ? { onMoveUp: () => moveItem(itemIndex, -1) } : {})}
                 {...(canMoveDown ? { onMoveDown: () => moveItem(itemIndex, 1) } : {})}
                 showDragHandle
+                sport={sport}
                 {...(physioContext !== undefined ? { physioContext } : {})}
               />
             </li>
@@ -291,6 +304,7 @@ export function BlockList({
                         block={block}
                         onSave={handleSaveEdit(itemIndex, blockIndex)}
                         onCancel={() => setEditingKey(null)}
+                        sport={sport}
                         {...(physioContext !== undefined ? { physioContext } : {})}
                       />
                     );
@@ -302,6 +316,7 @@ export function BlockList({
                       onEdit={() => setEditingKey(editKey(itemIndex, block.id))}
                       onRemove={() => removeBlockFromGroup(itemIndex, blockIndex)}
                       compact
+                      sport={sport}
                       {...(physioContext !== undefined ? { physioContext } : {})}
                     />
                   );
@@ -325,6 +340,8 @@ interface BlockRowProps {
   /** Muestra el handle de drag (solo desktop, hover-visible). */
   showDragHandle?: boolean;
   physioContext?: PhysioContext;
+  /** Deporte. En 'run' se oculta el profile (etiqueta) y los watts. */
+  sport?: Sport;
 }
 
 function BlockRow({
@@ -336,10 +353,16 @@ function BlockRow({
   compact = false,
   showDragHandle = false,
   physioContext,
+  sport = 'bike',
 }: BlockRowProps): JSX.Element {
+  const isRun = sport === 'run';
   const bpm = formatBpmRange(block.zone, physioContext?.karvonen ?? null);
-  const watts = formatWattsRange(block.zone, physioContext?.power ?? null);
-  const cadence = formatRecommendedCadence(block.zone, block.cadenceProfile);
+  // Watts solo aplican a ciclismo. En running ocultamos el badge aunque physioContext
+  // tenga datos: el runner promedio no entrena por potencia (ver memoria de feedback).
+  const watts = isRun
+    ? null
+    : formatWattsRange(block.zone, physioContext?.power ?? null);
+  const cadence = formatRecommendedCadenceForSport(block.zone, block.cadenceProfile, sport);
   return (
     <div
       className={`flex items-center gap-2 rounded-md border bg-white px-2.5 py-2 ${
@@ -387,10 +410,14 @@ function BlockRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <ZoneBadge zone={block.zone} size="sm" />
-          <span className="text-xs text-gris-500">·</span>
-          <span className="text-xs font-semibold text-gris-700">
-            {CADENCE_PROFILE_LABELS[block.cadenceProfile]}
-          </span>
+          {!isRun && (
+            <>
+              <span className="text-xs text-gris-500">·</span>
+              <span className="text-xs font-semibold text-gris-700">
+                {CADENCE_PROFILE_LABELS[block.cadenceProfile]}
+              </span>
+            </>
+          )}
           <span className="text-sm font-semibold text-gris-800 ml-1">
             {formatDuration(block.durationSec)}
           </span>

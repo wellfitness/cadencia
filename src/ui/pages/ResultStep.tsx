@@ -515,7 +515,9 @@ export function ResultStep({
         }
         hasSpotifySession={hasSpotifySession}
         {...(onEnterTVMode !== undefined ? { onEnterTVMode } : {})}
-        {...(sourceType === 'gpx' && routeSegments.length > 0
+        {...(sourceType === 'gpx' &&
+        routeSegments.length > 0 &&
+        validatedInputs.sport !== 'run'
           ? { onDownloadZwo: handleDownloadZwo }
           : {})}
       />

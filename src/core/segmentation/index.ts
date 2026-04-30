@@ -28,6 +28,6 @@ export {
   isSlopeVisuallyFlat,
   FLAT_SLOPE_DISPLAY_THRESHOLD_PCT,
 } from './segmentSlope';
-export { SESSION_TEMPLATES, findTemplate } from './sessionTemplates';
+export { SESSION_TEMPLATES, findTemplate, templatesForSport } from './sessionTemplates';
 export { classifySessionPlan, buildSessionRouteMeta } from './fromSessionBlocks';
 export { getRecommendedCadence, type CadenceRange } from './cadenceRecommendation';
