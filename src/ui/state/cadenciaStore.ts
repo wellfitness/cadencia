@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { emptySyncedData, isSyncedData } from '@core/sync/schema';
 import type { SyncedData } from '@core/sync/types';
 
@@ -17,6 +18,29 @@ const STORAGE_KEY = 'cadencia:data:v1';
  * saveCadenciaData / clearCadenciaData. El evento permite reaccionar a
  * cambios sin acoplar la UI con el modulo de Drive.
  */
+
+/**
+ * Normaliza datos persistidos hidratando campos que puedan faltar en
+ * blobs antiguos (anteriores a una extension del schema). Mantiene el
+ * principio backwards-compatible: cualquier blob valido en el pasado
+ * sigue siendo cargable, simplemente con los campos nuevos a su valor
+ * por defecto.
+ */
+function normalize(data: SyncedData): SyncedData {
+  const empty = emptySyncedData();
+  return {
+    ...empty,
+    ...data,
+    _sectionMeta: { ...empty._sectionMeta, ...data._sectionMeta },
+    // Defaults para campos anadidos en extensiones posteriores al schema
+    // original. La validacion isSyncedData no comprueba estos campos
+    // (back-compat), asi que aqui los rellenamos.
+    uploadedCsvs: data.uploadedCsvs ?? [],
+    nativeCatalogPrefs: data.nativeCatalogPrefs ?? null,
+    dismissedTrackUris: data.dismissedTrackUris ?? [],
+  };
+}
+
 export function loadCadenciaData(): SyncedData {
   try {
     if (typeof localStorage === 'undefined') return emptySyncedData();
@@ -24,7 +48,7 @@ export function loadCadenciaData(): SyncedData {
     if (raw === null) return emptySyncedData();
     const parsed: unknown = JSON.parse(raw);
     if (!isSyncedData(parsed)) return emptySyncedData();
-    return parsed;
+    return normalize(parsed);
   } catch {
     // JSON corrupto o storage deshabilitado: arrancamos con empty.
     return emptySyncedData();
@@ -54,7 +78,11 @@ export function clearCadenciaData(): void {
   }
 }
 
-type AtomicSectionKey = 'userInputs' | 'musicPreferences';
+type AtomicSectionKey =
+  | 'userInputs'
+  | 'musicPreferences'
+  | 'nativeCatalogPrefs'
+  | 'dismissedTrackUris';
 
 /**
  * Actualiza una seccion atomica del store, bumpeando su `_sectionMeta.updatedAt`
@@ -71,4 +99,23 @@ export function updateSection<K extends AtomicSectionKey>(
   data._sectionMeta[section] = { updatedAt: now };
   data.updatedAt = now;
   saveCadenciaData(data);
+}
+
+/**
+ * Hook React que se suscribe al evento `cadencia-data-saved` y devuelve
+ * el SyncedData actual, re-renderizando el componente cuando el store
+ * cambia (sea por una accion local o por un pull desde Drive).
+ *
+ * Util para que el livePool de App.tsx, MyAccountPage o cualquier UI
+ * dependiente de los datos sincronizados se mantenga reactivo sin tener
+ * que escuchar el evento manualmente en cada sitio.
+ */
+export function useCadenciaData(): SyncedData {
+  const [data, setData] = useState<SyncedData>(() => loadCadenciaData());
+  useEffect(() => {
+    const handler = (): void => setData(loadCadenciaData());
+    window.addEventListener('cadencia-data-saved', handler);
+    return () => window.removeEventListener('cadencia-data-saved', handler);
+  }, []);
+  return data;
 }
