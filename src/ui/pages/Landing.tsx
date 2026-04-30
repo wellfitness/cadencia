@@ -23,13 +23,18 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
     <div className="min-h-full flex flex-col bg-white">
       <main className="flex-1">
         <HeroVisual onTry={openModal} />
-        {/* Chips de beneficios en móvil + tablet (<lg): viven debajo del
-            hero, antes de Intro, en lugar de dentro del overlay sobre la
-            imagen (donde competirían por altura con el CTA y por superficie
-            con el copy pintado). Solo en desktop (lg+) los chips se
-            posicionan a la derecha-inferior del propio hero, donde hay aire
-            visual suficiente. */}
-        <div className="lg:hidden bg-white px-4 pt-5 pb-1 flex justify-center">
+        {/* Bloque post-hero móvil + tablet (<lg).
+            - Móvil (<md): CTA + microcopy + chips en blanco. La imagen 9:16
+              está saturada (logo, reproductor, corredor+ciclista, copy
+              pintado «Tu plan / Tu intensidad / Tu música») y no admite un
+              overlay de CTA sin pisarlos visualmente — el CTA vive aquí.
+            - Tablet (md..<lg): solo chips. El CTA sigue como overlay sobre
+              la imagen panorámica, donde la franja inferior está libre.
+            Los chips se mantienen en row para ambas anchuras. */}
+        <div className="lg:hidden bg-white px-4 pt-6 pb-2 flex flex-col items-center gap-5">
+          <div className="md:hidden w-full flex justify-center">
+            <LandingCtaBlock onTry={openModal} microcopyTone="dark" />
+          </div>
           <BenefitChips orientation="row" />
         </div>
         <Intro />
@@ -87,7 +92,7 @@ function LandingCtaBlock({
       <p
         className={
           microcopyTone === 'light'
-            ? 'text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]'
+            ? 'text-sm font-semibold text-white bg-gris-900/55 backdrop-blur-sm rounded-full px-3 py-1 shadow-sm'
             : 'text-sm font-semibold text-gris-700'
         }
       >
@@ -212,21 +217,17 @@ function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
           />
         </picture>
 
-        {/* Overlay CTA móvil + tablet (oculto en lg+).
-            - Anclado al borde inferior con padding generoso, SIN degradado
-              blanco: cubría demasiada imagen al final del hero. La
-              legibilidad del microcopy queda garantizada por el tono light
-              (blanco con drop-shadow) — mismo recurso que en desktop.
-            - Padding inferior responsive:
-                · Móvil (<md): pb-[6.5rem] (= 104 px) sobre la imagen 9:16
-                  donde el copy pintado «Tu plan / Tu intensidad / Tu música»
-                  ocupa la franja inferior. Subir el CTA evita el solape.
-                · Tablet (md..<lg): md:pb-2 (= 8 px). Padding mínimo para
-                  que el CTA quede prácticamente pegado al borde inferior de
-                  la imagen panorámica 16:9, lejos del reproductor central.
-                  Los chips no viven aquí: en <lg se renderizan en una
-                  mini-sección bajo el hero (en `Landing` raíz). */}
-        <div className="lg:hidden absolute inset-x-0 bottom-0 pt-16 pb-[6.5rem] md:pb-2 px-4 flex flex-col items-center">
+        {/* Overlay CTA SOLO en tablet (md..<lg).
+            - En móvil (<md) la imagen 9:16 está saturada (logo, reproductor,
+              corredor+ciclista, copy pintado «Tu plan / Tu intensidad / Tu
+              música» en la franja inferior); cualquier overlay competía por
+              superficie con esos elementos. Por eso en móvil el CTA vive en
+              el bloque blanco bajo el hero (ver `Landing` raíz).
+            - En tablet la imagen panorámica 16:9 deja una franja inferior
+              limpia donde sí cabe el overlay. `md:pb-6` da aire visual al
+              borde inferior; el microcopy usa tono `light` con pastilla
+              translúcida (gris-900/55 + backdrop-blur) para contraste WCAG. */}
+        <div className="hidden md:flex lg:hidden absolute inset-x-0 bottom-0 pt-16 pb-6 px-4 flex-col items-center">
           <LandingCtaBlock onTry={onTry} microcopyTone="light" />
         </div>
 
