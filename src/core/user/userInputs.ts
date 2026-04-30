@@ -1,4 +1,13 @@
 /**
+ * Deporte que el usuario practica. Determina motor de zonas (potencia ciclista
+ * vs Minetti running), validacion de inputs (peso obligatorio en bike, opcional
+ * en run) y plantillas de sesion ofrecidas (ciclismo vs running).
+ */
+export type Sport = 'bike' | 'run';
+
+export const SPORTS: readonly Sport[] = ['bike', 'run'] as const;
+
+/**
  * Tipos de bici soportados para el modelo fisico.
  *
  * No incluimos "urbana" deliberadamente: la app pide al ciclista llevar
@@ -25,8 +34,15 @@ export const BIOLOGICAL_SEXES: readonly BiologicalSex[] = ['female', 'male'] as 
 /**
  * Datos fisiologicos crudos tal cual los introduce el usuario en el formulario.
  * Cualquier campo puede ser null mientras la pantalla este en edicion.
+ *
+ * `sport` viene del paso 0 del wizard (Tipo). Es opcional en el tipo por
+ * retrocompatibilidad con datos persistidos antes de la extension a running:
+ * legacy localStorage → undefined → tratado como 'bike' por defecto en los
+ * lugares que ramifican. EMPTY_USER_INPUTS lo incluye explicitamente como
+ * 'bike' para que nuevos formularios arranquen consistentes.
  */
 export interface UserInputsRaw {
+  sport?: Sport;
   weightKg: number | null;
   ftpWatts: number | null;
   maxHeartRate: number | null;
@@ -49,6 +65,7 @@ export interface UserInputsRaw {
  *   zonificacion aplicar (Coggan si hay FTP, Karvonen si hay FC reposo).
  */
 export interface ValidatedUserInputs {
+  sport?: Sport;
   weightKg: number;
   ftpWatts: number | null;
   effectiveMaxHr: number | null;
@@ -61,6 +78,13 @@ export interface ValidatedUserInputs {
   hasHeartRateZones: boolean;
 }
 
+/**
+ * `sport` se omite intencionalmente: en formularios nuevos arranca undefined
+ * (el wizard paso 0 lo set). En `calculateDataRichness` y similares que
+ * cuentan campos no nulos, esto deja a EMPTY con riqueza 0 de forma natural;
+ * incluirlo explicitamente como 'bike' subiria la riqueza basal a 1 sin que
+ * el usuario haya tocado nada.
+ */
 export const EMPTY_USER_INPUTS: UserInputsRaw = {
   weightKg: null,
   ftpWatts: null,

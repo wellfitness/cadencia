@@ -1,5 +1,6 @@
 import type { Track } from '../tracks/types';
 import type { MatchQuality, ZoneMusicCriteria } from './types';
+import { getAlternativeBpmRange } from './zoneCriteria';
 
 export interface CandidateBag {
   candidates: Track[];
@@ -8,10 +9,11 @@ export interface CandidateBag {
 
 /**
  * Comprueba si el tempo de un track encaja con la cadencia objetivo del
- * bloque, aceptando dos vias:
- *   - 1:1: cadenceMin <= tempoBpm <= cadenceMax (track 80 BPM = 80 rpm).
- *   - 2:1 half-time: 2*cadenceMin <= tempoBpm <= 2*cadenceMax (track 160 BPM
- *     se pedalea a 80 rpm con golpe fuerte cada 2 pedaladas).
+ * bloque, aceptando dos vias dependientes del deporte:
+ *   - 1:1: cadenceMin <= tempoBpm <= cadenceMax. Track 80 BPM = 80 rpm en
+ *     bike, o = 80 spm en run.
+ *   - Alternativa: rango devuelto por getAlternativeBpmRange (2× en bike,
+ *     0.5× en run). Ver doc en zoneCriteria.ts.
  *
  * Esta es la UNICA condicion excluyente del matching. Energy y valence se
  * incorporan al SCORE (scoreTrack), no como filtro.
@@ -23,9 +25,8 @@ export function passesCadenceFilter(
   if (tempoBpm >= criteria.cadenceMin && tempoBpm <= criteria.cadenceMax) {
     return true;
   }
-  const halfTimeMin = 2 * criteria.cadenceMin;
-  const halfTimeMax = 2 * criteria.cadenceMax;
-  return tempoBpm >= halfTimeMin && tempoBpm <= halfTimeMax;
+  const alt = getAlternativeBpmRange(criteria);
+  return tempoBpm >= alt.min && tempoBpm <= alt.max;
 }
 
 /**
@@ -48,11 +49,12 @@ export function findCandidates(
 
   if (tracks.length === 0) return { candidates: [], quality: 'best-effort' };
 
-  // Best-effort: top 5 mas cercanos al midpoint mas cercano (1:1 o 2:1).
+  // Best-effort: top 5 mas cercanos al midpoint mas cercano (1:1 o alternativo).
   const midpoint11 = (criteria.cadenceMin + criteria.cadenceMax) / 2;
-  const midpoint21 = midpoint11 * 2;
+  const alt = getAlternativeBpmRange(criteria);
+  const midpointAlt = (alt.min + alt.max) / 2;
   const distanceToNearest = (bpm: number): number =>
-    Math.min(Math.abs(bpm - midpoint11), Math.abs(bpm - midpoint21));
+    Math.min(Math.abs(bpm - midpoint11), Math.abs(bpm - midpointAlt));
   const nearest = [...tracks]
     .sort((a, b) => distanceToNearest(a.tempoBpm) - distanceToNearest(b.tempoBpm))
     .slice(0, 5);

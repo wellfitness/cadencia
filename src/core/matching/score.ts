@@ -1,5 +1,6 @@
 import type { Track } from '../tracks/types';
 import type { ZoneMusicCriteria } from './types';
+import { getAlternativeBpmRange } from './zoneCriteria';
 
 /**
  * Pesos del score. Todos suman 1.00. Cadencia y energy son los factores
@@ -51,19 +52,23 @@ export function scoreTrack(
   preferredGenres: readonly string[],
 ): number {
   // === CADENCE ===
+  // Score por proximidad al midpoint del rango 1:1 O del rango alternativo
+  // (2× en bike, 0.5× en run). Tomamos el max para no penalizar tracks que
+  // matchean por la via half-time/half-cadence.
   const midpoint11 = (criteria.cadenceMin + criteria.cadenceMax) / 2;
   const halfRange11 = (criteria.cadenceMax - criteria.cadenceMin) / 2;
-  const midpoint21 = midpoint11 * 2;
-  const halfRange21 = halfRange11 * 2;
+  const alt = getAlternativeBpmRange(criteria);
+  const midpointAlt = (alt.min + alt.max) / 2;
+  const halfRangeAlt = (alt.max - alt.min) / 2;
   const score11 =
     halfRange11 > 0
       ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpoint11) / halfRange11)
       : 0;
-  const score21 =
-    halfRange21 > 0
-      ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpoint21) / halfRange21)
+  const scoreAlt =
+    halfRangeAlt > 0
+      ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpointAlt) / halfRangeAlt)
       : 0;
-  const cadenceScore = Math.max(score11, score21);
+  const cadenceScore = Math.max(score11, scoreAlt);
 
   // === ENERGY (continua, no excluyente, penalizacion CUADRATICA) ===
   // (1 - dist)² castiga mas fuerte los outliers. Track con energy 0.95 vs

@@ -49,16 +49,23 @@ function inRange(value: number, min: number, max: number): boolean {
 /**
  * Valida los inputs del usuario.
  *
- * Modo 'gpx' (default, retrocompatible):
- * - weightKg obligatorio.
+ * Bifurca por sport y mode:
+ *
+ * Sport 'bike' + Modo 'gpx' (default, retrocompatible):
+ * - weightKg obligatorio (alimenta ecuacion de potencia ciclista).
  * - Si no hay FTP, requiere FC max O ano de nacimiento.
  * - restingHeartRate opcional pero necesario para zonas Karvonen.
  *
- * Modo 'session' (sesion indoor):
+ * Sport 'bike' + Modo 'session' (sesion indoor cycling):
  * - weightKg opcional (defaultea a 70kg para estimaciones cosmeticas).
- * - Sin requisito de FTP/FC/birthYear (las zonas las elige el usuario por
- *   bloque al construir la sesion).
+ * - Sin requisito de FTP, pero exige FC max O (birthYear+sex).
  * - Bike fields ignorados (no afectan a la pipeline indoor).
+ *
+ * Sport 'run' (gpx outdoor o session indoor — misma validacion):
+ * - weightKg opcional (Minetti expresa Cr en J/kg/m, ya normalizado).
+ * - FTP descartado (no aplica en running, Stryd es nicho).
+ * - Exige FC max O (birthYear+sex) para mostrar rangos personalizados de bpm.
+ * - Bike fields irrelevantes pero defaulteados para cumplir el contrato.
  *
  * Funcion pura: misma entrada -> misma salida. currentYear se pasa por
  * parametro para mantenerla testeable sin mocks de Date.
@@ -68,6 +75,9 @@ export function validateUserInputs(
   currentYear: number,
   mode: ValidationMode = 'gpx',
 ): ValidationResult {
+  if (raw.sport === 'run') {
+    return validateRun(raw, currentYear);
+  }
   if (mode === 'session') {
     return validateSession(raw, currentYear);
   }
@@ -193,6 +203,7 @@ export function validateUserInputs(
   return {
     ok: true,
     data: {
+      sport: raw.sport ?? 'bike',
       weightKg,
       ftpWatts: raw.ftpWatts,
       effectiveMaxHr,
@@ -314,6 +325,7 @@ function validateSession(raw: UserInputsRaw, currentYear: number): ValidationRes
   return {
     ok: true,
     data: {
+      sport: raw.sport ?? 'bike',
       weightKg,
       ftpWatts: raw.ftpWatts,
       effectiveMaxHr,
@@ -323,6 +335,123 @@ function validateSession(raw: UserInputsRaw, currentYear: number): ValidationRes
       bikeWeightKg,
       bikeType,
       hasFtp,
+      hasHeartRateZones,
+    },
+  };
+}
+
+/**
+ * Validador para running (gpx outdoor o session indoor — misma validacion).
+ *
+ * Reglas:
+ * - weightKg opcional. Cr de Minetti se expresa en J/kg/m (ya normalizado por
+ *   masa), asi que el peso del runner no afecta a la zona inferida por
+ *   pendiente. Default 70 kg para cumplir el contrato de ValidatedUserInputs.
+ * - FTP ignorado (no aplica en running; Stryd es nicho descartado V1).
+ * - Exige FC max O (birthYear + sex) para que la UI pueda mostrar rangos
+ *   personalizados de bpm por zona en cada bloque (modo TV) o segmento (GPX).
+ * - Bike fields irrelevantes pero defaulteados para cumplir el contrato.
+ *
+ * Funcion pura: misma entrada -> misma salida.
+ */
+function validateRun(raw: UserInputsRaw, currentYear: number): ValidationResult {
+  const errors: ValidationError[] = [];
+  const limits = VALIDATION_LIMITS;
+
+  // weightKg: opcional, validar rango si esta
+  if (raw.weightKg !== null && !inRange(raw.weightKg, limits.weightKg.min, limits.weightKg.max)) {
+    errors.push({
+      code: 'WEIGHT_OUT_OF_RANGE',
+      min: limits.weightKg.min,
+      max: limits.weightKg.max,
+    });
+  }
+
+  // FTP: descartado en run, ignoramos cualquier valor.
+
+  // birthYear: opcional, validar rango si esta
+  const birthYearMax = currentYear - limits.birthYear.maxOffsetFromCurrent;
+  if (raw.birthYear !== null && !inRange(raw.birthYear, limits.birthYear.min, birthYearMax)) {
+    errors.push({
+      code: 'BIRTH_YEAR_OUT_OF_RANGE',
+      min: limits.birthYear.min,
+      max: birthYearMax,
+    });
+  }
+
+  // maxHeartRate: opcional, validar rango si esta
+  if (
+    raw.maxHeartRate !== null &&
+    !inRange(raw.maxHeartRate, limits.maxHeartRate.min, limits.maxHeartRate.max)
+  ) {
+    errors.push({
+      code: 'MAX_HR_OUT_OF_RANGE',
+      min: limits.maxHeartRate.min,
+      max: limits.maxHeartRate.max,
+    });
+  }
+
+  // restingHeartRate: opcional, validar rango si esta
+  if (
+    raw.restingHeartRate !== null &&
+    !inRange(raw.restingHeartRate, limits.restingHeartRate.min, limits.restingHeartRate.max)
+  ) {
+    errors.push({
+      code: 'RESTING_HR_OUT_OF_RANGE',
+      min: limits.restingHeartRate.min,
+      max: limits.restingHeartRate.max,
+    });
+  }
+
+  // FC obligatoria: el motor (sea GPX outdoor o sesion indoor) necesita FC max
+  // para mostrar rangos personalizados de bpm por zona. Aceptamos FC directa
+  // o (birthYear + sex) para estimarla con Gulati/Tanaka.
+  const hasMaxHr = raw.maxHeartRate !== null;
+  const canEstimateMaxHr = raw.birthYear !== null && raw.sex !== null;
+  if (!hasMaxHr && !canEstimateMaxHr) {
+    errors.push({ code: 'NEED_HR_DATA' });
+  }
+
+  if (errors.length > 0) {
+    return { ok: false, errors };
+  }
+
+  let effectiveMaxHr: number | null = null;
+  if (raw.maxHeartRate !== null) {
+    effectiveMaxHr = raw.maxHeartRate;
+  } else if (raw.birthYear !== null && raw.sex !== null) {
+    effectiveMaxHr = calculateMaxHeartRate(currentYear - raw.birthYear, raw.sex);
+  }
+
+  if (
+    raw.restingHeartRate !== null &&
+    effectiveMaxHr !== null &&
+    raw.restingHeartRate >= effectiveMaxHr
+  ) {
+    return { ok: false, errors: [{ code: 'RESTING_GE_MAX_HR' }] };
+  }
+
+  const hasHeartRateZones = effectiveMaxHr !== null && raw.restingHeartRate !== null;
+  const weightKg = raw.weightKg ?? SESSION_DEFAULT_WEIGHT_KG;
+
+  // Bike fields: defaulteados para cumplir el contrato; nunca consumidos en
+  // pipelines de running.
+  const bikeType: BikeType = raw.bikeType ?? DEFAULTS.bikeType;
+  const bikeWeightKg = raw.bikeWeightKg ?? DEFAULTS.bikeWeightByType[bikeType];
+
+  return {
+    ok: true,
+    data: {
+      sport: 'run',
+      weightKg,
+      ftpWatts: null, // FTP ignorado en running
+      effectiveMaxHr,
+      restingHeartRate: raw.restingHeartRate,
+      birthYear: raw.birthYear,
+      sex: raw.sex,
+      bikeWeightKg,
+      bikeType,
+      hasFtp: false,
       hasHeartRateZones,
     },
   };

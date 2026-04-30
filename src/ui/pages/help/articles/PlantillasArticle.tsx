@@ -19,6 +19,20 @@ const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
     'Más cortos y más explosivos que el Noruego 4×4. Los 2 min en Z5 son cortos pero la cadencia tipo escalada aumenta la solicitación muscular. Recuperación a Z1 para llegar fresco al siguiente.',
   'recuperacion-activa':
     'Día entre cargas duras o regreso post-lesión. La intensidad permite mantener una conversación. No suma estímulo, ayuda a recuperar y a construir hábito.',
+  // Plantillas de running (este artículo cubre solo las de ciclismo; los textos
+  // explicativos de running se documentan en su propio articulo de ayuda).
+  'run-easy-long':
+    'Sesión más frecuente en cualquier plan de fondo. 60 min Z2 con conversación posible, base aeróbica.',
+  'run-tempo':
+    'Veinte minutos a ritmo de umbral (Z3-Z4). "Cómodamente duro": solo frases cortas. Mejora MLSS.',
+  'run-yasso-800':
+    'Diez × 800 m al ritmo Z5 con 400 m suaves. Predictor clásico de tiempo de marathon (Yasso).',
+  'run-daniels-intervals':
+    'Cinco × 1000 m al ritmo VO2max con 2:30 min de recuperación. Sesión clásica de Jack Daniels.',
+  'run-hiit-30-30':
+    'Veinte ciclos de 30 s rápidos + 30 s suaves. Protocolo Billat para acumular tiempo a velocidad máxima aeróbica.',
+  'run-threshold-cruise':
+    'Tres × 1500 m a ritmo de umbral con 90 s suaves entre cada uno. T-pace de Daniels.',
 };
 
 function templatesByCategory(): {

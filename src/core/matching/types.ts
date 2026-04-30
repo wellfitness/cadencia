@@ -2,6 +2,7 @@ import type { HeartRateZone } from '../physiology/karvonen';
 import type { CadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
+import type { Sport } from '../user/userInputs';
 
 /**
  * Preferencias musicales del usuario para guiar el matching.
@@ -29,12 +30,16 @@ export const EMPTY_PREFERENCES: MatchPreferences = {
 };
 
 /**
- * Criterios musicales para una combinacion (zona, cadenceProfile).
+ * Criterios musicales para una combinacion (zona, cadenceProfile, sport).
  *
- * **Filtro EXCLUYENTE: cadencia rpm.** Un track encaja si su tempoBpm cae en
- * [cadenceMin, cadenceMax] (match 1:1, una pedalada por beat) o en
- * [2·cadenceMin, 2·cadenceMax] (match 2:1 half-time, golpe fuerte cada 2
- * pedaladas). Si no, no es candidato.
+ * **Filtro EXCLUYENTE: cadencia.** Un track encaja si su tempoBpm cae en
+ * [cadenceMin, cadenceMax] (match 1:1, una unidad de cadencia por beat) o en
+ * el rango alternativo dependiente del deporte:
+ *   - Sport 'bike': [2·cadenceMin, 2·cadenceMax] (half-time 2:1, track 2× rpm,
+ *     golpe fuerte cada 2 pedaladas).
+ *   - Sport 'run': [cadenceMin/2, cadenceMax/2] (track 0.5× spm, 2 pasos por
+ *     beat).
+ * Ver `getAlternativeBpmRange` en `zoneCriteria.ts`.
  *
  * **Score INCLUYENTE: energy y valence ideales.** Las dimensiones de
  * intensidad sonora y positividad emocional NO descartan tracks; afectan al
@@ -44,10 +49,17 @@ export const EMPTY_PREFERENCES: MatchPreferences = {
  */
 export interface ZoneMusicCriteria {
   zone: HeartRateZone;
+  /**
+   * Deporte para el que se calculan los criterios. Determina rangos de
+   * cadencia y direccion del match alternativo. Opcional por retrocompat;
+   * undefined se trata como 'bike' en getAlternativeBpmRange.
+   */
+  sport?: Sport;
+  /** En running es informativo (placeholder 'flat'); el matching no lo usa. */
   cadenceProfile: CadenceProfile;
-  /** Cadencia objetivo minima (rpm). Filtro excluyente vía 1:1 o 2:1. */
+  /** Cadencia objetivo minima (rpm en bike, spm en run). Filtro excluyente. */
   cadenceMin: number;
-  /** Cadencia objetivo maxima (rpm). Filtro excluyente vía 1:1 o 2:1. */
+  /** Cadencia objetivo maxima (rpm en bike, spm en run). Filtro excluyente. */
   cadenceMax: number;
   /** Energy [0..1] ideal para esta zona. Score por distancia, no excluye. */
   energyIdeal: number;

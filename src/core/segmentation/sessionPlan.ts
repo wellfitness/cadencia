@@ -1,13 +1,20 @@
 import type { HeartRateZone } from '../physiology/karvonen';
+import type { Sport } from '../user/userInputs';
 
 /**
- * Modelo de datos del constructor de sesiones indoor cycling.
+ * Modelo de datos del constructor de sesiones (indoor cycling y running).
  *
  * Distingue dos representaciones del mismo plan:
  * - EditableSessionPlan: lo que el usuario edita en la UI, con grupos × N
  *   visibles para que la lista no crezca con cada repeticion.
  * - SessionPlan: el plan ya expandido (lineal), listo para alimentar la
  *   pipeline de segmentacion → matching.
+ *
+ * Multisport: cada plan lleva un campo `sport: 'bike' | 'run'` que ramifica
+ * el motor de matching (rangos de cadencia musical distintos por deporte). En
+ * sesiones de running el campo `cadenceProfile` de cada bloque es informativo
+ * pero NO afecta al matching (la cadencia de running se acopla a la zona, no
+ * al terreno como en bici); por convencion se rellena con 'flat'.
  */
 
 export type Phase = 'warmup' | 'work' | 'recovery' | 'rest' | 'cooldown' | 'main';
@@ -93,6 +100,13 @@ export type SessionItem =
 /** Lo que el usuario manipula en la UI. Persistido en sessionStorage. */
 export interface EditableSessionPlan {
   name: string;
+  /**
+   * Deporte del plan. Opcional en el tipo por retrocompat con planes
+   * persistidos antes de la extension a running; los lugares que ramifican
+   * tratan undefined como 'bike'. Codigo nuevo (templates, wizard) lo set
+   * explicitamente.
+   */
+  sport?: Sport;
   items: SessionItem[];
 }
 
@@ -102,10 +116,12 @@ export interface EditableSessionPlan {
  */
 export interface SessionPlan {
   name: string;
+  sport?: Sport;
   blocks: SessionBlock[];
 }
 
 export type SessionTemplateId =
+  // Ciclismo (sport: 'bike')
   | 'sit'
   | 'hiit-10-20-30'
   | 'noruego-4x4'
@@ -113,10 +129,19 @@ export type SessionTemplateId =
   | 'tempo-mlss'
   | 'umbral-progresivo'
   | 'vo2max-cortos'
-  | 'recuperacion-activa';
+  | 'recuperacion-activa'
+  // Running (sport: 'run')
+  | 'run-easy-long'
+  | 'run-tempo'
+  | 'run-yasso-800'
+  | 'run-daniels-intervals'
+  | 'run-hiit-30-30'
+  | 'run-threshold-cruise';
 
 export interface SessionTemplate {
   id: SessionTemplateId;
+  /** Deporte para el que esta disenada la plantilla. Opcional por retrocompat; las plantillas integradas lo setean explicitamente. */
+  sport?: Sport;
   name: string;
   description: string;
   items: SessionItem[];
@@ -146,7 +171,7 @@ export function expandSessionPlan(editable: EditableSessionPlan): SessionPlan {
       }
     }
   }
-  return { name: editable.name, blocks };
+  return { name: editable.name, sport: editable.sport ?? 'bike', blocks };
 }
 
 /**
