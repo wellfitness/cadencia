@@ -20,6 +20,7 @@ import {
   formatBpmRange,
   formatRecommendedCadenceRun,
   formatWattsRange,
+  formatZoneFeeling,
 } from './zoneRangeFormat';
 
 export interface BlockEditorProps {
@@ -163,22 +164,24 @@ export function BlockEditor({
               </option>
             ))}
           </select>
-          {(bpmHint !== null || wattsHint !== null) && (
-            <p className="text-xs text-gris-500 mt-1 flex items-center gap-2 flex-wrap tabular-nums">
-              {bpmHint !== null && (
-                <span className="inline-flex items-center gap-1">
-                  <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
-                  {bpmHint}
-                </span>
-              )}
-              {wattsHint !== null && (
-                <span className="inline-flex items-center gap-1">
-                  <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
-                  {wattsHint}
-                </span>
-              )}
-            </p>
-          )}
+          <p className="text-xs text-gris-500 mt-1 flex items-center gap-2 flex-wrap tabular-nums">
+            {bpmHint !== null && (
+              <span className="inline-flex items-center gap-1">
+                <MaterialIcon name="monitor_heart" size="small" className="text-rosa-500" />
+                {bpmHint}
+              </span>
+            )}
+            {wattsHint !== null && (
+              <span className="inline-flex items-center gap-1">
+                <MaterialIcon name="bolt" size="small" className="text-tulipTree-500" />
+                {wattsHint}
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1">
+              <MaterialIcon name="psychology" size="small" className="text-tulipTree-600" />
+              {formatZoneFeeling(zone)}
+            </span>
+          </p>
         </label>
       </div>
 

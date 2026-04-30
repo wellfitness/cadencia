@@ -1,6 +1,7 @@
 import { ArticleShell } from '@ui/components/help/ArticleShell';
 import { Card } from '@ui/components/Card';
 import { Button } from '@ui/components/Button';
+import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { navigateInApp } from '@ui/utils/navigation';
 
 export function SesionIndoorArticle(): JSX.Element {
@@ -11,8 +12,28 @@ export function SesionIndoorArticle(): JSX.Element {
   return (
     <ArticleShell
       slug="sesion-indoor"
-      lead="Una sesión indoor es una secuencia de bloques de tiempo, cada uno con una intensidad y un perfil de pedaleo. Tú decides la estructura; Cadencia se encarga de poner la música."
+      lead="Una sesión indoor de ciclo (rodillo o spinning) es una secuencia de bloques de tiempo, cada uno con una intensidad y un perfil de pedaleo. Tú decides la estructura; Cadencia se encarga de poner la música."
     >
+      <Card variant="info" className="mb-6" title="¿Vienes de running?" titleIcon="directions_run">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          Este artículo cubre las sesiones de <strong>ciclo indoor</strong>. Si eres
+          runner, ve a{' '}
+          <a
+            href="/ayuda/sesion-running"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/sesion-running');
+            }}
+            className="text-turquesa-600 hover:text-turquesa-700 font-semibold inline-flex items-center gap-1"
+          >
+            Cómo construir una sesión de running
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </a>{' '}
+          — el constructor es muy parecido pero los bloques de running solo llevan zona y
+          duración (sin perfil de cadencia).
+        </p>
+      </Card>
+
       <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-2 mb-3">
         ¿En qué se diferencia de una ruta GPX?
       </h2>

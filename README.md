@@ -1,8 +1,8 @@
 # Cadencia
 
-> *para ciclistas con ritmo*
+> *disfruta del cardio a tu ritmo*
 
-Webapp que sincroniza música de Spotify con la intensidad de tus entrenamientos en bici. Outdoor desde un GPX o indoor desde sesiones por bloques.
+Webapp que sincroniza música de Spotify con la intensidad de tu cardio, para corredores y ciclistas. Outdoor desde un GPX o indoor desde sesiones por bloques.
 
 > **Source-available, open a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la lógica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist).
 

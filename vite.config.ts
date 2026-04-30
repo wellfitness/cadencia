@@ -17,10 +17,10 @@ export default defineConfig({
         'robots.txt',
       ],
       manifest: {
-        name: 'Cadencia — para ciclistas con ritmo',
+        name: 'Cadencia — disfruta del cardio a tu ritmo',
         short_name: 'Cadencia',
         description:
-          'Música de Spotify sincronizada con la intensidad de tus entrenamientos en bici. Outdoor desde un GPX o indoor desde sesiones por bloques.',
+          'Música de Spotify sincronizada con la intensidad de tu cardio, para corredores y ciclistas. Outdoor desde un GPX o indoor desde sesiones por bloques.',
         theme_color: '#00bec8',
         background_color: '#ffffff',
         display: 'standalone',

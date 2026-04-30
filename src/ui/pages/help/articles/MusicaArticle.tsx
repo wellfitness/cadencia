@@ -17,15 +17,36 @@ export function MusicaArticle(): JSX.Element {
       </p>
       <ul className="list-disc pl-6 space-y-2">
         <li>
-          <strong>1:1</strong>: una pedalada por pulso. Una canción de 80 BPM se pedalea a
-          80 rpm.
+          <strong>1:1</strong>: un movimiento por pulso. Una canción de 80 BPM se pedalea
+          a 80 rpm; una de 170 BPM se corre a 170 spm.
         </li>
         <li>
-          <strong>2:1 (a tempo doble)</strong>: golpe fuerte cada dos pedaladas. Una
-          canción de 145 BPM se pedalea a ~72 rpm. Esto rescata mucho rock y dance clásico
-          que Spotify etiqueta al doble de su tempo perceptual.
+          <strong>2:1 (a tempo doble)</strong>: golpe fuerte cada dos movimientos. Una
+          canción de 145 BPM se pedalea a ~72 rpm o se corre a ~145 spm con beat fuerte
+          cada dos zancadas. Esto rescata mucho rock y dance clásico que Spotify etiqueta
+          al doble de su tempo perceptual.
         </li>
       </ul>
+
+      <Card variant="info" className="my-6" title="Qué cambia entre ciclismo y running" titleIcon="compare_arrows">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          El motor de matching es el mismo para ambos deportes — lo único distinto es de
+          dónde sale la cadencia objetivo del bloque:
+        </p>
+        <ul className="list-disc pl-6 mt-2 text-sm text-gris-700 space-y-1">
+          <li>
+            <strong>Ciclismo</strong>: la cadencia depende del{' '}
+            <strong>perfil de pedaleo</strong> (llano 70-90 rpm / escalada 55-80 rpm /
+            sprint 90-115 rpm). Un Z4 a llano y un Z4 a escalada llevan música distinta.
+          </li>
+          <li>
+            <strong>Running</strong>: la cadencia se acopla a la{' '}
+            <strong>zona del bloque</strong>. La zancada natural (160-180 spm) es muy
+            uniforme, así que el filtro de BPM aplica directamente por zona, sin perfil
+            de cadencia.
+          </li>
+        </ul>
+      </Card>
 
       <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-6 mb-3">
         Energía, valencia y género: suman, no descartan
@@ -110,7 +131,7 @@ export function MusicaArticle(): JSX.Element {
       </p>
 
       <h3 className="font-display text-lg text-gris-900 mt-5 mb-2">
-        En rutas al aire libre (GPX)
+        En rutas al aire libre (GPX, ciclismo o running)
       </h3>
       <p>
         Aquí el motor usa <em>solapamiento</em>: si una canción es lo bastante larga para

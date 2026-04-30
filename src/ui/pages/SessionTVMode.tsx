@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   calculateKarvonenZones,
+  formatRpeRange,
+  getZoneFeeling,
   type HeartRateZone,
   type KarvonenZoneRange,
-} from '@core/physiology/karvonen';
+} from '@core/physiology';
 import {
   expandSessionPlan,
   getRecommendedCadence,
@@ -11,7 +13,8 @@ import {
   type EditableSessionPlan,
   type SessionBlock,
 } from '@core/segmentation';
-import type { ValidatedUserInputs } from '@core/user/userInputs';
+import { getZoneCriteria } from '@core/matching';
+import type { Sport, ValidatedUserInputs } from '@core/user/userInputs';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { zoneTextColor } from '@ui/components/zoneColors';
@@ -37,14 +40,29 @@ const PHASE_LABELS: Record<string, string> = {
   main: 'PRINCIPAL',
 };
 
-const PHASE_ICONS: Record<string, string> = {
-  warmup: 'whatshot',
-  work: 'fitness_center',
-  recovery: 'self_improvement',
-  rest: 'pause_circle',
-  cooldown: 'ac_unit',
-  main: 'directions_bike',
-};
+/**
+ * Iconos por fase. La fase 'main' es el unico icono dependiente del deporte:
+ * en bike pintamos una bici, en run un corredor. El resto son universales
+ * (calentamiento, descanso, etc.) y se reutilizan tal cual.
+ */
+function getPhaseIcon(phase: string, sport: Sport): string {
+  switch (phase) {
+    case 'warmup':
+      return 'whatshot';
+    case 'work':
+      return 'fitness_center';
+    case 'recovery':
+      return 'self_improvement';
+    case 'rest':
+      return 'pause_circle';
+    case 'cooldown':
+      return 'ac_unit';
+    case 'main':
+      return sport === 'run' ? 'directions_run' : 'directions_bike';
+    default:
+      return 'fitness_center';
+  }
+}
 
 const ZONE_BG_DARK: Record<HeartRateZone, string> = {
   1: 'bg-zone-1',
@@ -90,6 +108,10 @@ export function SessionTVMode({
 }: SessionTVModeProps): JSX.Element {
   const expanded = useMemo(() => expandSessionPlan(plan), [plan]);
   const blocks = expanded.blocks;
+  // Default 'bike' por retrocompat con planes guardados antes de la extension
+  // a running (mismo criterio que expandSessionPlan).
+  const sport: Sport = plan.sport ?? 'bike';
+  const isRun = sport === 'run';
   const totalDurationSec = useMemo(
     () => blocks.reduce((acc, b) => acc + b.durationSec, 0),
     [blocks],
@@ -203,9 +225,10 @@ export function SessionTVMode({
       setCurrentIndex(nextIndex);
       setTimeRemaining(nextBlock?.durationSec ?? 0);
       playPhaseChange();
-      // Sprint Z6 → patrón más largo y rotundo para que se note sobre el manillar.
-      const isZ6Sprint = nextBlock?.zone === 6;
-      vibrate(isZ6Sprint ? [400, 80, 400, 80, 400] : [200, 100, 200]);
+      // Z6 → patrón más largo y rotundo para que destaque del cambio de fase
+      // estándar, dado que es el tramo de máxima exigencia.
+      const isMaxZone = nextBlock?.zone === 6;
+      vibrate(isMaxZone ? [400, 80, 400, 80, 400] : [200, 100, 200]);
     } else {
       setIsCompleted(true);
       setIsRunning(false);
@@ -413,7 +436,7 @@ export function SessionTVMode({
               <div className="flex items-center gap-3 md:gap-4 min-w-0">
                 <span className="flex items-center justify-center w-12 h-12 md:w-16 md:h-16 rounded-xl bg-white/30 flex-shrink-0">
                   <MaterialIcon
-                    name={PHASE_ICONS[currentBlock.phase] ?? 'fitness_center'}
+                    name={getPhaseIcon(currentBlock.phase, sport)}
                     size="large"
                     className="text-white"
                   />
@@ -423,14 +446,34 @@ export function SessionTVMode({
                     {PHASE_LABELS[currentBlock.phase] ?? currentBlock.phase.toUpperCase()}
                   </h2>
                   <p className="font-display text-2xl sm:text-3xl md:text-5xl leading-tight mt-1">
-                    Zona {currentBlock.zone} · {CADENCE_PROFILE_LABELS[currentBlock.cadenceProfile]}
+                    Zona {currentBlock.zone}
+                    {!isRun && ` · ${CADENCE_PROFILE_LABELS[currentBlock.cadenceProfile]}`}
                   </p>
                   {(() => {
-                    const r = getRecommendedCadence(currentBlock.zone, currentBlock.cadenceProfile);
+                    // Bike: rpm via getRecommendedCadence (zona+profile, Coggan/Dunst).
+                    // Run: spm via filtro musical de running (rangos por zona, alineados
+                    // con el matcher para no divergir entre lo que se muestra y lo que
+                    // selecciona la musica).
+                    const cadenceRange = isRun
+                      ? (() => {
+                          const c = getZoneCriteria(currentBlock.zone, 'flat', 'run');
+                          return { min: c.cadenceMin, max: c.cadenceMax };
+                        })()
+                      : getRecommendedCadence(currentBlock.zone, currentBlock.cadenceProfile);
+                    const unit = isRun ? 'spm' : 'rpm';
                     return (
                       <p className="text-sm sm:text-base md:text-xl opacity-90 mt-1 flex items-center gap-1.5">
                         <MaterialIcon name="speed" size="small" />
-                        Cadencia: {r.min}-{r.max} rpm
+                        Cadencia: {cadenceRange.min}-{cadenceRange.max} {unit}
+                      </p>
+                    );
+                  })()}
+                  {(() => {
+                    const feeling = getZoneFeeling(currentBlock.zone);
+                    return (
+                      <p className="text-sm sm:text-base md:text-xl opacity-90 mt-1 flex items-center gap-1.5">
+                        <MaterialIcon name="psychology" size="small" />
+                        {formatRpeRange(feeling)} · «{feeling.sensation}»
                       </p>
                     );
                   })()}

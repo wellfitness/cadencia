@@ -6,7 +6,8 @@ export type LogoTone = 'light' | 'dark';
 export interface LogoProps {
   /**
    * Que se muestra:
-   * - 'mark': solo el simbolo (bici sobre vinilos). Para favicon-like contexts.
+   * - 'mark': solo el simbolo (corazon con clave de sol y onda de pulso).
+   *   Para favicon-like contexts.
    * - 'brand': simbolo + "Cadencia". Para Header / TopBar.
    * - 'full': simbolo + "Cadencia" + "by MOVIMIENTO FUNCIONAL". Para Hero / Footer / About.
    */
@@ -82,7 +83,7 @@ export function Logo({
         // fondo. Lo renderizamos via CSS mask-image: el alpha del PNG actúa
         // como recorte y el `bg-white` rellena la silueta. Así el mismo
         // asset sirve para ambos tonos sin generar un PNG extra. El logo es
-        // cuadrado (1398×1398) por lo que aspect-square no distorsiona.
+        // cuadrado (1280×1280) por lo que aspect-square no distorsiona.
         <div
           role={isMarkOnly ? 'img' : undefined}
           aria-label={isMarkOnly ? 'Cadencia' : undefined}

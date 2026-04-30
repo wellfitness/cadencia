@@ -1,0 +1,108 @@
+import { ArticleShell } from '@ui/components/help/ArticleShell';
+import { Card } from '@ui/components/Card';
+import { Button } from '@ui/components/Button';
+import { navigateInApp } from '@ui/utils/navigation';
+
+export function SesionRunningArticle(): JSX.Element {
+  const goToWizard = (): void => {
+    navigateInApp('/');
+  };
+
+  return (
+    <ArticleShell
+      slug="sesion-running"
+      lead="Una sesión de running en pista o tapiz es una secuencia de bloques de tiempo, cada uno con una intensidad. Tú decides la estructura; Cadencia se encarga de poner la música."
+    >
+      <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-2 mb-3">
+        ¿En qué se diferencia de una ruta GPX?
+      </h2>
+      <p>
+        En modo <strong>outdoor</strong> subes un archivo .gpx de tu carrera y la app deduce
+        la zona de cada tramo a partir de la pendiente del terreno (curva metabólica de
+        Minetti). En modo <strong>sesión</strong> tú defines el entrenamiento por bloques: la
+        app no necesita ningún archivo, solo tu plan.
+      </p>
+      <p>
+        Por eso en sesión controlas exactamente qué zonas trabajas y en qué orden — ideal
+        para entrenamientos científicos como Yasso 800s, Daniels Intervals, Threshold
+        Cruise o un HIIT 30-30.
+      </p>
+
+      <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-6 mb-3">
+        Estructura típica de una sesión
+      </h2>
+      <ol className="list-decimal pl-6 space-y-2">
+        <li>
+          <strong>Calentamiento</strong>: 10-15 min trotando suave en Z1-Z2 para subir la
+          temperatura muscular y preparar el sistema cardiovascular. Imprescindible si
+          después vas a tirar series rápidas.
+        </li>
+        <li>
+          <strong>Trabajo principal</strong>: el meollo de la sesión. Puede ser un rodaje
+          continuo (Easy Long Run en Z2, Tempo Run en Z3-Z4) o intervalos de trabajo
+          intercalados con recuperaciones (1000 m a vVO₂max, 800 m de Yasso, 30 s rápidos en
+          un HIIT…).
+        </li>
+        <li>
+          <strong>Recuperaciones</strong>: los bloques entre los intervalos duros. Para
+          intervalos de umbral (Z4) basta una recuperación corta en Z1 trotando suave; para
+          intervalos VO₂max (Z5) necesitas más tiempo (2-3 min) para llegar fresco al
+          siguiente.
+        </li>
+        <li>
+          <strong>Vuelta a la calma</strong>: 10 min trotando muy suave o caminando para
+          bajar las pulsaciones. Saltársela no es trágico, pero ayuda a la recuperación.
+        </li>
+      </ol>
+
+      <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-6 mb-3">
+        Cómo funciona el constructor
+      </h2>
+      <p>
+        En el asistente, cuando eliges <strong>Carrera + Sesión</strong>, entras al
+        constructor visual. Tienes dos formas de empezar:
+      </p>
+      <ul className="list-disc pl-6 space-y-2">
+        <li>
+          <strong>Una plantilla</strong>: 6 sesiones validadas científicamente que puedes
+          modificar después (ver <em>Plantillas de running y cuándo usarlas</em>).
+        </li>
+        <li>
+          <strong>Desde cero</strong>: añades bloques uno a uno y los ordenas a tu gusto.
+        </li>
+      </ul>
+      <p>
+        Cada bloque tiene <strong>zona</strong> (Z1-Z6), <strong>duración</strong> y
+        descripción opcional. Los intervalos repetidos los agrupas en un <em>grupo × N</em>{' '}
+        en lugar de duplicarlos — más limpio y más fácil de editar (5 × 1000 m son un grupo
+        con dos bloques: trabajo + recuperación).
+      </p>
+
+      <Card variant="info" className="my-6" title="¿Y la cadencia de pedaleo?" titleIcon="info">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          En running no hay perfil de cadencia tipo "llano / escalada / sprint" como en
+          ciclismo. La cadencia natural de zancada es bastante uniforme (160-180 spm) sea
+          cual sea la zona. Por eso el constructor de running no te pide ese campo: solo
+          zona y duración. La música encaja con la zona del bloque (ver{' '}
+          <em>Cómo se elige la música</em>).
+        </p>
+      </Card>
+
+      <Card variant="tip" className="my-6" title="¿Qué dice la ciencia sobre HIIT en running?" titleIcon="science">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          Los HIIT cortos en running (30-30, 15-15, sprints de 200 m) son{' '}
+          <strong>eficientes en tiempo</strong> para mejorar el VO₂max. Los intervalos
+          largos a vVO₂max (3-5 min, como Daniels Intervals) <strong>maximizan</strong> esa
+          mejora a costa de mayor desgaste. La mejor estrategia combina ambos en distintos
+          momentos del año, junto a un volumen sólido de Z2.
+        </p>
+      </Card>
+
+      <div className="mt-6">
+        <Button variant="primary" iconRight="arrow_forward" onClick={goToWizard}>
+          Empezar a construir mi sesión
+        </Button>
+      </div>
+    </ArticleShell>
+  );
+}

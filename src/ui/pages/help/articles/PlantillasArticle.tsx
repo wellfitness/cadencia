@@ -1,6 +1,9 @@
 import { SESSION_TEMPLATES, type SessionTemplate, type SessionTemplateId } from '@core/segmentation';
 import { ArticleShell } from '@ui/components/help/ArticleShell';
+import { Card } from '@ui/components/Card';
+import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TemplateExplainer } from '@ui/components/help/TemplateExplainer';
+import { navigateInApp } from '@ui/utils/navigation';
 
 const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
   sit:
@@ -42,7 +45,7 @@ function templatesByCategory(): {
   vo2max: SessionTemplate[];
   anaerobic: SessionTemplate[];
 } {
-  const all = [...SESSION_TEMPLATES];
+  const all = [...SESSION_TEMPLATES].filter((t) => t.sport === 'bike');
   return {
     recovery: all.filter((t) => t.id === 'recuperacion-activa'),
     aerobic: all.filter((t) => t.id === 'zona2-continuo' || t.id === 'tempo-mlss'),
@@ -58,8 +61,28 @@ export function PlantillasArticle(): JSX.Element {
   return (
     <ArticleShell
       slug="plantillas"
-      lead="Ocho plantillas validadas científicamente, organizadas por objetivo fisiológico. Cárgalas tal cual o úsalas como punto de partida y modifícalas en el constructor."
+      lead="Ocho plantillas de ciclo indoor validadas científicamente, organizadas por objetivo fisiológico. Cárgalas tal cual o úsalas como punto de partida y modifícalas en el constructor."
     >
+      <Card variant="info" className="mb-6" title="¿Buscas plantillas de running?" titleIcon="directions_run">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          Este artículo cubre solo las plantillas de <strong>ciclo indoor</strong>. Si
+          eres runner, ve a{' '}
+          <a
+            href="/ayuda/plantillas-running"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/plantillas-running');
+            }}
+            className="text-turquesa-600 hover:text-turquesa-700 font-semibold inline-flex items-center gap-1"
+          >
+            Plantillas de running y cuándo usarlas
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </a>{' '}
+          (Yasso 800s, Daniels Intervals, Threshold Cruise, HIIT 30-30, Easy Long Run y
+          Tempo Run).
+        </p>
+      </Card>
+
       <Section title="Recuperación activa" icon="self_improvement">
         {cats.recovery.map((t) => (
           <TemplateExplainer key={t.id} template={t} context={TEMPLATE_CONTEXT[t.id]} />

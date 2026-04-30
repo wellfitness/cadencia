@@ -6,10 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Objetivo
 
-**Cadencia** — *para ciclistas con ritmo*. App **source-available** (PolyForm Noncommercial — colaboración abierta, uso comercial reservado a la autora) que sincroniza música de Spotify con la intensidad de tus entrenamientos en bici, en dos modalidades:
+**Cadencia** — *disfruta del cardio a tu ritmo*. App **source-available** (PolyForm Noncommercial — colaboración abierta, uso comercial reservado a la autora) que sincroniza música de Spotify con la intensidad de tus entrenamientos de cardio. Da soporte a dos deportes (**ciclismo** y **carrera**) y dos modalidades por deporte (outdoor desde GPX o indoor por bloques):
 
-- **Outdoor**: subes un GPX de tu ruta, la app estima la **potencia (vatios)** por segmentos y genera una playlist Spotify ordenada donde el BPM/energy de cada track encaja con la intensidad del segmento correspondiente.
-- **Indoor cycling**: construyes una sesión por bloques (calentamiento, intervalos, recuperación, sprints…) desde cero o partiendo de **plantillas científicas** (SIT, HIIT, Noruego 4×4, Z2…) y la app genera la playlist sincronizada para esa sesión.
+- **Bike outdoor**: subes un GPX de tu ruta, la app estima la **potencia (vatios)** por segmentos (ecuación gravedad + rodadura + aerodinámica) y mapea cada segmento a su zona Z1-Z6.
+- **Bike indoor**: construyes una sesión de rodillo o spinning por bloques (calentamiento, intervalos, recuperación, sprints…) desde cero o partiendo de **plantillas científicas de ciclismo** (SIT, HIIT 10-20-30, Noruego 4×4, Z2…).
+- **Run outdoor**: subes un GPX de tu carrera y la app deriva la zona de cada tramo desde la **pendiente del terreno** usando el polinomio metabólico de Minetti (independiente de velocidad y peso).
+- **Run indoor / pista**: construyes una sesión en tapiz o pista por bloques desde cero o partiendo de **plantillas científicas de running** (Yasso 800s, Daniels Intervals vVO2max, Threshold Cruise, HIIT 30-30, Easy run…).
+
+En las cuatro combinaciones la app genera una playlist Spotify ordenada donde el BPM y la energía de cada track encajan con la intensidad real de cada tramo o bloque.
 
 Sin registros obligatorios, sin base de datos propia, sin backend. Toda la lógica corre en cliente. Opcionalmente, el usuario puede conectar **Google Drive** para sincronizar sus ajustes y sesiones guardadas entre dispositivos — los datos viajan a una carpeta privada de su propio Drive (scope `drive.appdata`, invisible incluso para él en la UI normal de Drive), nunca pasan por nosotros.
 
@@ -71,9 +75,9 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 
 | # | Paso | Página | Qué hace |
 |---|---|---|---|
-| 0 | **Tipo** | `SourceTypeStep` | Elige modalidad: GPX outdoor o sesión indoor. |
-| 1 | **Datos** | `UserDataStep` | Recoge inputs fisiológicos. Validación **bifurcada por modo** (ver "Modelo de dominio"). |
-| 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según el modo elegido. | Outdoor: sube GPX y procesa segmentos. Indoor: construye sesión por bloques desde plantilla, desde cero o **importando un .zwo** (Zwift Workout); cada bloque muestra los rangos bpm/W del usuario para su zona. Permite **descargar el plan como .zwo** para Zwift, TrainingPeaks Virtual, TrainerRoad, Wahoo SYSTM, MyWhoosh. |
+| 0 | **Tipo** | `SourceTypeStep` | Elige **deporte** (ciclismo / carrera) en un toggle y **fuente** (GPX outdoor / sesión por bloques) en una card, en una sola pantalla. La combinación `{sport, source}` ramifica el resto del wizard. |
+| 1 | **Datos** | `UserDataStep` | Recoge inputs fisiológicos. Validación **bifurcada por `(sport, mode)`**: en run el peso es opcional (Minetti normaliza por kg); en bike+gpx el peso alimenta la ecuación de potencia y es obligatorio. Ver "Modelo de dominio". |
+| 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según la fuente elegida. | Outdoor: sube GPX y procesa segmentos (potencia ciclista o Cr de Minetti según deporte). Indoor: construye sesión por bloques desde plantilla, desde cero o **importando un .zwo** (Zwift Workout); cada bloque muestra los rangos bpm/W del usuario para su zona. Permite **descargar el plan como .zwo** para Zwift, TrainingPeaks Virtual, TrainerRoad, Wahoo SYSTM, MyWhoosh. |
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
@@ -94,16 +98,19 @@ src/
   core/                       # TypeScript puro, SIN imports de React ni del DOM
     physiology/               # FC máx (Gulati ♀ / Tanaka ♂), zonas Karvonen y Coggan
     gpx/                      # Parser GPX (DOMParser), haversine, pendiente
-    power/                    # Ecuación de potencia (gravedad + rodadura + aero)
+    power/                    # Ecuación de potencia ciclista (gravedad + rodadura + aero)
     segmentation/             # Bloques de 60 s, clasificación en zonas, plan de sesión, plantillas
-      sessionPlan.ts          # Tipos SessionBlock, SessionItem, EditableSessionPlan
-      sessionTemplates.ts     # Plantillas científicas (SIT, HIIT, Noruego 4×4, Z2…)
+      sessionPlan.ts          # Tipos SessionBlock, SessionItem, EditableSessionPlan, sport
+      sessionTemplates.ts     # Plantillas: bike (SIT, HIIT 10-20-30, Noruego 4×4, Z2…)
+                              # y run (Yasso 800s, Daniels Intervals, Threshold Cruise, HIIT 30-30, Easy run)
       fromSessionBlocks.ts    # Conversión sesión-indoor → segmentos clasificados
+      runMetabolic.ts         # Polinomio de Minetti 2002: Cr(pendiente) en J/kg/m
+                              # + slopeToRunZone() para mapear pendiente → zona en GPX de running
     matching/                 # Motor de scoring zona ↔ track (determinista)
     tracks/                   # Carga y deduplicación de CSVs
-    user/                     # Inputs del usuario, validación bifurcada (gpx|session), persistencia
-      userInputs.ts           # Tipo UserInputsRaw + EMPTY
-      validation.ts           # validateUserInputs(raw, currentYear, mode)
+    user/                     # Inputs del usuario, validación bifurcada por sport+mode, persistencia
+      userInputs.ts           # Tipo UserInputsRaw (incluye `sport: 'bike' | 'run'`) + EMPTY
+      validation.ts           # validateUserInputs(raw, currentYear, mode) — ramifica run vs bike+gpx vs bike+session
       storage.ts              # sessionStorage wrapper + localStorage opt-in legacy
     playlist/                 # Builders de nombre y descripción de la playlist Spotify
     sessionFormats/           # Import/export de planes en formatos externos (zwo.ts → Zwift Workout)
@@ -169,25 +176,27 @@ src/
 ### Inputs fisiológicos del usuario
 
 ```
-Peso corporal (kg)               obligatorio en modo gpx; opcional en modo session (default 70)
-FTP en vatios (W)                opcional (suma rangos de potencia al builder y al modo TV)
-FC máxima (bpm)                  obligatoria en session si no hay birthYear + sex
-FC en reposo (bpm)               opcional (necesaria para zonas Karvonen completas)
-Año de nacimiento                obligatorio en session si no hay FC máxima
-Sexo biológico                   obligatorio si se estima FC máxima por edad
+Sport ('bike' | 'run')           viene del paso 0 del wizard (toggle deporte). Default 'bike' para datos legacy.
+Peso corporal (kg)               obligatorio en bike+gpx; opcional en bike+session (default 70) y en run (default 70).
+FTP en vatios (W)                opcional en bike (suma rangos de potencia al builder y modo TV); ignorado en run.
+FC máxima (bpm)                  obligatoria en bike+session y en run si no hay birthYear + sex.
+FC en reposo (bpm)               opcional (necesaria para zonas Karvonen completas).
+Año de nacimiento                obligatorio en bike+session y en run si no hay FC máxima.
+Sexo biológico                   obligatorio si se estima FC máxima por edad.
 ```
 
-**Validación bifurcada por modo** (`src/core/user/validation.ts`):
+**Validación bifurcada por `(sport, mode)`** (`src/core/user/validation.ts`):
 
-| Campo | Modo `gpx` | Modo `session` |
-|---|---|---|
-| Peso | obligatorio (alimenta ecuación de potencia) | opcional, default 70 kg |
-| FTP | opcional; junto con FC máx/birthYear, uno mínimo | opcional (suma rangos de vatios al builder y al modo TV) |
-| FC máx **o** (birthYear + sex) | uno mínimo si no hay FTP | **mínimo obligatorio** — sin esto, el modo TV no podría mostrar pulsaciones objetivo y el builder se quedaría sin guía de bpm por bloque |
-| FC reposo | opcional (necesaria para zonas Karvonen) | opcional (necesaria para zonas Karvonen) |
-| Sexo biológico | obligatorio sii `birthYear && !maxHeartRate` (para elegir fórmula) | obligatorio sii `birthYear && !maxHeartRate` (misma regla) |
+| Campo | `bike + gpx` | `bike + session` | `run` (gpx u session) |
+|---|---|---|---|
+| Peso | obligatorio (alimenta ecuación de potencia ciclista) | opcional, default 70 kg | opcional (Cr de Minetti es J/kg/m, ya normalizado), default 70 kg |
+| FTP | opcional; junto con FC máx/birthYear, uno mínimo | opcional (suma rangos de vatios) | **descartado** (Stryd es nicho V2; en V1 no aplica) |
+| FC máx **o** (birthYear + sex) | uno mínimo si no hay FTP | **mínimo obligatorio** — sin esto el modo TV no podría mostrar pulsaciones objetivo | **mínimo obligatorio** — los rangos de bpm por zona se muestran en cada bloque/segmento |
+| FC reposo | opcional (necesaria para zonas Karvonen) | opcional (necesaria para zonas Karvonen) | opcional (necesaria para zonas Karvonen) |
+| Sexo biológico | obligatorio sii `birthYear && !maxHeartRate` | obligatorio sii `birthYear && !maxHeartRate` | obligatorio sii `birthYear && !maxHeartRate` |
+| Bike type / bike weight | usados (alimentan masa total y Crr/CdA por defecto) | irrelevantes (defaulteados) | irrelevantes (defaulteados) |
 
-La pública objetivo prioritaria son **ciclistas con pulsómetro** (FC), no con potenciómetro (FTP). Por eso en `session` se exige FC al menos como dato derivable (FC máx o estimable por edad+sexo): sin ello, el `SessionBuilder` y el modo TV pierden la mitad de su valor (los rangos de pulsaciones por bloque). FTP es la excepción para usuarios avanzados con potenciómetro y suma rangos de vatios cuando se rellena.
+El público prioritario son **personas con pulsómetro** (FC), no con potenciómetro: las cuatro combinaciones aceptan FC como dato derivable (FC máx directa o estimable por edad+sexo). FTP queda como excepción para ciclistas avanzados con potenciómetro y suma rangos de vatios al builder y al modo TV cuando se rellena. En running `ftpWatts` se descarta deliberadamente (Stryd y similares son nicho — el motor running V1 deriva intensidad de la pendiente, no de la potencia medida).
 
 **Rangos por zona en el `SessionBuilder`**: cada bloque de la lista (y el editor inline al elegir zona) muestra los rangos bpm y vatios concretos del usuario para esa zona — ej. "Z3 → 138-148 bpm · 195-235 W". Los rangos se calculan una sola vez por sesión en `SessionBuilder` con `calculateKarvonenZones` + `calculatePowerZones` (ver `src/core/physiology/`) y viajan como `PhysioContext` (definido en `BlockList`) hasta cada `BlockRow` y `BlockEditor`. Helpers de formato compartidos en `src/ui/components/session-builder/zoneRangeFormat.ts`. La banda de FC se omite en Z6 (la FC se satura en máxima); la banda de vatios usa "<X W" para Z1 (abierta por debajo) y ">X W" para Z6 (abierta por arriba).
 
@@ -224,7 +233,9 @@ Z5  105–120 % FTP
 Z6 > 120 % FTP        // Se mapea a Z5 musical (no hay banda BPM superior)
 ```
 
-### Cálculo de potencia por segmento (modo GPX)
+### Cálculo de potencia por segmento (modo `bike + gpx`)
+
+Aplicable solo a ciclismo outdoor. En running outdoor se usa el polinomio de Minetti (siguiente sección).
 
 ```
 P_total = P_gravedad + P_rodadura + P_aerodinámica
@@ -250,13 +261,42 @@ subida >8 %  →  10 km/h
 bajada       →  35 km/h
 ```
 
+### Cálculo de zonas en running outdoor — polinomio de Minetti (modo `run + gpx`)
+
+A diferencia del ciclismo (donde la velocidad domina la ecuación por la aerodinámica), en running el coste energético `Cr` (J/kg/m) depende **solo de la pendiente** y es independiente de la velocidad. Esto simplifica radicalmente el motor outdoor de running: no necesitamos peso ni velocidad estimada, solo el perfil de elevación del GPX.
+
+Modelo: polinomio empírico de quinto grado ajustado a Minetti et al. 2002 (J Appl Physiol — DOI 10.1152/japplphysiol.01177.2001), datos sobre 10 corredores en cinta entre −45 % y +45 % de pendiente.
+
+```
+Cr(g) = 155.4·g⁵ − 30.4·g⁴ − 43.3·g³ + 46.3·g² + 19.5·g + 3.6
+```
+
+donde `g` es la pendiente en fracción (no en porcentaje). El polinomio captura la forma "U" del coste en bajada: mínimo a g ≈ −0,20 (~1,8 J/kg/m, 50 % del llano) y vuelve a subir en bajadas más pronunciadas por la carga excéntrica.
+
+**Multiplicador metabólico relativo al llano**: `multiplier(g) = Cr(g) / 3.6`. Es 1× en llano, ~5,6× en +45 %, mínimo ~0,53× a −20 %, vuelve a ~1,18× en −45 % por carga excéntrica.
+
+**Mapeo pendiente → zona** (`slopeToRunZone()` en [src/core/segmentation/runMetabolic.ts](src/core/segmentation/runMetabolic.ts)):
+
+```
+multiplier < 0.75   → Z1   (bajada moderada o recovery)
+0.75 – 1.05         → Z2   (llano, base aeróbica)
+1.05 – 1.40         → Z3   (subida 2-5 %, tempo)
+1.40 – 2.00         → Z4   (subida 5-10 %, umbral)
+2.00 – 2.50         → Z5   (subida 10-15 %, VO₂max)
+≥ 2.50              → Z6   (subida > 15 %, anaeróbico, muros)
+```
+
+Pendientes fuera de [−50 %, +50 %] se clampan (suelen ser ruido del GPS). El polinomio se acota a un piso fisiológico mínimo de 0,5 J/kg/m para evitar valores negativos cerca del mínimo del fit.
+
 ### Segmentación
 
-**Modo GPX**: agrupar puntos en bloques de **60 segundos** estimados. Para cada bloque: potencia media, zona (Z1–Z6), `cadenceProfile` inferido por pendiente (>6% → `climb`, resto → `flat`), duración.
+**`bike + gpx`**: agrupar puntos en bloques de **60 segundos** estimados. Para cada bloque: potencia media, zona Coggan (Z1–Z6), `cadenceProfile` inferido por pendiente (>6 % → `climb`, resto → `flat`), duración.
 
-**Modo sesión indoor**: el usuario define `SessionBlock`s con `{durationSec, zone, cadenceProfile, label}`. La función `fromSessionBlocks` los convierte a `ClassifiedSegment[]` directamente — sin pasar por física, porque el usuario ya marca zona y perfil.
+**`run + gpx`**: agrupar puntos en bloques de 60 s. Para cada bloque: pendiente media, zona via `slopeToRunZone()`, duración. `cadenceProfile` se rellena por convención a `'flat'` (en running la cadencia musical se acopla a la zona, no al terreno — ver matching).
 
-Output común a ambos modos: `Array<{ zone: 1|2|3|4|5|6; cadenceProfile: 'flat'|'climb'|'sprint'; durationSec: number }>`.
+**`bike + session` y `run + session`**: el usuario define `SessionBlock`s con `{durationSec, zone, cadenceProfile, description}`. La función `fromSessionBlocks` los convierte a `ClassifiedSegment[]` directamente — sin pasar por física, porque el usuario ya marca zona.
+
+Output común a las cuatro combinaciones: `Array<{ zone: 1|2|3|4|5|6; cadenceProfile: 'flat'|'climb'|'sprint'; durationSec: number }>`. El campo `cadenceProfile` viaja por toda la pipeline aunque en running solo es informativo.
 
 ### Modelo de zonas (Coggan 6 zonas + cadenceProfile)
 
@@ -293,16 +333,30 @@ Si el usuario marca "todo con energía", `energyIdeal` de Z1-Z2 sube a 0.70 (ide
 
 ### Plantillas de sesión científicas (`src/core/segmentation/sessionTemplates.ts`)
 
-Plantillas predefinidas basadas en literatura de entrenamiento. Cada usuario puede partir de una y editarla, o construir desde cero:
+Cada `SessionTemplate` lleva un campo `sport: 'bike' | 'run'`. La galería del `SessionBuilder` filtra por `sport` (las de bike no aparecen en sesiones de running y viceversa). Plantillas predefinidas basadas en literatura de entrenamiento — el usuario puede partir de una y editarla, o construir desde cero.
 
-- **SIT** (Sprint Interval Training): 6 sprints de 30s en **Z6 + sprint** + recuperaciones largas Z1 + flat.
-- **HIIT 10-20-30** (Bangsbo): el intervalo de 10s es **Z6 + sprint**; los de 20s Z3 + flat; los de 30s Z2 + flat.
+**Ciclismo (`sport: 'bike'`)**:
+
+- **SIT** (Sprint Interval Training): 6 sprints de 30 s en **Z6 + sprint** + recuperaciones largas Z1 + flat.
+- **HIIT 10-20-30** (Bangsbo): el intervalo de 10 s es **Z6 + sprint**; los de 20 s Z3 + flat; los de 30 s Z2 + flat.
 - **Noruego 4×4** (Helgerud et al., NTNU): 4 × (4 min Z4 + flat / 3 min Z2 + flat). VO₂max.
 - **Z2 continuo**: sesión sostenida Z2 + flat.
 
+**Carrera (`sport: 'run'`)**:
+
+- **Easy run** (E-pace de Daniels): rodaje continuo en Z2. Base aeróbica del plan de fondo (5 K → marathon → ultra).
+- **Yasso 800s** (Bart Yasso): 10 × 800 m en Z5 con 400 m de recovery suave Z2. Predictor clásico de tiempo de marathon (el tiempo medio de los 800 m en min:seg ≈ tiempo objetivo en h:min).
+- **Daniels Intervals (vVO₂max)**: 5 × 1000 m en Z5 con 2:30 de recovery Z1 trotando muy suave. Mejora el techo cardiovascular.
+- **Threshold Cruise** (Daniels T-pace): 3 × 1500 m en Z4 con 90 s de recovery Z1. El ritmo "más rápido que puedes sostener una hora" — capacidad de tolerar lactato.
+- **HIIT 30-30**: 10 × (30 s Z5 + 30 s Z2). Estímulo VO₂max de tiempo total breve, alta densidad.
+
+En running el campo `cadenceProfile` de los bloques se rellena por convención a `'flat'`: el matching musical en running se acopla a la zona, no al terreno (ver siguiente sección).
+
 ### Algoritmo de matching (determinista)
 
-**Regla cero repeticiones (vinculante):** ninguna canción aparece dos veces en la playlist final. Esto vale en ambos modos (`overlap` GPX y `discrete` sesión).
+**Multisport — qué cambia entre bike y run**: el motor de matching es el mismo (mismo scoring, misma regla cero-repeticiones, misma política strict/best-effort/repeated). Lo único distinto es **el filtro de cadencia**: en cycling la cadencia musical (rpm pedaleando 1:1 al beat o 2:1 half-time) depende del `cadenceProfile` del bloque (flat/climb/sprint); en running la cadencia natural se acopla a la zona (cadencia de zancada ~160-180 spm es bastante uniforme), por lo que el `cadenceProfile` deja de discriminar y los rangos de cadencia musical aplican en función directa de la zona Z1-Z6. El resto del pipeline (energy/valence ideales por zona, género preferido, scoring, fallback cross-zone) es idéntico.
+
+**Regla cero repeticiones (vinculante):** ninguna canción aparece dos veces en la playlist final. Esto vale en ambos deportes y en ambos modos (`overlap` GPX y `discrete` sesión).
 
 **Filtro por cadencia con dual-range** (`src/core/matching/candidates.ts`): un track encaja con una `(zona, profile)` si su `tempoBpm` cae en uno de los dos rangos válidos:
 

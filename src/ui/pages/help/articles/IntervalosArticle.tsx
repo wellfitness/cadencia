@@ -6,7 +6,7 @@ export function IntervalosArticle(): JSX.Element {
   return (
     <ArticleShell
       slug="intervalos"
-      lead="Trabajar por intervalos es alternar bloques duros con recuperaciones para acumular más tiempo en una zona alta del que aguantarías en continuo. La prescripción correcta depende de la zona objetivo."
+      lead="Trabajar por intervalos es alternar bloques duros con recuperaciones para acumular más tiempo en una zona alta del que aguantarías en continuo. La prescripción correcta depende de la zona objetivo. Esta lógica es universal: aplica igual al ciclismo y al running."
     >
       <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-2 mb-3">
         TMM, TTA y recuperación
@@ -47,8 +47,16 @@ export function IntervalosArticle(): JSX.Element {
       </Card>
 
       <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-6 mb-3">
-        Perfil de cadencia: llano, escalada y sprint
+        Cadencia y elección de música — qué cambia entre ciclismo y running
       </h2>
+      <p>
+        El motor de Cadencia empareja música usando la cadencia esperada del bloque, pero
+        cómo se determina esa cadencia <strong>depende del deporte</strong>:
+      </p>
+
+      <h3 className="font-display text-lg text-gris-900 mt-5 mb-2">
+        En ciclismo: perfil de cadencia (llano / escalada / sprint)
+      </h3>
       <p>
         Cada bloque tiene un <strong>perfil de cadencia</strong> que define qué tipo de
         pedaleo se espera. La música encaja en función de este perfil, no solo de la zona:
@@ -67,10 +75,25 @@ export function IntervalosArticle(): JSX.Element {
         </li>
       </ul>
       <p>
-        La cadencia del bloque determina qué rangos de BPM de canción son válidos por
-        coincidencia 1:1 (una pedalada por pulso) o 2:1 (golpe fuerte cada dos pedaladas).
         Por eso un bloque Z4 a 65 rpm en escalada y un bloque Z4 a 85 rpm en llano llevan
         música muy distinta aunque trabajen la misma zona fisiológica.
+      </p>
+
+      <h3 className="font-display text-lg text-gris-900 mt-5 mb-2">
+        En running: cadencia acoplada a la zona (sin perfil)
+      </h3>
+      <p>
+        En running la cadencia natural de zancada se mantiene bastante uniforme alrededor
+        de 160-180 spm sea cual sea la intensidad — no hay un equivalente al "perfil
+        llano vs escalada" del ciclismo. Por eso los bloques de una sesión de running
+        llevan solo <strong>zona</strong> y <strong>duración</strong>; el constructor no
+        te pide perfil de cadencia.
+      </p>
+      <p>
+        El motor musical aplica el rango de BPM de canción adecuado a la zona del bloque
+        (más enérgico en zonas altas, más calmado en Z1-Z2) y mantiene la coincidencia
+        1:1 / 2:1 — la doble vía rescata mucha música rock y dance que Spotify etiqueta
+        al doble de su tempo perceptual.
       </p>
     </ArticleShell>
   );

@@ -263,6 +263,96 @@ describe('zwo: exportZwo', () => {
     expect(xml).not.toContain('flat 70-90 rpm');
   });
 
+  it('SteadyState textevent incluye RPE + sensacion + cadencia (bike)', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Test',
+      sport: 'bike',
+      items: [
+        {
+          type: 'block',
+          block: {
+            id: 'b1',
+            phase: 'work',
+            zone: 4,
+            cadenceProfile: 'flat',
+            durationSec: 240,
+          },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    expect(xml).toContain('<textevent');
+    // Z4 → RPE 7 (singular)
+    expect(xml).toContain('RPE 7');
+    expect(xml).toContain('duro, palabras sueltas');
+    // Cadencia bike sigue en rpm con recomendacion
+    expect(xml).toContain('Cadencia 70-90 rpm');
+    expect(xml).toContain('recomendado');
+  });
+
+  it('description incluye Esfuerzo percibido por zona', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Test',
+      items: [
+        {
+          type: 'block',
+          block: { id: 'a', phase: 'work', zone: 3, cadenceProfile: 'flat', durationSec: 60 },
+        },
+        {
+          type: 'block',
+          block: { id: 'b', phase: 'work', zone: 5, cadenceProfile: 'climb', durationSec: 60 },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    expect(xml).toContain('Esfuerzo percibido por zona');
+    // Z3 (rango) y Z5 (rango)
+    expect(xml).toContain('Z3 → RPE 5-6');
+    expect(xml).toContain('Z5 → RPE 8-9');
+    // Z4 no esta presente, no debe aparecer
+    expect(xml).not.toContain('Z4 →');
+  });
+
+  it('plan.sport "run" emite <sportType>run</sportType> y cadencia en spm', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Yasso 800',
+      sport: 'run',
+      items: [
+        {
+          type: 'block',
+          block: {
+            id: 'b1',
+            phase: 'work',
+            zone: 5,
+            cadenceProfile: 'flat',
+            durationSec: 240,
+          },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    expect(xml).toContain('<sportType>run</sportType>');
+    expect(xml).toContain('spm');
+    // En run NO debe colarse "rpm" en el textevent del bloque
+    expect(xml).not.toMatch(/<textevent[^>]*rpm/);
+    // En run NO debe colarse cadencia bike "Cadencias orientativas: flat..."
+    expect(xml).not.toContain('Cadencias orientativas');
+  });
+
+  it('plan.sport undefined defaultea a bike en el XML', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Legacy',
+      items: [
+        {
+          type: 'block',
+          block: { id: 'b', phase: 'work', zone: 3, cadenceProfile: 'flat', durationSec: 60 },
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    expect(xml).toContain('<sportType>bike</sportType>');
+  });
+
   it('grupo de 3+ bloques se expande como bloques sueltos repetidos', () => {
     const plan: EditableSessionPlan = {
       name: 'Test',
@@ -297,18 +387,50 @@ describe('zwo: importZwo', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('rechaza sportType distinto de bike', () => {
+  it('rechaza sportType distinto de bike o run (ej. swim)', () => {
     const xml = `<?xml version="1.0"?>
 <workout_file>
-  <name>Run test</name>
-  <sportType>run</sportType>
+  <name>Swim test</name>
+  <sportType>swim</sportType>
   <workout>
     <SteadyState Duration="60" Power="0.7"/>
   </workout>
 </workout_file>`;
     const result = importZwo(xml);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toContain('bike');
+    if (!result.ok) expect(result.error).toContain('swim');
+  });
+
+  it('acepta sportType="run" y refleja sport en el plan', () => {
+    const xml = `<?xml version="1.0"?>
+<workout_file>
+  <name>Run test</name>
+  <sportType>run</sportType>
+  <workout>
+    <SteadyState Duration="120" Power="0.7"/>
+  </workout>
+</workout_file>`;
+    const result = importZwo(xml);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.plan.sport).toBe('run');
+      expect(result.plan.items).toHaveLength(1);
+    }
+  });
+
+  it('default sport "bike" cuando no hay sportType en el XML', () => {
+    const xml = `<?xml version="1.0"?>
+<workout_file>
+  <name>Sin sportType</name>
+  <workout>
+    <SteadyState Duration="60" Power="0.7"/>
+  </workout>
+</workout_file>`;
+    const result = importZwo(xml);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.plan.sport).toBe('bike');
+    }
   });
 
   it('rechaza workout vacio', () => {
@@ -415,6 +537,53 @@ describe('zwo: round-trip sobre plantillas cientificas', () => {
       expect(result.plan.name).toBe(plan.name);
     },
   );
+
+  it('round-trip preserva sport "run" del plan original', () => {
+    const plan: EditableSessionPlan = {
+      name: 'Yasso 800',
+      sport: 'run',
+      items: [
+        {
+          type: 'block',
+          block: {
+            id: 'wu',
+            phase: 'warmup',
+            zone: 2,
+            cadenceProfile: 'flat',
+            durationSec: 600,
+          },
+        },
+        {
+          type: 'group',
+          id: 'g1',
+          repeat: 10,
+          blocks: [
+            {
+              id: 'on',
+              phase: 'work',
+              zone: 5,
+              cadenceProfile: 'flat',
+              durationSec: 240,
+            },
+            {
+              id: 'off',
+              phase: 'recovery',
+              zone: 1,
+              cadenceProfile: 'flat',
+              durationSec: 240,
+            },
+          ],
+        },
+      ],
+    };
+    const xml = exportZwo(plan);
+    const result = importZwo(xml);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.plan.sport).toBe('run');
+      expect(countTotalDuration(result.plan)).toBe(countTotalDuration(plan));
+    }
+  });
 
   it('grupo de 2 bloques (Noruego 4x4) sobrevive como group, no se desagrega', () => {
     const noruego = SESSION_TEMPLATES.find((t) => t.id === 'noruego-4x4')!;

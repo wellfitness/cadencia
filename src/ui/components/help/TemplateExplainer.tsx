@@ -5,6 +5,7 @@ import { navigateInApp } from '@ui/utils/navigation';
 import { buildIntensityBars, ZONE_BG_BAR } from './intensityBars';
 
 const TEMPLATE_ICONS: Record<string, string> = {
+  // Ciclismo
   sit: 'bolt',
   'hiit-10-20-30': 'local_fire_department',
   'noruego-4x4': 'trending_up',
@@ -13,6 +14,13 @@ const TEMPLATE_ICONS: Record<string, string> = {
   'umbral-progresivo': 'show_chart',
   'vo2max-cortos': 'rocket_launch',
   'recuperacion-activa': 'self_improvement',
+  // Running
+  'run-easy-long': 'favorite',
+  'run-tempo': 'speed',
+  'run-yasso-800': 'show_chart',
+  'run-daniels-intervals': 'rocket_launch',
+  'run-hiit-30-30': 'local_fire_department',
+  'run-threshold-cruise': 'trending_up',
 };
 
 export interface TemplateExplainerProps {

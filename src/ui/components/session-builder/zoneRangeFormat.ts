@@ -1,8 +1,10 @@
 import { getZoneCriteria } from '@core/matching';
-import type {
-  HeartRateZone,
-  KarvonenZoneRange,
-  PowerZoneRange,
+import {
+  formatRpeRange,
+  getZoneFeeling,
+  type HeartRateZone,
+  type KarvonenZoneRange,
+  type PowerZoneRange,
 } from '@core/physiology';
 import { getRecommendedCadence, type CadenceProfile } from '@core/segmentation';
 import type { Sport } from '@core/user';
@@ -74,4 +76,16 @@ export function formatRecommendedCadenceForSport(
 ): string {
   if (sport === 'run') return formatRecommendedCadenceRun(zone);
   return formatRecommendedCadence(zone, profile);
+}
+
+/**
+ * Devuelve "RPE X · «sensacion»" para la zona pedida. Universal: no depende
+ * del deporte ni de los datos del usuario, solo de la zona Z1-Z6.
+ *
+ * El uso de comillas tipograficas «...» sigue la convencion del copy de
+ * usuario del proyecto (CLAUDE.md, seccion "Open source colaborativo").
+ */
+export function formatZoneFeeling(zone: HeartRateZone): string {
+  const feeling = getZoneFeeling(zone);
+  return `${formatRpeRange(feeling)} · «${feeling.sensation}»`;
 }

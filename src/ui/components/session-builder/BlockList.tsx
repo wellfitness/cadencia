@@ -10,6 +10,7 @@ import {
   formatBpmRange,
   formatRecommendedCadenceForSport,
   formatWattsRange,
+  formatZoneFeeling,
 } from './zoneRangeFormat';
 
 /**
@@ -440,6 +441,10 @@ function BlockRow({
               {watts}
             </span>
           )}
+          <span className="inline-flex items-center gap-1">
+            <MaterialIcon name="psychology" size="small" className="text-tulipTree-600" />
+            {formatZoneFeeling(block.zone)}
+          </span>
         </p>
         {block.description !== undefined && (
           <p className="text-xs text-gris-500 italic truncate mt-0.5">{block.description}</p>

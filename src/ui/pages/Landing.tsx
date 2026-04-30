@@ -22,7 +22,16 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
   return (
     <div className="min-h-full flex flex-col bg-white">
       <main className="flex-1">
-        <HeroVisual />
+        <HeroVisual onTry={openModal} />
+        {/* Chips de beneficios en móvil + tablet (<lg): viven debajo del
+            hero, antes de Intro, en lugar de dentro del overlay sobre la
+            imagen (donde competirían por altura con el CTA y por superficie
+            con el copy pintado). Solo en desktop (lg+) los chips se
+            posicionan a la derecha-inferior del propio hero, donde hay aire
+            visual suficiente. */}
+        <div className="lg:hidden bg-white px-4 pt-5 pb-1 flex justify-center">
+          <BenefitChips orientation="row" />
+        </div>
         <Intro />
         <HowItWorks />
         <InteropZwo />
@@ -44,17 +53,117 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
 }
 
 /**
+ * LandingCtaBlock: CTA primario «Probar aplicación» (variante gold size xl)
+ * + microcopy debajo. Sin chips: los chips viven aparte como `BenefitChips`
+ * para poder anclarlos a una posición independiente del botón en desktop.
+ *
+ * La prop `microcopyTone`:
+ *   - 'dark' (default): microcopy en gris-700 (overlay con degradado blanco
+ *     en móvil/tablet — el degradado da contraste).
+ *   - 'light': microcopy en blanco con drop-shadow (overlay desktop sin
+ *     fondo opaco; el texto debe leer sobre cualquier zona de la imagen).
+ *
+ * No incluye márgenes externos: el contenedor padre decide el spacing.
+ */
+function LandingCtaBlock({
+  onTry,
+  microcopyTone = 'dark',
+}: {
+  onTry: () => void;
+  microcopyTone?: 'dark' | 'light';
+}): JSX.Element {
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <Button
+        variant="gold"
+        size="xl"
+        onClick={onTry}
+        iconRight="arrow_forward"
+        aria-label="Probar aplicación de Cadencia"
+        className="shadow-xl"
+      >
+        Probar aplicación
+      </Button>
+      <p
+        className={
+          microcopyTone === 'light'
+            ? 'text-sm font-semibold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]'
+            : 'text-sm font-semibold text-gris-700'
+        }
+      >
+        Gratis. Sin registro. Sin servidor.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * BenefitChips: tres chips de beneficios (adherencia / disfrute / rendimiento).
+ * Render independiente para poder ubicarlos en una posición distinta a la
+ * del CTA — concretamente, en desktop se anclan a la esquina inferior derecha
+ * del hero mientras el CTA queda centrado horizontalmente.
+ *
+ * La prop `orientation`:
+ *   - 'row' (default): fila horizontal envolvente. Pensado para overlay full
+ *     width móvil/tablet bajo el botón.
+ *   - 'col': columna vertical. Pensado para apilarse en lateral derecho del
+ *     hero en desktop sin invadir el centro horizontal.
+ */
+function BenefitChips({
+  orientation = 'row',
+}: {
+  orientation?: 'row' | 'col';
+}): JSX.Element {
+  return (
+    <ul
+      aria-label="Beneficios de Cadencia"
+      className={
+        orientation === 'col'
+          ? 'flex flex-col items-start gap-2'
+          : 'flex flex-wrap justify-center gap-2'
+      }
+    >
+      <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
+        <MaterialIcon name="favorite" size="small" className="text-turquesa-600" />
+        <span className="text-sm font-semibold text-gris-800">Más adherencia</span>
+      </li>
+      <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
+        <MaterialIcon name="mood" size="small" className="text-turquesa-600" />
+        <span className="text-sm font-semibold text-gris-800">Más disfrute</span>
+      </li>
+      <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
+        <MaterialIcon name="trending_up" size="small" className="text-turquesa-600" />
+        <span className="text-sm font-semibold text-gris-800">Más rendimiento</span>
+      </li>
+    </ul>
+  );
+}
+
+/**
  * HeroVisual: imagen full-bleed (panorámica en md+, vertical en <md). La
  * imagen ya contiene todo el copy de cabecera pintado ("Cadencia / disfruta
  * del cardio a tu ritmo / Tu plan. Tu intensidad. Tu música.") junto con la
  * escena multisport (corredor + ciclista) y el mockup del reproductor; ese
  * contenido NO se duplica en HTML.
  *
- * Diferencia respecto a versiones anteriores: aquí no hay overlays (ni CTA,
- * ni chips, ni gradient). El nuevo hero está visualmente lleno y los
- * elementos interactivos quedarían apretados sobre el copy pintado. El CTA
- * "Probar aplicación" y los chips de beneficios viven en la sección Intro
- * inmediatamente debajo, donde tienen aire y contraste sobre fondo blanco.
+ * Overlay del CTA en TODOS los breakpoints, con dos formatos distintos:
+ *   - Móvil (<md) + tablet (md..<lg): franja full-width anclada al borde
+ *     inferior con degradado blanco→transparente. Móvil sin chips (ahorrar
+ *     altura sobre la imagen 9:16); tablet con chips.
+ *   - Desktop (lg+): card flotante (bg blanco translúcido + backdrop-blur +
+ *     shadow-xl + rounded-2xl) anclada a la mitad-inferior DERECHA del hero,
+ *     sobre la zona del ciclista/asfalto. Esa zona está libre de copy pintado
+ *     (el texto «Tu plan / Tu intensidad / Tu música» vive abajo-izquierda y
+ *     «CADENCIA» arriba-centro). max-w-md para no invadir el centro.
+ *
+ * Posición móvil/tablet: anclado al borde inferior con un degradado
+ * blanco→transparente hacia arriba (`from-white/95 via-white/80 to-transparent`).
+ * El gradient garantiza contraste WCAG AA del microcopy gris-700 incluso si
+ * el track de imagen tiene texturas.
+ *
+ * Posición desktop: card sólida-traslúcida sobre la imagen. El fondo
+ * `bg-white/85 backdrop-blur-sm` mantiene la imagen visible detrás pero
+ * eleva el texto a contraste AA sin depender de la zona exacta de la foto.
  *
  * Art-direction con <picture>: cada breakpoint descarga solo su variante.
  * El <img> es decoración (alt="" + aria-hidden), eager + fetchpriority="high"
@@ -62,7 +171,7 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
  * página es el H1 sr-only — Google y lectores de pantalla lo leen aunque
  * la imagen sea decorativa.
  */
-function HeroVisual(): JSX.Element {
+function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
   return (
     <section
       aria-labelledby="hero-title"
@@ -71,17 +180,23 @@ function HeroVisual(): JSX.Element {
       {/* H1 real, oculto visualmente (la imagen ya muestra la marca pintada).
           Único H1 de la página: SEO + lectores de pantalla. */}
       <h1 id="hero-title" className="sr-only">
-        Cadencia: música de Spotify sincronizada con tu carrera o ruta en bici, outdoor desde GPX o indoor desde sesiones por bloques
+        Cadencia: música de Spotify sincronizada con tu salida en bici o tu carrera a pie, al aire libre desde GPX o en interior desde sesiones por bloques
       </h1>
 
       {/* Imagen responsive con art-direction.
           - aspect-[9/16] en mobile cubre el viewport vertical sin estirar.
-          - aspect-[16/9] en md+ sin override de altura: el contenedor
-            adopta exactamente el ratio de la imagen panorámica, así
-            con object-cover no hay recortes laterales (tablet portrait,
-            que antes sufría min-h-[520px]) ni verticales (xl/2xl con
-            h-[640px] o max-h-[80vh] forzando ratios distintos del 16:9). */}
-      <div className="relative w-full aspect-[9/16] md:aspect-[16/9]">
+          - md..<lg (tablet): aspect-[16/9] sin tope de altura, el contenedor
+            adopta el ratio nativo de la panorámica.
+          - lg+ (desktop): mismo aspect-[16/9] pero con max-h calc(100vh + 20px)
+            para que en pantallas muy anchas (1920+) el alto no exceda el
+            viewport en exceso pero permita 20 px adicionales que reducen el
+            recorte vertical y dejan ver más de la franja inferior de la imagen
+            (la zona donde está pintado «Tu música»). El copy «Tu música» sigue
+            cabiendo dentro del fold gracias al ratio panorámico.
+          - El `lg:-mb-6` hace que la sección Intro suba ligeramente
+            solapándose con el degradado inferior de la imagen, evitando una
+            franja vacía entre hero y siguiente bloque. */}
+      <div className="relative w-full aspect-[9/16] md:aspect-[16/9] lg:max-h-[calc(100vh+20px)] lg:-mb-6">
         <picture>
           <source media="(min-width: 768px)" srcSet="/hero_cadencia.webp" type="image/webp" />
           <img
@@ -96,27 +211,65 @@ function HeroVisual(): JSX.Element {
             className="absolute inset-0 w-full h-full object-cover"
           />
         </picture>
+
+        {/* Overlay CTA móvil + tablet (oculto en lg+).
+            - Anclado al borde inferior con padding generoso, SIN degradado
+              blanco: cubría demasiada imagen al final del hero. La
+              legibilidad del microcopy queda garantizada por el tono light
+              (blanco con drop-shadow) — mismo recurso que en desktop.
+            - Padding inferior responsive:
+                · Móvil (<md): pb-[6.5rem] (= 104 px) sobre la imagen 9:16
+                  donde el copy pintado «Tu plan / Tu intensidad / Tu música»
+                  ocupa la franja inferior. Subir el CTA evita el solape.
+                · Tablet (md..<lg): md:pb-2 (= 8 px). Padding mínimo para
+                  que el CTA quede prácticamente pegado al borde inferior de
+                  la imagen panorámica 16:9, lejos del reproductor central.
+                  Los chips no viven aquí: en <lg se renderizan en una
+                  mini-sección bajo el hero (en `Landing` raíz). */}
+        <div className="lg:hidden absolute inset-x-0 bottom-0 pt-16 pb-[6.5rem] md:pb-2 px-4 flex flex-col items-center">
+          <LandingCtaBlock onTry={onTry} microcopyTone="light" />
+        </div>
+
+        {/* Overlays CTA desktop (lg+): dos bloques transparentes, posicionados
+            de forma independiente para cumplir la disposición pedida:
+              - Botón + microcopy CENTRADOS horizontalmente, anclados al borde
+                inferior. La zona central inferior está libre de copy pintado
+                (el copy «Tu plan / Tu intensidad / Tu música» vive a la
+                izquierda, debajo del corredor) y queda visualmente sobre el
+                asfalto/ruedas — ideal para un CTA llamativo.
+              - Chips de beneficios anclados al margen INFERIOR DERECHO en
+                columna, lejos del CTA y del copy pintado.
+            Sin fondo blanco / blur / card en ninguno de los dos: el botón
+            es variant=gold size=xl con sombra propia, y el microcopy usa
+            tono `light` (blanco con drop-shadow) para legibilidad sobre la
+            imagen. */}
+        <div className="hidden lg:flex absolute left-1/2 lg:bottom-10 -translate-x-1/2 px-4">
+          <LandingCtaBlock onTry={onTry} microcopyTone="light" />
+        </div>
+        <div className="hidden lg:block absolute lg:right-6 xl:right-10 lg:bottom-10">
+          <BenefitChips orientation="col" />
+        </div>
       </div>
     </section>
   );
 }
 
 /**
- * Intro: bloque inmediatamente bajo el HeroVisual. NO duplica el logo, los
- * marcos editoriales ni el "Tu plan. Tu intensidad. Tu música." porque la
- * imagen del HeroVisual ya muestra esos elementos pintados. Aquí va solo el
- * contenido que añade información nueva: párrafo descriptivo, chips de
- * beneficios, botón "Instalar app" (PWA) condicional, microcopy y el
- * HeroMockup (card con altimetría y tracks, output real del producto).
+ * Intro: bloque inmediatamente bajo el HeroVisual. NO duplica el logo ni el
+ * "Tu plan. Tu intensidad. Tu música." porque la imagen del HeroVisual ya
+ * muestra esos elementos pintados. Aquí van el copy descriptivo, el botón
+ * "Instalar app" (PWA) condicional y el HeroMockup (card con altimetría y
+ * tracks).
  *
- * El H2 se mantiene en sr-only para conservar jerarquía DOM (SEO + lectores
- * de pantalla) sin contaminar la vista — el ojo del usuario no necesita un
- * título encima del párrafo cuando viene de un Hero visualmente cargado.
+ * El CTA primario "Probar aplicación" + microcopy + chips de beneficios
+ * vive en TODOS los breakpoints como overlay sobre el hero (ver HeroVisual):
+ * franja full-width inferior en móvil/tablet, y card flotante derecha en
+ * desktop. Por eso este componente ya no necesita renderizarlo — arranca
+ * directamente con la grid del copy + HeroMockup. El padding superior
+ * `pt-8 md:pt-12` del contenedor da el aire visual entre el hero y el H2.
  *
- * El botón "Instalar app" (PWA) vive aquí, no en el HeroVisual: en el Hero
- * solo queremos un CTA dominante (Probar aplicación). Al moverlo a Intro,
- * mantenemos la opción de instalación visible sin saturar la imagen ni
- * solapar el mockup holográfico en mobile.
+ * El botón "Instalar app" (PWA) sigue siendo CTA secundario condicional,
+ * dentro de la columna de copy.
  */
 function Intro(): JSX.Element {
   const { canInstall, installing, install } = usePwaInstall();
@@ -126,32 +279,7 @@ function Intro(): JSX.Element {
       aria-labelledby="intro-title"
       className="relative bg-white"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 pt-6 pb-10 md:pt-14 md:pb-16">
-        {/* Chips de beneficios en mobile y tablet (<lg): el HeroVisual los
-            esconde porque sobre la imagen compiten con el texto pintado y
-            el HUD holográfico (especialmente en tablets, donde la imagen
-            panorámica reduce el espacio útil para overlay). Aquí, sobre
-            fondo blanco, ya no necesitan backdrop-blur: simples cápsulas
-            turquesa-50 con borde sutil. Pegados al límite superior de
-            Intro para que se sientan continuación visual del Hero. */}
-        <ul
-          aria-label="Beneficios de Cadencia"
-          className="lg:hidden flex flex-wrap justify-center gap-2 mb-8"
-        >
-          <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
-            <MaterialIcon name="favorite" size="small" className="text-turquesa-600" />
-            <span className="text-sm font-semibold text-gris-800">Más adherencia</span>
-          </li>
-          <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
-            <MaterialIcon name="mood" size="small" className="text-turquesa-600" />
-            <span className="text-sm font-semibold text-gris-800">Más disfrute</span>
-          </li>
-          <li className="flex items-center gap-1.5 rounded-full bg-turquesa-50 border border-turquesa-200 px-3 py-1.5">
-            <MaterialIcon name="trending_up" size="small" className="text-turquesa-600" />
-            <span className="text-sm font-semibold text-gris-800">Más rendimiento</span>
-          </li>
-        </ul>
-
+      <div className="mx-auto w-full max-w-6xl px-4 pt-8 pb-10 md:pt-12 md:pb-16">
         <div className="grid lg:grid-cols-[1.1fr,1fr] gap-8 lg:gap-12 items-center">
           <div className="text-center lg:text-left">
             {/* H2 visible (no sr-only): el bloque necesita un título para
@@ -175,8 +303,8 @@ function Intro(): JSX.Element {
                 pierden el origen de cada línea). */}
             <ul className="space-y-3 mb-6 max-w-xl mx-auto lg:mx-0 text-left">
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
-                <MaterialIcon name="route" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Sube un GPX o construye tu sesión indoor por bloques.</span>
+                <MaterialIcon name="directions_bike" className="text-turquesa-600 mt-0.5 shrink-0" />
+                <span>Bici o carrera a pie, al aire libre con GPX o en sala por bloques.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="music_note" className="text-turquesa-600 mt-0.5 shrink-0" />
@@ -184,7 +312,7 @@ function Intro(): JSX.Element {
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="import_export" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Compatible con Zwift, TrainingPeaks Virtual y otros simuladores (.zwo).</span>
+                <span>Bici en rodillo: exporta a Zwift, TrainingPeaks Virtual y otros simuladores con .zwo.</span>
               </li>
             </ul>
 
@@ -197,15 +325,15 @@ function Intro(): JSX.Element {
                 InteropZwo, para coherencia visual. */}
             <p className="text-sm text-gris-600 mb-2 max-w-xl mx-auto lg:mx-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-gris-500 mr-2">
-                8 plantillas con base científica:
+                14 plantillas con base científica · bici y carrera:
               </span>
-              <strong className="font-semibold text-gris-800">SIT</strong>
-              <span className="text-gris-300 mx-1.5">·</span>
-              <strong className="font-semibold text-gris-800">HIIT 10-20-30</strong>
-              <span className="text-gris-300 mx-1.5">·</span>
               <strong className="font-semibold text-gris-800">Noruego 4×4</strong>
               <span className="text-gris-300 mx-1.5">·</span>
-              <strong className="font-semibold text-gris-800">VO2max</strong>
+              <strong className="font-semibold text-gris-800">SIT</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <strong className="font-semibold text-gris-800">Yasso 800</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <strong className="font-semibold text-gris-800">Daniels</strong>
               <span className="text-gris-300 mx-1.5">·</span>
               <span>y más</span>
             </p>
@@ -222,9 +350,10 @@ function Intro(): JSX.Element {
             </a>
 
             {/* CTA secundario: Instalar app (PWA). Solo aparece si el
-                navegador expone el prompt de instalación. El CTA primario
-                "Probar aplicación" vive en el HeroVisual; aquí no se duplica
-                para no canibalizar conversión. */}
+                navegador expone el prompt de instalación. Vive bajo el
+                bloque informativo, después del CTA primario "Probar
+                aplicación" del inicio de la sección, para no canibalizar
+                conversión. */}
             {canInstall ? (
               <div className="flex justify-center lg:justify-start">
                 <Button
@@ -331,7 +460,7 @@ function HeroMockup(): JSX.Element {
             artist="Steppenwolf"
             bpm={147}
             zone={5}
-            zoneLabel="Muros"
+            zoneLabel="VO₂max"
           />
           <HeroTrackRow
             title="Don't Stop Me Now"
@@ -414,13 +543,13 @@ function HowItWorks(): JSX.Element {
             num={1}
             icon="person"
             title="Tus datos"
-            desc="Tu peso, tu frecuencia cardíaca máxima (medida o estimada por edad y sexo) y, si tienes potenciómetro, tu FTP. Con eso calculamos tus zonas con Karvonen y Coggan."
+            desc="Tu frecuencia cardíaca máxima (medida o estimada por edad y sexo). Si haces bici, también tu peso (y tu FTP si tienes potenciómetro). Calculamos tus zonas con Karvonen y, en bici, Coggan."
           />
           <StepCard
             num={2}
             icon="route"
             title="Tu plan"
-            desc="Sube un GPX exportado desde Strava o Komoot, o construye una sesión indoor por bloques desde plantillas científicas (SIT, HIIT, Noruego 4×4). Calculamos la intensidad de cada tramo o bloque."
+            desc="Sube un GPX (de Strava, Komoot u otra app) con tu ruta o tu carrera, o construye una sesión en sala por bloques desde plantillas científicas (Noruego 4×4 en bici, Yasso 800 o Daniels en carrera, y más). Calculamos la intensidad de cada tramo o bloque."
           />
           <StepCard
             num={3}
@@ -473,6 +602,10 @@ function InteropZwo(): JSX.Element {
       <div className="mx-auto w-full max-w-6xl px-4 py-12 md:py-16">
         <div className="grid lg:grid-cols-[1fr,1.1fr] gap-8 lg:gap-12 items-center">
           <div className="text-center lg:text-left">
+            <p className="mb-2 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-turquesa-700">
+              <MaterialIcon name="directions_bike" size="small" />
+              Bici en rodillo
+            </p>
             <h2
               id="interop-zwo-title"
               className="font-display text-gris-800 text-3xl md:text-4xl mb-4"
@@ -621,9 +754,10 @@ function PersonalizedRanges(): JSX.Element {
           Tus números, <span className="text-turquesa-600">no los de un manual</span>
         </h2>
         <p className="text-center text-gris-600 max-w-2xl mx-auto mb-10">
-          Cada bloque de tu sesión muestra el rango exacto de pulsaciones y
-          vatios que <strong>a ti</strong> te corresponde. Ya sabes cuándo subir,
-          cuándo aguantar y cuándo soltar.
+          Cada bloque de tu sesión muestra el rango exacto que <strong>a ti</strong>{' '}
+          te corresponde — pulsaciones siempre, vatios si haces bici con
+          potenciómetro, ritmo si corres. Sabes cuándo subir, cuándo aguantar y
+          cuándo soltar.
         </p>
         <div className="grid md:grid-cols-3 gap-4 md:gap-6">
           <ZoneRangeCard
@@ -652,8 +786,8 @@ function PersonalizedRanges(): JSX.Element {
           />
         </div>
         <p className="text-center text-xs text-gris-500 mt-6">
-          Calculado con Karvonen (FC reserva) y Coggan (% FTP) sobre tus datos.
-          Editable bloque a bloque.
+          Calculado con Karvonen (FC reserva), Coggan (% FTP) en bici y Minetti
+          (coste energético) en carrera. Editable bloque a bloque.
         </p>
       </div>
     </section>
@@ -959,22 +1093,27 @@ function Privacy(): JSX.Element {
   );
 }
 
-// Las 3 preguntas top que mas peso tienen en la decision del usuario al
-// llegar a la landing: indoor (la mitad de la propuesta de valor), Zwift
-// (interoperabilidad con la herramienta que ya usan) y Premium (objecion
-// comercial mas frecuente). El resto del FAQ vive en /ayuda/spotify.
+// Las preguntas top que mas peso tienen en la decision del usuario al llegar
+// a la landing: bici (modalidad fundadora), running (incorporacion reciente,
+// hay que afirmarla explicitamente), Zwift (interoperabilidad con la
+// herramienta que ya usan) y Premium (objecion comercial mas frecuente). El
+// resto del FAQ vive en /ayuda/spotify.
 const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   {
-    q: '¿Sirve para entrenamiento indoor (rodillo o bici estática)?',
-    a: 'Sí. Además de procesar GPX outdoor, Cadencia tiene un constructor de sesiones indoor: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas (SIT, HIIT, Noruego 4×4) y la app te genera la lista sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar.',
+    q: '¿Sirve para entrenar en interior (rodillo o bici estática)?',
+    a: 'Sí. Además de procesar GPX al aire libre (rutas en bici o carreras a pie), Cadencia tiene un constructor de sesiones en sala: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas — Noruego 4×4 y SIT en bici, Yasso 800 y Daniels en carrera, entre otras — y la app te genera la lista sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar (bici en rodillo) o frente a la cinta.',
+  },
+  {
+    q: '¿Sirve también para correr?',
+    a: 'Sí. Cadencia trabaja con bici y con carrera a pie por igual. En carrera estimamos la intensidad de cada tramo del GPX según pendiente y ritmo (modelo de coste energético de Minetti), y construimos las zonas a partir de tu frecuencia cardíaca. No necesitas potenciómetro ni sensores especiales: con tu pulsómetro (o tu edad y sexo si no tienes) basta. Las plantillas de carrera incluyen Yasso 800, intervalos de Daniels, Tempo y rodaje largo en Z2.',
   },
   {
     q: '¿Es compatible con Zwift, TrainerRoad o TrainingPeaks?',
-    a: 'Sí. Cadencia exporta tu sesión en formato .zwo (estándar abierto de sesiones) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte una sesión ya hecha y darle música sincronizada.',
+    a: 'Sí, en bici. Cadencia exporta tu sesión en formato .zwo (estándar abierto de sesiones) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte una sesión ya hecha y darle música sincronizada.',
   },
   {
     q: '¿Funciona sin Spotify Premium?',
-    a: 'Para crear la lista sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción.',
+    a: 'Para crear la lista sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta o carrera: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción.',
   },
 ] as const;
 
@@ -1052,7 +1191,7 @@ function Faq(): JSX.Element {
  *
  * El H2 sigue el patron "frase + span turquesa-600" usado en Intro/InteropZwo
  * para coherencia visual. La lista de 4 beneficios cubre los 4 ejes del
- * producto: tipos de evento, modalidad indoor/outdoor, integracion en cabecera
+ * producto: tipos de evento, modalidad en sala/al aire libre, integración en cabecera
  * con TodayBadge y sincronizacion con Drive.
  *
  * Footer pequeno reafirma la promesa "funciona local sin Drive, sincroniza si
@@ -1071,9 +1210,9 @@ function PlanningCalendar(): JSX.Element {
               Tu plan, <span className="text-turquesa-600">semana a semana</span>
             </h2>
             <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
-              Programa tus rutas y sesiones indoor en el calendario. Cadencia te
-              las recuerda y, cuando llegue el día, las carga listas en el
-              asistente.
+              Programa tus rutas, carreras y sesiones en sala en el calendario.
+              Cadencia te las recuerda y, cuando llegue el día, las carga listas
+              en el asistente.
             </p>
             <ul className="space-y-3 mb-2 max-w-xl mx-auto lg:mx-0 text-left">
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
@@ -1082,7 +1221,7 @@ function PlanningCalendar(): JSX.Element {
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="directions_bike" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Indoor con plan completo, outdoor con enlace a Strava o Komoot.</span>
+                <span>En sala con plan completo; al aire libre con enlace a Strava, Komoot o tu app.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="notifications_active" className="text-turquesa-600 mt-0.5 shrink-0" />
@@ -1111,17 +1250,17 @@ function PlanningCalendar(): JSX.Element {
 
 /**
  * Mock visual del calendario: card flotante con vista lista (3 entradas
- * hardcodeadas) que ilustra los dos tipos de evento (indoor/outdoor) y el
+ * hardcodeadas) que ilustra los dos tipos de evento (en sala / al aire libre) y el
  * concepto de recurrencia. Hermano de HeroMockup y ZwoMockup en lenguaje
  * visual: white bg, rounded-2xl, shadow-xl, border gris-200, micro-rotacion
  * que se neutraliza en hover.
  *
  * Cada fila combina:
- *   - Icono con color tematico (turquesa para indoor, tulipTree para outdoor).
+ *   - Icono con color temático (turquesa para sala, tulipTree para aire libre).
  *   - Etiqueta de dia ("Hoy" / "Mañana" / "Jueves") en font-semibold gris-800.
  *   - Titulo del evento entre comillas tipograficas.
- *   - Chip de tipo (indoor/outdoor) con icono auxiliar (event_repeat para
- *     entradas recurrentes, link externo para outdoor con URL).
+ *   - Chip de tipo (sala / aire libre) con icono auxiliar (event_repeat para
+ *     entradas recurrentes, enlace externo para aire libre con URL).
  */
 function CalendarMockup(): JSX.Element {
   return (
@@ -1146,7 +1285,7 @@ function CalendarMockup(): JSX.Element {
         </header>
 
         <ul className="space-y-2.5">
-          {/* Hoy: sesion indoor concreta (no recurrente) */}
+          {/* Hoy: sesión en sala concreta (no recurrente) */}
           <li className="flex items-center gap-3 p-3 rounded-lg bg-turquesa-50 border border-turquesa-100">
             <span className="flex items-center justify-center rounded-md bg-turquesa-600 text-white w-10 h-10 flex-shrink-0">
               <MaterialIcon name="directions_bike" size="medium" />
@@ -1157,7 +1296,7 @@ function CalendarMockup(): JSX.Element {
                   Hoy
                 </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-turquesa-700 bg-white border border-turquesa-200 px-1.5 py-0.5 rounded">
-                  Indoor
+                  En sala
                 </span>
               </div>
               <p className="text-sm font-semibold text-gris-800 truncate">
@@ -1166,10 +1305,10 @@ function CalendarMockup(): JSX.Element {
             </div>
           </li>
 
-          {/* Manana: ruta outdoor con enlace a Strava */}
+          {/* Manana: carrera al aire libre con enlace a Strava */}
           <li className="flex items-center gap-3 p-3 rounded-lg bg-gris-50 border border-gris-200">
             <span className="flex items-center justify-center rounded-md bg-tulipTree-500 text-white w-10 h-10 flex-shrink-0">
-              <MaterialIcon name="landscape" size="medium" />
+              <MaterialIcon name="directions_run" size="medium" />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-0.5">
@@ -1177,7 +1316,7 @@ function CalendarMockup(): JSX.Element {
                   Mañana
                 </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-tulipTree-600 bg-white border border-tulipTree-200 px-1.5 py-0.5 rounded">
-                  Outdoor
+                  Aire libre
                 </span>
               </div>
               <p className="text-sm font-semibold text-gris-800 truncate">
@@ -1190,7 +1329,7 @@ function CalendarMockup(): JSX.Element {
             </div>
           </li>
 
-          {/* Jueves: indoor recurrente (todos los jueves) */}
+          {/* Jueves: sesion en sala recurrente (todos los jueves) */}
           <li className="flex items-center gap-3 p-3 rounded-lg bg-gris-50 border border-gris-200">
             <span className="flex items-center justify-center rounded-md bg-turquesa-600 text-white w-10 h-10 flex-shrink-0">
               <MaterialIcon name="directions_bike" size="medium" />
@@ -1201,7 +1340,7 @@ function CalendarMockup(): JSX.Element {
                   Jueves
                 </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-turquesa-700 bg-white border border-turquesa-200 px-1.5 py-0.5 rounded">
-                  Indoor
+                  En sala
                 </span>
                 <span
                   className="inline-flex items-center text-turquesa-600"
@@ -1242,7 +1381,7 @@ function FinalCta({ onTry }: { onTry: () => void }): JSX.Element {
           id="final-cta-title"
           className="font-display text-turquesa-700 text-3xl md:text-4xl mb-4"
         >
-          ¿Listo para pedalear con ritmo?
+          ¿Listo para entrenar con ritmo?
         </h2>
         <p className="text-gris-700 mb-6 text-lg">
           Tarda menos de un minuto en generarte la lista.

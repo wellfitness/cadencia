@@ -1,4 +1,6 @@
+import { getZoneCriteria } from '../matching';
 import type { HeartRateZone } from '../physiology/karvonen';
+import { formatRpeRange, getZoneFeeling } from '../physiology/zoneFeeling';
 import {
   defaultCadenceProfile,
   reconcileCadenceProfile,
@@ -8,6 +10,7 @@ import {
   type SessionBlock,
   type SessionItem,
 } from '../segmentation/sessionPlan';
+import type { Sport } from '../user/userInputs';
 
 /**
  * Lectura/escritura del formato ZWO (Zwift Workout). Es XML plano, espec
@@ -130,24 +133,67 @@ function fmtPower(p: number): string {
   return p.toFixed(3).replace(/\.?0+$/, (match) => (match.startsWith('.') ? '' : match));
 }
 
-function blockToZwoElement(block: SessionBlock): string {
+/**
+ * Compone el rango de cadencia mostrado en cues y atributos. En bike viene
+ * de CADENCE_RANGE_BY_PROFILE (1:1) en rpm; en run viene de la tabla por
+ * zona del matcher (CADENCE_BY_RUN_ZONE) en spm. Mantener ambos en la misma
+ * unidad que ve el usuario en la app evita confusiones cuando importa el
+ * .zwo en Zwift/TrainerRoad y compara con Cadencia.
+ */
+function cadenceRangeFor(
+  block: SessionBlock,
+  sport: Sport,
+): { min: number; max: number; unit: 'rpm' | 'spm' } {
+  if (sport === 'run') {
+    const c = getZoneCriteria(block.zone, 'flat', 'run');
+    return { min: c.cadenceMin, max: c.cadenceMax, unit: 'spm' };
+  }
+  const r = CADENCE_RANGE_BY_PROFILE[block.cadenceProfile];
+  return { min: r.min, max: r.max, unit: 'rpm' };
+}
+
+/**
+ * Compone el message del <textevent> (SteadyState) o un equivalente
+ * descriptivo: RPE + sensacion de la zona + cadencia objetivo. Universal
+ * (bike y run) — la unica diferencia es la unidad de cadencia.
+ *
+ * Para bike la cadencia recomendada se incluye entre parentesis (la version
+ * Coggan/Dunst, mas estrecha que el rango musical); en run no, porque la
+ * tabla de matching ya da rangos estrechos por zona.
+ */
+function blockCueMessage(block: SessionBlock, sport: Sport): string {
+  const feeling = getZoneFeeling(block.zone);
+  const cadence = cadenceRangeFor(block, sport);
+  const rpe = formatRpeRange(feeling);
+  const cadencePart =
+    sport === 'run'
+      ? `Cadencia ${cadence.min}-${cadence.max} ${cadence.unit}`
+      : (() => {
+          const recommended = recommendedRpm(block.zone, block.cadenceProfile);
+          return `Cadencia ${cadence.min}-${cadence.max} ${cadence.unit} (recomendado ${recommended})`;
+        })();
+  return `${rpe} · «${feeling.sensation}» · ${cadencePart}`;
+}
+
+function blockToZwoElement(block: SessionBlock, sport: Sport): string {
   const power = fmtPower(ZONE_TO_POWER[block.zone]);
-  const range = CADENCE_RANGE_BY_PROFILE[block.cadenceProfile];
-  const recommended = recommendedRpm(block.zone, block.cadenceProfile);
+  const cadence = cadenceRangeFor(block, sport);
   const dur = Math.max(1, Math.round(block.durationSec));
   switch (block.phase) {
     case 'warmup':
       // Warmup admite rango nativo via Cadence (low) + CadenceHigh. El
-      // simulador muestra el rango sin forzar una cadencia fija.
-      return `    <Warmup Duration="${dur}" PowerLow="0.5" PowerHigh="${power}" Cadence="${range.min}" CadenceHigh="${range.max}"/>`;
+      // simulador muestra el rango sin forzar una cadencia fija. En running
+      // tambien lo emitimos: Zwift Run interpreta Cadence como spm
+      // (independientemente de la unidad textual).
+      return `    <Warmup Duration="${dur}" PowerLow="0.5" PowerHigh="${power}" Cadence="${cadence.min}" CadenceHigh="${cadence.max}"/>`;
     case 'cooldown':
-      return `    <Cooldown Duration="${dur}" PowerLow="${power}" PowerHigh="0.4" Cadence="${range.min}" CadenceHigh="${range.max}"/>`;
+      return `    <Cooldown Duration="${dur}" PowerLow="${power}" PowerHigh="0.4" Cadence="${cadence.min}" CadenceHigh="${cadence.max}"/>`;
     default: {
       // SteadyState NO admite rango nativo. Omitimos Cadence (asi el simulador
       // no fija una cadencia obligatoria) y emitimos un textevent en t=0 con
-      // rango orientativo + cadencia recomendada. Visible como cue al iniciar
-      // el bloque en Zwift, TrainerRoad, SYSTM, MyWhoosh.
-      const message = `Cadencia ${range.min}-${range.max} rpm (recomendado ${recommended})`;
+      // RPE + sensacion + cadencia. Visible como cue al iniciar el bloque en
+      // Zwift, TrainerRoad, SYSTM, MyWhoosh.
+      const message = blockCueMessage(block, sport);
       return `    <SteadyState Duration="${dur}" Power="${power}">\n      <textevent timeoffset="0" message="${escapeXml(message)}"/>\n    </SteadyState>`;
     }
   }
@@ -173,26 +219,55 @@ function groupToIntervalsT(repeat: number, on: SessionBlock, off: SessionBlock):
 }
 
 /**
- * Compone una linea con los rangos de cadencia orientativos para los profiles
- * presentes en el plan. Se concatena al <description> del workout para que el
- * usuario vea las referencias incluso en bloques IntervalsT (que no aceptan
- * textevent anidado).
+ * Compone las lineas descriptivas del workout: cadencias orientativas por
+ * profile (solo en bike) y RPE + sensacion por cada zona presente en el
+ * plan. Se concatena al <description> del workout para que el usuario vea
+ * las referencias incluso en bloques IntervalsT (que no aceptan textevent
+ * anidado).
  */
-function describeCadenceRanges(plan: EditableSessionPlan): string {
+function describeWorkoutFeel(plan: EditableSessionPlan, sport: Sport): string {
+  const zonesPresent = new Set<HeartRateZone>();
   const profiles = new Set<CadenceProfile>();
   for (const item of plan.items) {
-    if (item.type === 'block') profiles.add(item.block.cadenceProfile);
-    else for (const b of item.blocks) profiles.add(b.cadenceProfile);
+    if (item.type === 'block') {
+      zonesPresent.add(item.block.zone);
+      profiles.add(item.block.cadenceProfile);
+    } else {
+      for (const b of item.blocks) {
+        zonesPresent.add(b.zone);
+        profiles.add(b.cadenceProfile);
+      }
+    }
   }
-  const labels: Record<CadenceProfile, string> = {
-    flat: 'flat 70-90 rpm',
-    climb: 'climb 55-80 rpm',
-    sprint: 'sprint 90-115 rpm',
-  };
-  const order: CadenceProfile[] = ['flat', 'climb', 'sprint'];
-  const present = order.filter((p) => profiles.has(p));
-  if (present.length === 0) return '';
-  return `Cadencias orientativas (no obligatorias): ${present.map((p) => labels[p]).join(' · ')}`;
+
+  const lines: string[] = [];
+
+  if (sport === 'bike') {
+    const labels: Record<CadenceProfile, string> = {
+      flat: 'flat 70-90 rpm',
+      climb: 'climb 55-80 rpm',
+      sprint: 'sprint 90-115 rpm',
+    };
+    const order: CadenceProfile[] = ['flat', 'climb', 'sprint'];
+    const present = order.filter((p) => profiles.has(p));
+    if (present.length > 0) {
+      lines.push(
+        `Cadencias orientativas (no obligatorias): ${present.map((p) => labels[p]).join(' · ')}`,
+      );
+    }
+  }
+
+  const zones: HeartRateZone[] = [1, 2, 3, 4, 5, 6];
+  const presentZones = zones.filter((z) => zonesPresent.has(z));
+  if (presentZones.length > 0) {
+    const items = presentZones.map((z) => {
+      const feeling = getZoneFeeling(z);
+      return `Z${z} → ${formatRpeRange(feeling)} «${feeling.sensation}»`;
+    });
+    lines.push(`Esfuerzo percibido por zona: ${items.join(' · ')}`);
+  }
+
+  return lines.join('\n');
 }
 
 export interface ZwoExportOptions {
@@ -208,15 +283,18 @@ export interface ZwoExportOptions {
  */
 export function exportZwo(plan: EditableSessionPlan, options: ZwoExportOptions = {}): string {
   const author = options.author ?? 'Cadencia';
-  const cadenceLine = describeCadenceRanges(plan);
+  // Default 'bike' por retrocompat con planes guardados antes de la extension
+  // a running.
+  const sport: Sport = plan.sport ?? 'bike';
+  const feelLines = describeWorkoutFeel(plan, sport);
   const description =
-    cadenceLine.length > 0
-      ? `Generado por cadencia.movimientofuncional.app\n${cadenceLine}`
+    feelLines.length > 0
+      ? `Generado por cadencia.movimientofuncional.app\n${feelLines}`
       : 'Generado por cadencia.movimientofuncional.app';
   const lines: string[] = [];
   for (const item of plan.items) {
     if (item.type === 'block') {
-      lines.push(blockToZwoElement(item.block));
+      lines.push(blockToZwoElement(item.block, sport));
       continue;
     }
     if (canUseIntervalsT(item.blocks)) {
@@ -227,7 +305,7 @@ export function exportZwo(plan: EditableSessionPlan, options: ZwoExportOptions =
     const reps = Math.max(1, Math.floor(item.repeat));
     for (let i = 0; i < reps; i++) {
       for (const block of item.blocks) {
-        lines.push(blockToZwoElement(block));
+        lines.push(blockToZwoElement(block, sport));
       }
     }
   }
@@ -236,7 +314,7 @@ export function exportZwo(plan: EditableSessionPlan, options: ZwoExportOptions =
   <author>${escapeXml(author)}</author>
   <name>${escapeXml(plan.name)}</name>
   <description>${escapeXml(description)}</description>
-  <sportType>bike</sportType>
+  <sportType>${sport}</sportType>
   <tags/>
   <workout>
 ${lines.join('\n')}
@@ -402,8 +480,19 @@ export function importZwo(xml: string): ZwoImportResult {
     return { ok: false, error: 'No es un archivo ZWO valido (falta <workout_file>).' };
   }
   const sportType = root.querySelector('sportType')?.textContent?.trim();
-  if (sportType !== undefined && sportType !== '' && sportType !== 'bike') {
-    return { ok: false, error: `Solo se soporta sportType "bike" (este es "${sportType}").` };
+  // Aceptamos 'bike' y 'run'. Cualquier otro valor (ej. 'swim') se rechaza
+  // explicitamente con mensaje claro. Si no hay sportType (o esta vacio)
+  // asumimos 'bike' por retrocompat con archivos antiguos.
+  let sport: Sport = 'bike';
+  if (sportType !== undefined && sportType !== '') {
+    if (sportType === 'run') {
+      sport = 'run';
+    } else if (sportType !== 'bike') {
+      return {
+        ok: false,
+        error: `Solo se soportan sportType "bike" o "run" (este es "${sportType}").`,
+      };
+    }
   }
   const name = root.querySelector('name')?.textContent?.trim();
   const workout = root.querySelector('workout');
@@ -451,6 +540,7 @@ export function importZwo(xml: string): ZwoImportResult {
     ok: true,
     plan: {
       name: name !== undefined && name.length > 0 ? name : 'Workout importado',
+      sport,
       items,
     },
   };

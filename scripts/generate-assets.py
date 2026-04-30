@@ -16,10 +16,11 @@ Genera assets de marca a partir de public/logo.png:
   Open Graph (1200x630 social card):
     public/og-image.png
 
-El logo de marca esta en silueta negra (public/logo.png). En la Landing y el
-Header el componente <Logo /> lo muestra tal cual (negro nativo). Aqui, sin
-embargo, se TINTA en turquesa-700 (#0e7e85) para los assets PWA/favicon/OG:
-sobre la pantalla de inicio del movil o en una preview social, una silueta
+El logo de marca (corazon + clave de sol + onda de pulso) esta en silueta
+negra sobre transparente (public/logo.png). En la Landing y el Header el
+componente <Logo /> lo muestra tal cual (negro nativo). Aqui, sin embargo,
+se TINTA en turquesa-700 (#0e7e85) para los assets PWA/favicon/OG: sobre
+la pantalla de inicio del movil o en una preview social, una silueta
 turquesa lee como icono de marca, mientras que un negro plano se confunde
 con cualquier otro icono oscuro. El tinte se aplica usando el canal alpha
 del PNG original como mascara.
@@ -99,8 +100,9 @@ logo = tint_logo(TURQUESA_700)
 def make_favicon(size: int, out_path: str) -> None:
     """Favicon transparente con silueta turquesa centrada al ancho completo del lienzo.
 
-    A 16x16 los detalles internos del logo (ranuras del piñón) se pierden, pero
-    la silueta global sigue siendo reconocible como nota musical + rueda.
+    A 16x16 los detalles internos del logo (la onda de pulso dentro del
+    corazon) se pierden, pero la silueta global sigue siendo reconocible
+    como corazon con clave de sol.
     """
     aspect = logo.width / logo.height
     target_h = size
@@ -197,11 +199,11 @@ def make_og_image(out_path: str) -> None:
     bb_brand = draw.textbbox((0, 0), brand_text, font=font_brand)
     brand_h = bb_brand[3] - bb_brand[1]
 
-    # Tagline (uppercase con tracking) en gris.
-    # Tamano calibrado para que quepa en text_x..W-margen sin recortar la
-    # ultima letra ('O' de RITMO).
+    # Tagline (uppercase con tracking) en gris. Eco del subtitulo pintado en
+    # el hero ("disfruta del cardio a tu ritmo"). Tamano calibrado para que
+    # quepa en text_x..W-margen sin recortar la ultima letra ('O' de RITMO).
     font_tag = ImageFont.truetype(FONT_BODY, 26)
-    tag_text = 'P A R A   C I C L I S T A S   C O N   R I T M O'
+    tag_text = 'D E L   C A R D I O   A   T U   R I T M O'
     bb_tag = draw.textbbox((0, 0), tag_text, font=font_tag)
     tag_h = bb_tag[3] - bb_tag[1]
 

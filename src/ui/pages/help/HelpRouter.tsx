@@ -1,9 +1,12 @@
 import { HelpLayout } from '@ui/components/help/HelpLayout';
 import { HelpHome } from './HelpHome';
 import { SesionIndoorArticle } from './articles/SesionIndoorArticle';
+import { SesionRunningArticle } from './articles/SesionRunningArticle';
+import { GpxRunningArticle } from './articles/GpxRunningArticle';
 import { ZonasArticle } from './articles/ZonasArticle';
 import { IntervalosArticle } from './articles/IntervalosArticle';
 import { PlantillasArticle } from './articles/PlantillasArticle';
+import { PlantillasRunningArticle } from './articles/PlantillasRunningArticle';
 import { MusicaArticle } from './articles/MusicaArticle';
 import { SpotifyArticle } from './articles/SpotifyArticle';
 import { SincronizarDriveArticle } from './articles/SincronizarDriveArticle';
@@ -37,6 +40,18 @@ export function HelpRouter({ pathname }: HelpRouterProps): JSX.Element {
           <SesionIndoorArticle />
         </HelpLayout>
       );
+    case '/ayuda/sesion-running':
+      return (
+        <HelpLayout activeSlug="sesion-running">
+          <SesionRunningArticle />
+        </HelpLayout>
+      );
+    case '/ayuda/gpx-running':
+      return (
+        <HelpLayout activeSlug="gpx-running">
+          <GpxRunningArticle />
+        </HelpLayout>
+      );
     case '/ayuda/zonas':
       return (
         <HelpLayout activeSlug="zonas">
@@ -53,6 +68,12 @@ export function HelpRouter({ pathname }: HelpRouterProps): JSX.Element {
       return (
         <HelpLayout activeSlug="plantillas">
           <PlantillasArticle />
+        </HelpLayout>
+      );
+    case '/ayuda/plantillas-running':
+      return (
+        <HelpLayout activeSlug="plantillas-running">
+          <PlantillasRunningArticle />
         </HelpLayout>
       );
     case '/ayuda/musica':

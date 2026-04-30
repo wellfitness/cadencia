@@ -12,10 +12,13 @@ describe('HelpRouter', () => {
 
   it('renderiza el articulo correspondiente para cada slug conocido', () => {
     const slugs = [
-      ['/ayuda/sesion-indoor', 'Cómo construir una sesión indoor'],
-      ['/ayuda/zonas', 'Zonas de entrenamiento'],
+      ['/ayuda/sesion-indoor', 'Cómo construir una sesión indoor (ciclismo)'],
+      ['/ayuda/sesion-running', 'Cómo construir una sesión de running'],
+      ['/ayuda/gpx-running', 'Cómo trabaja Cadencia tu GPX de carrera'],
+      ['/ayuda/zonas', 'Zonas de entrenamiento (Z1-Z6)'],
       ['/ayuda/intervalos', 'Prescripción de intervalos'],
-      ['/ayuda/plantillas', 'Plantillas y cuándo usarlas'],
+      ['/ayuda/plantillas', 'Plantillas de ciclismo y cuándo usarlas'],
+      ['/ayuda/plantillas-running', 'Plantillas de running y cuándo usarlas'],
       ['/ayuda/musica', 'Cómo se elige la música de cada bloque'],
       ['/ayuda/spotify', 'Spotify y preguntas frecuentes'],
     ] as const;
@@ -36,6 +39,6 @@ describe('HelpRouter', () => {
   it('acepta trailing slash', () => {
     const { getByRole } = render(<HelpRouter pathname="/ayuda/zonas/" />);
     const heading = getByRole('heading', { level: 1 });
-    expect(heading.textContent).toBe('Zonas de entrenamiento');
+    expect(heading.textContent).toBe('Zonas de entrenamiento (Z1-Z6)');
   });
 });
