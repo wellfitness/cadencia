@@ -10,23 +10,31 @@ import { listSavedSessions, deleteSavedSession } from '@core/sessions/saved';
 import { calculateTotalDurationSec } from '@core/segmentation';
 import { navigateInApp } from '@ui/utils/navigation';
 import { BIKE_TYPE_LABELS } from '@core/power';
+import {
+  isPersistentStorageEnabled,
+  loadUserInputsFromSession,
+  saveUserInputsToLocal,
+  clearUserInputsFromLocal,
+  EMPTY_USER_INPUTS,
+} from '@core/user';
+import { updateSection } from '@ui/state/cadenciaStore';
 
-export interface MyAccountPageProps {
+export interface MyPreferencesPageProps {
   onClose: () => void;
 }
 
 /**
- * Pagina "Mi cuenta": vista consolidada de todo lo que Cadencia recuerda
- * sobre el usuario. Accesible via /cuenta.
+ * Pagina "Mis preferencias": vista consolidada de todo lo que Cadencia
+ * recuerda sobre el usuario. Accesible via /preferencias.
  *
  * Reactivo: usa useCadenciaData() para refrescarse cuando llegan cambios
  * via sync de Drive desde otro dispositivo.
  *
- * No tiene cuentas ni login — la "cuenta" aqui es el conjunto de datos
- * locales (cadenciaStore en localStorage), opcionalmente sincronizados
- * con Google Drive del usuario via opt-in.
+ * Deliberadamente NO se llama "Mi cuenta" para no sugerir que existe un
+ * sistema de registro/login: Cadencia no tiene cuentas. Estas son tus
+ * preferencias locales, opcionalmente sincronizadas con tu propio Drive.
  */
-export function MyAccountPage({ onClose }: MyAccountPageProps): JSX.Element {
+export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Element {
   const data = useCadenciaData();
   const [confirmWipe, setConfirmWipe] = useState<boolean>(false);
 
@@ -43,7 +51,7 @@ export function MyAccountPage({ onClose }: MyAccountPageProps): JSX.Element {
             <span>Volver</span>
           </button>
           <h1 className="text-lg md:text-xl font-display font-bold text-gris-900">
-            Mi cuenta
+            Mis preferencias
           </h1>
           <span className="w-12" aria-hidden /> {/* spacer */}
         </div>
@@ -51,6 +59,8 @@ export function MyAccountPage({ onClose }: MyAccountPageProps): JSX.Element {
 
       <main className="flex-1">
         <div className="mx-auto w-full max-w-3xl px-4 py-4 md:py-6 space-y-4 md:space-y-5">
+          <PersistenceSection data={data} />
+
           <Card title="Sincronización entre dispositivos" titleIcon="cloud_sync">
             <GoogleSyncCard />
           </Card>
@@ -115,6 +125,129 @@ export function MyAccountPage({ onClose }: MyAccountPageProps): JSX.Element {
 
 interface SectionProps {
   data: ReturnType<typeof useCadenciaData>;
+}
+
+/**
+ * Persistencia local de los datos del usuario en este dispositivo. Es el
+ * antiguo «Recordar mis datos» del wizard, movido aqui porque es ajuste
+ * de preferencias, no algo que el usuario tenga que tocar cada vez que
+ * inicie una sesion.
+ *
+ * Estados:
+ *  - Activado (data.userInputs !== null): los datos sobreviven al cierre
+ *    de la pestana. El usuario puede pulsar «Olvidar mis datos» para
+ *    borrarlos del almacenamiento.
+ *  - Desactivado: los datos solo viven en sessionStorage durante la
+ *    pestana actual. Si hay datos en session, ofrece «Recordar» que los
+ *    copia al cadenciaStore.
+ *  - Sin datos en absoluto: hint informativo, sin botones.
+ */
+function PersistenceSection({ data }: SectionProps): JSX.Element {
+  const enabled = isPersistentStorageEnabled() || data.userInputs !== null;
+  const sessionInputs = useMemo(() => loadUserInputsFromSession(), []);
+  const hasSessionData =
+    sessionInputs !== null &&
+    Object.values(sessionInputs).some((v) => v !== null);
+
+  const [confirmForget, setConfirmForget] = useState<boolean>(false);
+
+  const handleEnable = (): void => {
+    const inputs = sessionInputs ?? EMPTY_USER_INPUTS;
+    saveUserInputsToLocal(inputs);
+    updateSection('userInputs', inputs);
+  };
+
+  const handleForget = (): void => {
+    clearUserInputsFromLocal();
+    updateSection('userInputs', null);
+    setConfirmForget(false);
+  };
+
+  return (
+    <Card title="Datos en este dispositivo" titleIcon="save">
+      {enabled ? (
+        <>
+          <p className="text-sm text-gris-700 flex items-start gap-2">
+            <MaterialIcon
+              name="check_circle"
+              size="small"
+              className="text-turquesa-600 mt-0.5 shrink-0"
+            />
+            <span>
+              <strong>Tus datos se guardan en este navegador.</strong>{' '}
+              <span className="text-gris-500">
+                Sobreviven al cierre de la pestaña y al reinicio del dispositivo.
+                No salen de aquí salvo que actives la sincronización con Drive.
+              </span>
+            </span>
+          </p>
+          <p className="text-xs text-gris-500 mt-2">
+            ⚠ No actives esto si compartes el ordenador.
+          </p>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="critical"
+              size="sm"
+              iconLeft="delete_outline"
+              onClick={() => setConfirmForget(true)}
+            >
+              Olvidar mis datos
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-gris-700 flex items-start gap-2">
+            <MaterialIcon
+              name="info"
+              size="small"
+              className="text-gris-500 mt-0.5 shrink-0"
+            />
+            <span>
+              <strong>Tus datos solo viven en esta pestaña.</strong>{' '}
+              <span className="text-gris-500">
+                Se borrarán al cerrar el navegador. Para recordarlos en este
+                dispositivo, pulsa el botón de abajo.
+              </span>
+            </span>
+          </p>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="save"
+              onClick={handleEnable}
+              disabled={!hasSessionData}
+              title={
+                hasSessionData
+                  ? 'Guardar los datos actuales en este navegador'
+                  : 'Rellena tus datos en una sesión primero'
+              }
+            >
+              Recordar mis datos en este dispositivo
+            </Button>
+          </div>
+        </>
+      )}
+      <ConfirmDialog
+        open={confirmForget}
+        title="Olvidar mis datos guardados"
+        icon="delete_outline"
+        confirmLabel="Sí, olvidar"
+        confirmVariant="critical"
+        cancelLabel="Cancelar"
+        onConfirm={handleForget}
+        onCancel={() => setConfirmForget(false)}
+        message={
+          <p>
+            Se borrarán tus datos guardados en este navegador (peso, FTP, FC,
+            etc.). Tu Drive no se ve afectado. Podrás volver a guardarlos en
+            cualquier momento.
+          </p>
+        }
+      />
+    </Card>
+  );
 }
 
 function UserDataSection({ data }: SectionProps): JSX.Element {

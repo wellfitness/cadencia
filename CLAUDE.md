@@ -77,7 +77,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
-Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con tabs nativo/listas-propias y persistencia automática), `MyAccountPage` (`/cuenta`, vista consolidada de todos los datos guardados del usuario), `HelpRouter` (`/ayuda/*`).
+Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con tabs nativo/listas-propias y persistencia automática), `MyPreferencesPage` (`/preferencias`, vista consolidada de todos los datos guardados del usuario), `HelpRouter` (`/ayuda/*`).
 
 El estado **ephemeral** del wizard (paso actual, ruta procesada, lista casada, índices reemplazados, etc.) persiste en `sessionStorage` (`@ui/state/wizardStorage`) para sobrevivir al redirect del OAuth de Spotify (full page navigation a `/callback`). El estado **duradero** del usuario (inputs fisiológicos, preferencias musicales, sesiones guardadas) vive en `localStorage` vía `@ui/state/cadenciaStore` y se sincroniza opcionalmente con Google Drive (ver "Sincronización opcional con Google Drive" más abajo).
 
@@ -134,7 +134,7 @@ src/
       …                       # Resto: Stepper, Card, FileDropzone, ZoneBadge, Charts, etc.
     pages/                    # Landing, SourceTypeStep, UserDataStep, RouteStep, MusicStep,
                               # ResultStep, SessionBuilder, SessionTVMode, SpotifyCallback,
-                              # CatalogEditorPage (/catalogo), MyAccountPage (/cuenta)
+                              # CatalogEditorPage (/catalogo), MyPreferencesPage (/cuenta)
     state/                    # cadenciaStore (single source of truth localStorage),
                               # wizardStorage (sessionStorage para wizard ephemeral),
                               # userInputsReducer, migrateLegacyStorage

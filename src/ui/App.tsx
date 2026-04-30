@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   EMPTY_USER_INPUTS,
-  clearUserInputsFromLocal,
-  isPersistentStorageEnabled,
   loadUserInputs,
   saveUserInputs,
-  saveUserInputsToLocal,
   validateUserInputs,
   type UserInputsRaw,
 } from '@core/user';
@@ -27,7 +24,7 @@ import type { RouteSourceChoice } from '@ui/components/SourceSelector';
 import { CatalogEditorPage } from '@ui/pages/CatalogEditorPage';
 import { HelpRouter } from '@ui/pages/help/HelpRouter';
 import { Landing } from '@ui/pages/Landing';
-import { MyAccountPage } from '@ui/pages/MyAccountPage';
+import { MyPreferencesPage } from '@ui/pages/MyPreferencesPage';
 import { SourceTypeStep } from '@ui/pages/SourceTypeStep';
 import { UserDataStep } from '@ui/pages/UserDataStep';
 import { RouteStep } from '@ui/pages/RouteStep';
@@ -76,8 +73,10 @@ export function App(): JSX.Element {
   if (pathname === '/catalogo') {
     return <CatalogEditorPage onClose={() => navigateBack('/')} />;
   }
-  if (pathname === '/cuenta') {
-    return <MyAccountPage onClose={() => navigateBack('/')} />;
+  if (pathname === '/preferencias' || pathname === '/cuenta') {
+    // /cuenta queda como alias retrocompatible por si algun link antiguo
+    // (Drive consent screen, marcadores) lleva ahi.
+    return <MyPreferencesPage onClose={() => navigateBack('/')} />;
   }
   if (pathname.startsWith('/ayuda')) {
     return <HelpRouter pathname={pathname} />;
@@ -165,34 +164,17 @@ function WizardApp(): JSX.Element {
   // currentYear cacheado en una sesion (no cambia significativamente durante el uso normal).
   const [currentYear] = useState(() => new Date().getFullYear());
 
-  // Opt-in del usuario a persistir sus datos fisiologicos entre sesiones en
-  // este dispositivo (localStorage). La fuente de verdad arranca en la
-  // presencia de userInputs en cadenciaStore (SoT actual) o en la key legacy
-  // (compat tras migracion). Estados imposibles (flag sin datos / datos
-  // sin flag) no existen.
-  const [persistentStorage, setPersistentStorageState] = useState<boolean>(
-    () => loadCadenciaData().userInputs !== null || isPersistentStorageEnabled(),
-  );
-
-  const handlePersistentStorageChange = useCallback(
-    (enabled: boolean): void => {
-      setPersistentStorageState(enabled);
-      if (enabled) {
-        // Snapshot inmediato: si el usuario marca el checkbox tras rellenar
-        // el formulario, no esperamos al siguiente render para escribir.
-        saveUserInputsToLocal(inputs);
-        updateSection('userInputs', inputs);
-      } else {
-        clearUserInputsFromLocal();
-        updateSection('userInputs', null);
-      }
-    },
-    [inputs],
-  );
+  // Persistencia derivada: true cuando hay userInputs en cadenciaStore.
+  // El usuario lo activa/desactiva desde /preferencias (no en el wizard).
+  // Reactivo via useCadenciaData mas abajo, pero aqui leemos el snapshot
+  // mas reciente para el efecto de guardado. La migracion one-shot del
+  // legacy localStorage ya copio cualquier dato antiguo al cadenciaStore.
+  const cadenciaSnapshot = loadCadenciaData();
+  const persistentStorage = cadenciaSnapshot.userInputs !== null;
 
   // Persistencia debounceada. sessionStorage se actualiza siempre (necesario
   // para sobrevivir al OAuth de Spotify); cadenciaStore (y localStorage
-  // legacy mientras dure la migracion) solo si el opt-in esta activo.
+  // legacy mientras dure la migracion) solo si la persistencia esta activa.
   // cadenciaStore es el SoT que el motor de Drive sync observa.
   useEffect(() => {
     const id = setTimeout(() => {
@@ -565,8 +547,6 @@ function WizardApp(): JSX.Element {
             onBack={handleBack}
             onNext={handleNext}
             mode={sourceType === 'session' ? 'session' : 'gpx'}
-            persistentStorage={persistentStorage}
-            onPersistentStorageChange={handlePersistentStorageChange}
           />
         )}
         {currentStep === STEP_DATA && sourceType === null && (
@@ -743,8 +723,21 @@ function NeedsMusicMessage({ onBack }: { onBack: () => void }): JSX.Element {
 function Header(): JSX.Element {
   return (
     <header className="border-b border-gris-200 bg-white">
-      <div className="mx-auto w-full max-w-4xl px-4 py-4 flex items-center gap-3">
+      <div className="mx-auto w-full max-w-4xl px-4 py-4 flex items-center justify-between gap-3">
         <Logo variant="full" size="md" />
+        <a
+          href="/preferencias"
+          onClick={(e) => {
+            e.preventDefault();
+            navigateInApp('/preferencias');
+          }}
+          className="inline-flex items-center gap-1.5 text-sm text-gris-700 hover:text-turquesa-700 hover:bg-turquesa-50 rounded-md px-2 py-1.5 min-h-[36px] transition-colors"
+          aria-label="Mis preferencias"
+          title="Mis preferencias"
+        >
+          <MaterialIcon name="manage_accounts" size="small" className="text-gris-500" />
+          <span className="hidden sm:inline">Mis preferencias</span>
+        </a>
       </div>
     </header>
   );

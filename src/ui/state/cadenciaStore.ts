@@ -106,7 +106,7 @@ export function updateSection<K extends AtomicSectionKey>(
  * el SyncedData actual, re-renderizando el componente cuando el store
  * cambia (sea por una accion local o por un pull desde Drive).
  *
- * Util para que el livePool de App.tsx, MyAccountPage o cualquier UI
+ * Util para que el livePool de App.tsx, MyPreferencesPage o cualquier UI
  * dependiente de los datos sincronizados se mantenga reactivo sin tener
  * que escuchar el evento manualmente en cada sitio.
  */

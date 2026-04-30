@@ -191,7 +191,7 @@ export function ResultStep({
     name: string;
   } | null>(null);
   // Contador local de descartes en esta sesion del wizard. Util para el
-  // toast informativo "Has descartado N · Ver descartes en Mi cuenta".
+  // toast informativo "Has descartado N · Ver descartes en Mis preferencias".
   const [sessionDismissCount, setSessionDismissCount] = useState<number>(0);
 
   if (clientId === null) {
@@ -537,7 +537,7 @@ export function ResultStep({
             </p>
             <p className="mt-2 text-gris-600">
               Puedes recuperarla más tarde desde{' '}
-              <strong>Mi cuenta → Canciones descartadas</strong>.
+              <strong>Mis preferencias → Editar catálogo → Descartadas</strong>.
             </p>
           </>
         }
@@ -554,14 +554,14 @@ export function ResultStep({
             {sessionDismissCount === 1 ? 'canción' : 'canciones'} en esta sesión.
           </p>
           <a
-            href="/cuenta"
+            href="/preferencias"
             onClick={(e) => {
               e.preventDefault();
-              navigateInApp('/cuenta');
+              navigateInApp('/preferencias');
             }}
             className="text-xs font-semibold text-turquesa-700 hover:underline whitespace-nowrap"
           >
-            Ver descartes
+            Mis preferencias
           </a>
         </div>
       )}

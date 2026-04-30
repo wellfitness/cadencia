@@ -22,9 +22,6 @@ export interface UserDataStepProps {
   onNext: () => void;
   /** 'gpx' (default) o 'session' (sesion indoor: peso/bici se ocultan). */
   mode?: 'gpx' | 'session';
-  /** Estado del opt-in para persistir datos fisiologicos en localStorage. */
-  persistentStorage?: boolean;
-  onPersistentStorageChange?: (enabled: boolean) => void;
 }
 
 export function UserDataStep({
@@ -35,8 +32,6 @@ export function UserDataStep({
   onBack,
   onNext,
   mode = 'gpx',
-  persistentStorage,
-  onPersistentStorageChange,
 }: UserDataStepProps): JSX.Element {
   // Para mostrar errores de "campo vacio" solo despues de un intento de submit
   const [showAllErrors, setShowAllErrors] = useState(false);
@@ -50,12 +45,6 @@ export function UserDataStep({
     dispatch({ type: 'RESET' });
     setShowAllErrors(false);
     setConfirmOpen(false);
-    // Si el opt-in estaba activo, "limpiar todo" tambien lo desactiva: deja
-    // EMPTY_USER_INPUTS persistido seria contraintuitivo ("borrar mis datos"
-    // pero los vacios siguen guardados como mi perfil para la siguiente sesion).
-    if (persistentStorage === true && onPersistentStorageChange !== undefined) {
-      onPersistentStorageChange(false);
-    }
   };
   const handleCancelReset = (): void => {
     setConfirmOpen(false);
@@ -122,8 +111,6 @@ export function UserDataStep({
         currentYear={currentYear}
         showAllErrors={showAllErrors}
         mode={mode}
-        {...(persistentStorage !== undefined ? { persistentStorage } : {})}
-        {...(onPersistentStorageChange !== undefined ? { onPersistentStorageChange } : {})}
       />
 
       {/* P6: confirmacion discreta cuando la validacion pasa. */}

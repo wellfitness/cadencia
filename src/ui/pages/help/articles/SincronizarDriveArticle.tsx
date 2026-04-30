@@ -18,11 +18,11 @@ const FAQS: readonly FaqItem[] = [
   },
   {
     q: '¿Cómo descartar canciones que no me gustan?',
-    a: 'En el paso «A pedalear» (paso 5), cada canción tiene tres botones debajo: «Aleatorio» (sustituir por otra al azar), «Otro tema» (elegir manualmente de un menú) y «No la quiero» (descartar permanentemente). El botón «No la quiero» pide confirmación y luego: (a) la guarda en tu lista de descartes globales (sincronizada con Drive), (b) sustituye automáticamente el hueco con otra canción del catálogo, y (c) la canción descartada NO volverá a aparecer en futuras listas. Puedes recuperarla cuando quieras desde Mi cuenta → Canciones descartadas.',
+    a: 'En el paso «A pedalear» (paso 5), cada canción tiene tres botones debajo: «Aleatorio» (sustituir por otra al azar), «Otro tema» (elegir manualmente de un menú) y «No la quiero» (descartar permanentemente). El botón «No la quiero» pide confirmación y luego: (a) la guarda en tu lista de descartes globales (sincronizada con Drive), (b) sustituye automáticamente el hueco con otra canción del catálogo, y (c) la canción descartada NO volverá a aparecer en futuras listas. Puedes recuperarla cuando quieras desde Mis preferencias → Canciones descartadas.',
   },
   {
     q: '¿Mis listas CSV propias se guardan también?',
-    a: 'Sí. Cuando subes un CSV en el paso «Música» o desde el editor del catálogo, Cadencia guarda el texto del CSV en este dispositivo y, si tienes Drive conectado, lo sincroniza con tu Drive privado. Tamaño típico: 50-300 KB por lista. Si subes la misma lista en dos dispositivos distintos, ambas conviven como entradas independientes. Para borrar una lista: en el editor del catálogo, pestaña «Mis listas», o desde «Mi cuenta».',
+    a: 'Sí. Cuando subes un CSV en el paso «Música» o desde el editor del catálogo, Cadencia guarda el texto del CSV en este dispositivo y, si tienes Drive conectado, lo sincroniza con tu Drive privado. Tamaño típico: 50-300 KB por lista. Si subes la misma lista en dos dispositivos distintos, ambas conviven como entradas independientes. Para borrar una lista: en el editor del catálogo, pestaña «Mis listas», o desde «Mis preferencias».',
   },
   {
     q: '¿Dónde se guardan los datos? ¿Los puede ver alguien?',
@@ -30,7 +30,7 @@ const FAQS: readonly FaqItem[] = [
   },
   {
     q: '¿Cómo conecto Drive?',
-    a: 'Ve a "Mi cuenta" desde el pie de la página o el menú, busca la tarjeta "Sincronizar entre dispositivos" y pulsa "Conectar mi Google Drive". Se abrirá una ventana emergente oficial de Google donde te pedirá autorizar a Cadencia el acceso a su carpeta privada (drive.appdata). Acepta y listo: la etiqueta cambia a "Sincronizado" y a partir de ese momento todos tus cambios se subirán automáticamente.',
+    a: 'Ve a "Mis preferencias" desde el pie de la página o el menú, busca la tarjeta "Sincronizar entre dispositivos" y pulsa "Conectar mi Google Drive". Se abrirá una ventana emergente oficial de Google donde te pedirá autorizar a Cadencia el acceso a su carpeta privada (drive.appdata). Acepta y listo: la etiqueta cambia a "Sincronizado" y a partir de ese momento todos tus cambios se subirán automáticamente.',
   },
   {
     q: '¿Cuándo se sincroniza?',
@@ -88,7 +88,7 @@ export function SincronizarDriveArticle(): JSX.Element {
 
       <Card title="Cómo activar la sincronización" titleIcon="cloud_sync">
         <ol className="list-decimal list-inside space-y-2 text-sm text-gris-700 leading-relaxed">
-          <li>Abre Cadencia y entra a <strong>«Mi cuenta»</strong> desde el pie de página.</li>
+          <li>Abre Cadencia y entra a <strong>«Mis preferencias»</strong> desde el pie de página.</li>
           <li>
             Localiza la tarjeta <strong>«Sincronizar entre dispositivos»</strong> en
             la parte superior.
