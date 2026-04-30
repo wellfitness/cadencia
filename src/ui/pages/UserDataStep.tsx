@@ -22,6 +22,8 @@ export interface UserDataStepProps {
   onNext: () => void;
   /** 'gpx' (default) o 'session' (sesion indoor: peso/bici se ocultan). */
   mode?: 'gpx' | 'session';
+  /** 'bike' (default) o 'run'. En run se ocultan bici y FTP del formulario. */
+  sport?: 'bike' | 'run';
 }
 
 export function UserDataStep({
@@ -32,6 +34,7 @@ export function UserDataStep({
   onBack,
   onNext,
   mode = 'gpx',
+  sport = 'bike',
 }: UserDataStepProps): JSX.Element {
   // Para mostrar errores de "campo vacio" solo despues de un intento de submit
   const [showAllErrors, setShowAllErrors] = useState(false);
@@ -66,11 +69,14 @@ export function UserDataStep({
   const submitDisabled = !validation.ok;
   const nextLabel = 'Plan';
 
-  // P3: copy reescrito.
+  // P3: copy reescrito. En running el peso es opcional (Cr es J/kg/m, ya
+  // normalizado por masa) y FTP/Stryd no se ofrecen.
   const subtitle =
-    mode === 'session'
-      ? 'Necesitamos tu FC máxima — o tu año de nacimiento y sexo, y la estimamos. Con eso te guiamos en pulsaciones y vatios durante el modo TV.'
-      : 'Necesitamos tu peso. Para tus zonas vale tu FC, tu FTP o tu año de nacimiento — lo que tengas.';
+    sport === 'run'
+      ? 'Necesitamos tu FC máxima — o tu año de nacimiento y sexo, y la estimamos. Con eso te marcamos los rangos de pulsaciones para cada zona.'
+      : mode === 'session'
+        ? 'Necesitamos tu FC máxima — o tu año de nacimiento y sexo, y la estimamos. Con eso te guiamos en pulsaciones y vatios durante el modo TV.'
+        : 'Necesitamos tu peso. Para tus zonas vale tu FC, tu FTP o tu año de nacimiento — lo que tengas.';
 
   // Resumen de errores para aria-live (P2). Solo se calcula cuando hay errores
   // visibles tras intento de submit.
@@ -111,6 +117,7 @@ export function UserDataStep({
         currentYear={currentYear}
         showAllErrors={showAllErrors}
         mode={mode}
+        sport={sport}
       />
 
       {/* P6: confirmacion discreta cuando la validacion pasa. */}
@@ -148,7 +155,8 @@ export function UserDataStep({
         title="¿Borrar todos tus datos?"
         message={
           <p>
-            Esta acción no se puede deshacer. Perderás peso, FC, FTP y todo lo que hayas
+            Esta acción no se puede deshacer. Perderás{' '}
+            {sport === 'run' ? 'tu FC y todo lo que hayas' : 'peso, FC, FTP y todo lo que hayas'}{' '}
             introducido.
           </p>
         }

@@ -4,12 +4,14 @@ export {
   BIKE_TYPES,
   BIOLOGICAL_SEXES,
   DEFAULTS,
+  SPORTS,
 } from './userInputs';
 export type {
   UserInputsRaw,
   ValidatedUserInputs,
   BikeType,
   BiologicalSex,
+  Sport,
 } from './userInputs';
 
 export { validateUserInputs, describeValidationError } from './validation';

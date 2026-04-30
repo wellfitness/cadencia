@@ -21,7 +21,7 @@ import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TodayBadge } from '@ui/components/TodayBadge';
-import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import type { TypeChoice } from '@ui/components/SourceSelector';
 import { CalendarPage } from '@ui/pages/CalendarPage';
 import { CatalogEditorPage } from '@ui/pages/CatalogEditorPage';
 import { HelpRouter } from '@ui/pages/help/HelpRouter';
@@ -411,8 +411,15 @@ function WizardApp(): JSX.Element {
     setRouteMeta(meta);
   };
 
-  const handleSourceTypeSelect = (next: RouteSourceChoice): void => {
-    if (sourceType !== next) {
+  const handleSourceTypeSelect = (choice: TypeChoice): void => {
+    const { sport, source } = choice;
+    // Cambio de deporte: refrescamos el reducer del usuario para que la
+    // validacion del paso Datos use la rama correcta (peso opcional + FTP
+    // ignorado en run, peso obligatorio en bike).
+    if (inputs.sport !== sport) {
+      dispatch({ type: 'SET_SPORT', value: sport });
+    }
+    if (sourceType !== source) {
       // Si cambia la rama, limpiamos los datos derivados de la rama anterior.
       // NOTA: uploadedCsvs YA NO se limpia aqui — son persistentes en
       // cadenciaStore desde Fase E y deben sobrevivir a cambios de rama.
@@ -422,12 +429,12 @@ function WizardApp(): JSX.Element {
       setReplacedIndices(new Set());
       setPlaylistName('');
       // Si dejamos la rama indoor, limpiamos el plan y la plantilla activa
-      if (next !== 'session') {
+      if (source !== 'session') {
         setSessionPlan(null);
         setActiveTemplateId(null);
       }
     }
-    setSourceType(next);
+    setSourceType(source);
     // Avance automatico al paso Datos: el usuario no necesita un boton extra
     setCompletedSteps((prev) => (prev.includes(STEP_TYPE) ? prev : [...prev, STEP_TYPE]));
     setCurrentStep(STEP_DATA);
@@ -540,7 +547,10 @@ function WizardApp(): JSX.Element {
           </div>
         )}
         {currentStep === STEP_TYPE && (
-          <SourceTypeStep onSelect={handleSourceTypeSelect} />
+          <SourceTypeStep
+            {...(inputs.sport !== undefined ? { defaultSport: inputs.sport } : {})}
+            onSelect={handleSourceTypeSelect}
+          />
         )}
 
         {currentStep === STEP_DATA && sourceType !== null && (
@@ -552,6 +562,7 @@ function WizardApp(): JSX.Element {
             onBack={handleBack}
             onNext={handleNext}
             mode={sourceType === 'session' ? 'session' : 'gpx'}
+            sport={inputs.sport ?? 'bike'}
           />
         )}
         {currentStep === STEP_DATA && sourceType === null && (

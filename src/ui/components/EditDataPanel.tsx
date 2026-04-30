@@ -13,6 +13,8 @@ export interface EditDataPanelProps {
   defaultOpen?: boolean;
   /** 'gpx' (default) o 'session'. Pasa al UserDataForm para condicionar campos. */
   mode?: 'gpx' | 'session';
+  /** 'bike' (default) o 'run'. En run se ocultan bici y FTP del formulario. */
+  sport?: 'bike' | 'run';
 }
 
 /**
@@ -30,7 +32,12 @@ export function EditDataPanel({
   currentYear,
   defaultOpen = false,
   mode = 'gpx',
+  sport = 'bike',
 }: EditDataPanelProps): JSX.Element {
+  const blurb =
+    sport === 'run'
+      ? 'Cambia tu FC si quieres recalcular las zonas. La lista se actualiza al instante.'
+      : 'Cambia tu peso, FC o tipo de bici si quieres recalcular las zonas. La lista se actualiza al instante.';
   return (
     <details
       className="group rounded-xl border border-gris-200 bg-white p-3 md:p-5 open:border-turquesa-300"
@@ -46,16 +53,14 @@ export function EditDataPanel({
         />
       </summary>
       <div className="mt-3 pt-3 border-t border-gris-100">
-        <p className="text-sm text-gris-600 mb-3">
-          Cambia tu peso, FC o tipo de bici si quieres recalcular las zonas. La lista
-          se actualiza al instante.
-        </p>
+        <p className="text-sm text-gris-600 mb-3">{blurb}</p>
         <UserDataForm
           inputs={inputs}
           dispatch={dispatch}
           validation={validation}
           currentYear={currentYear}
           mode={mode}
+          sport={sport}
         />
       </div>
     </details>

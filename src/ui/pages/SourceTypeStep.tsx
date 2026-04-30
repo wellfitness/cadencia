@@ -1,25 +1,38 @@
-import { SourceSelector, type RouteSourceChoice } from '@ui/components/SourceSelector';
+import type { Sport } from '@core/user';
+import { SourceSelector, type TypeChoice } from '@ui/components/SourceSelector';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 
 export interface SourceTypeStepProps {
-  /** Se llama al elegir una de las dos opciones. Avanza el wizard al siguiente paso. */
-  onSelect: (choice: RouteSourceChoice) => void;
+  /** Deporte recordado de sesion previa (si lo hay). Default 'bike'. */
+  defaultSport?: Sport;
+  /**
+   * Se llama al elegir una de las cards: capta deporte + tipo de fuente en
+   * un solo click. Avanza el wizard al siguiente paso.
+   */
+  onSelect: (choice: TypeChoice) => void;
 }
 
 /**
- * Primer paso del wizard: el usuario elige si va a entrenar con una ruta
- * GPX exterior o construir una sesion indoor cycling. Al pulsar una de las
- * dos cards el wizard avanza directamente al paso "Datos" — sin boton
- * intermedio para no añadir un click innecesario.
+ * Primer paso del wizard: el usuario elige DOS cosas en la misma pantalla:
+ *   1. Deporte (bici / running) via toggle.
+ *   2. Tipo de fuente (ruta GPX exterior / sesion por bloques) via card.
+ * Al pulsar una de las dos cards el wizard avanza directamente al paso
+ * "Datos" — sin boton intermedio para no añadir un click innecesario.
  */
-export function SourceTypeStep({ onSelect }: SourceTypeStepProps): JSX.Element {
+export function SourceTypeStep({
+  defaultSport,
+  onSelect,
+}: SourceTypeStepProps): JSX.Element {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 md:py-10 pb-10">
       <WizardStepHeading
-        title="Elige tu modalidad"
-        subtitle="Decide si vas a entrenar con una ruta exterior o una sesión indoor."
+        title="¿Qué vas a hacer hoy?"
+        subtitle="Elige tu deporte y tipo de sesión. La lista la creamos a tu medida."
       />
-      <SourceSelector onSelect={onSelect} />
+      <SourceSelector
+        {...(defaultSport !== undefined ? { defaultSport } : {})}
+        onSelect={onSelect}
+      />
     </div>
   );
 }

@@ -73,6 +73,13 @@ export interface UserDataFormProps {
    *   se usan en la pipeline indoor, asi que no se piden.
    */
   mode?: 'gpx' | 'session';
+  /**
+   * Deporte. Cuando es 'run', NO se renderizan ni el bloque de bici ni el
+   * disclosure de FTP/potenciometro: el runner solo aporta FC max (o
+   * birthYear+sex). Default 'bike' por retrocompat con flujos antes de la
+   * extension a running.
+   */
+  sport?: 'bike' | 'run';
 }
 
 /**
@@ -90,10 +97,15 @@ export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
       currentYear,
       showAllErrors = false,
       mode = 'gpx',
+      sport = 'bike',
     },
     ref,
   ): JSX.Element {
     const isSession = mode === 'session';
+    const isRun = sport === 'run';
+    // En running NO pedimos bici (no aplica) ni FTP (Stryd/COROS Pod son
+    // nicho elite — la app no los soporta y no los menciona como opcion).
+    const hideBikeBlock = isSession || isRun;
     const [internalShowAllErrors] = useState(showAllErrors);
     const showVacios = showAllErrors || internalShowAllErrors;
 
@@ -265,10 +277,10 @@ export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
             debajo, full-width, para no dejar hueco visual con la columna izquierda. === */}
         <div
           className={`grid grid-cols-1 ${
-            !isSession ? 'lg:grid-cols-2' : ''
+            !hideBikeBlock ? 'lg:grid-cols-2' : ''
           } gap-3 md:gap-4 lg:gap-6 items-start`}
         >
-          {!isSession && (
+          {!hideBikeBlock && (
             <Card title="Bici y peso" titleIcon="directions_bike">
               <div className="space-y-3">
                 <div
@@ -468,41 +480,45 @@ export const UserDataForm = forwardRef<UserDataFormHandle, UserDataFormProps>(
         </div>
 
         {/* === Accordion FTP (P5), full-width fuera del grid para no
-            dejar hueco visual cuando la columna izquierda termina antes. === */}
-        <details
-          ref={ftpDetailsRef}
-          className="group rounded-xl border border-gris-200 bg-white p-3 md:p-5 open:border-turquesa-300 motion-safe:transition-colors motion-safe:duration-200"
-          {...(ftpOpen ? { open: true } : {})}
-          onToggle={handleFtpToggle}
-        >
-          <summary className="flex cursor-pointer items-center gap-2 text-base md:text-lg font-semibold text-gris-800 select-none min-h-[44px]">
-            <MaterialIcon name="bolt" size="small" className="text-turquesa-600" />
-            ¿Tienes potenciómetro? Mete tu FTP
-            <MaterialIcon
-              name="expand_more"
-              size="small"
-              className="ml-auto text-gris-500 motion-safe:transition-transform motion-safe:duration-200 group-open:rotate-180"
-            />
-          </summary>
-          <div className="mt-3 pt-3 border-t border-gris-100 space-y-2 motion-safe:animate-fade-in">
-            <p className="text-sm text-gris-600">
-              Con FTP afinamos las zonas con Coggan. Sin esto usamos tu FC.
-            </p>
-            <Input
-              ref={ftpRef}
-              label="FTP"
-              hideLabel
-              type="number"
-              step="1"
-              min={VALIDATION_LIMITS.ftpWatts.min}
-              max={VALIDATION_LIMITS.ftpWatts.max}
-              unit="W"
-              value={numberToInputValue(inputs.ftpWatts)}
-              onChange={setField('ftpWatts')}
-              {...fieldFeedback(['FTP_OUT_OF_RANGE'], 'Functional Threshold Power.')}
-            />
-          </div>
-        </details>
+            dejar hueco visual cuando la columna izquierda termina antes.
+            Se omite por completo en running: el runner promedio no usa FTP
+            ni potenciometro (Stryd/COROS Pod son nicho elite, no soportados). === */}
+        {!isRun && (
+          <details
+            ref={ftpDetailsRef}
+            className="group rounded-xl border border-gris-200 bg-white p-3 md:p-5 open:border-turquesa-300 motion-safe:transition-colors motion-safe:duration-200"
+            {...(ftpOpen ? { open: true } : {})}
+            onToggle={handleFtpToggle}
+          >
+            <summary className="flex cursor-pointer items-center gap-2 text-base md:text-lg font-semibold text-gris-800 select-none min-h-[44px]">
+              <MaterialIcon name="bolt" size="small" className="text-turquesa-600" />
+              ¿Tienes potenciómetro? Mete tu FTP
+              <MaterialIcon
+                name="expand_more"
+                size="small"
+                className="ml-auto text-gris-500 motion-safe:transition-transform motion-safe:duration-200 group-open:rotate-180"
+              />
+            </summary>
+            <div className="mt-3 pt-3 border-t border-gris-100 space-y-2 motion-safe:animate-fade-in">
+              <p className="text-sm text-gris-600">
+                Con FTP afinamos las zonas con Coggan. Sin esto usamos tu FC.
+              </p>
+              <Input
+                ref={ftpRef}
+                label="FTP"
+                hideLabel
+                type="number"
+                step="1"
+                min={VALIDATION_LIMITS.ftpWatts.min}
+                max={VALIDATION_LIMITS.ftpWatts.max}
+                unit="W"
+                value={numberToInputValue(inputs.ftpWatts)}
+                onChange={setField('ftpWatts')}
+                {...fieldFeedback(['FTP_OUT_OF_RANGE'], 'Functional Threshold Power.')}
+              />
+            </div>
+          </details>
+        )}
 
         {globalNeedHrError && showVacios && !isSession && (
           <Card variant="info" title="Faltan datos para calcular las zonas" titleIcon="info">
