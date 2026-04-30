@@ -77,7 +77,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
-Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect).
+Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con tabs nativo/listas-propias y persistencia automática), `MyAccountPage` (`/cuenta`, vista consolidada de todos los datos guardados del usuario), `HelpRouter` (`/ayuda/*`).
 
 El estado **ephemeral** del wizard (paso actual, ruta procesada, lista casada, índices reemplazados, etc.) persiste en `sessionStorage` (`@ui/state/wizardStorage`) para sobrevivir al redirect del OAuth de Spotify (full page navigation a `/callback`). El estado **duradero** del usuario (inputs fisiológicos, preferencias musicales, sesiones guardadas) vive en `localStorage` vía `@ui/state/cadenciaStore` y se sincroniza opcionalmente con Google Drive (ver "Sincronización opcional con Google Drive" más abajo).
 
@@ -113,6 +113,10 @@ src/
       richness.ts             # calculateDataRichness, isEmptyData (anti-regresión)
     sessions/                 # CRUD de sesiones guardadas por el usuario
       saved.ts                # createSavedSession, list, get, update, delete (tombstone)
+    csvs/                     # CRUD de catalogo personal del usuario
+      uploadedCsvs.ts         # createUploadedCsv (tombstones), list, get, update, delete
+      dismissed.ts            # add/removeDismissedUri, isDismissed, clearAllDismissed
+      nativeCatalogPrefs.ts   # set/getNativeCatalogPrefs, addExcludedUri, etc.
 
   integrations/
     spotify/                  # OAuth PKCE + endpoints search/playlists/items
@@ -129,7 +133,8 @@ src/
       sync/                   # GoogleSyncCard, SyncStatusBadge
       …                       # Resto: Stepper, Card, FileDropzone, ZoneBadge, Charts, etc.
     pages/                    # Landing, SourceTypeStep, UserDataStep, RouteStep, MusicStep,
-                              # ResultStep, SessionBuilder, SessionTVMode, SpotifyCallback
+                              # ResultStep, SessionBuilder, SessionTVMode, SpotifyCallback,
+                              # CatalogEditorPage (/catalogo), MyAccountPage (/cuenta)
     state/                    # cadenciaStore (single source of truth localStorage),
                               # wizardStorage (sessionStorage para wizard ephemeral),
                               # userInputsReducer, migrateLegacyStorage
@@ -418,12 +423,14 @@ Para que el usuario pueda llevar sus datos entre el móvil y el ordenador sin re
 - `userInputs`: peso, FTP, FCmáx, FC reposo, año de nacimiento, sexo biológico, tipo y peso de bici.
 - `musicPreferences`: géneros preferidos, semilla de generación, "todo con energía", modo de fuente.
 - `savedSessions`: planes de sesión indoor que el usuario haya guardado con un nombre desde el botón "Guardar como mi sesión" en `SessionBuilder`.
+- `uploadedCsvs`: listas CSV propias subidas por el usuario. Persistimos el `csvText` raw (re-parseable con `parseTrackCsv` en cada device) en lugar de los tracks parseados — más compacto, source-of-truth honesta y resistente a cambios futuros del catálogo de Spotify.
+- `nativeCatalogPrefs`: denylist (`excludedUris`) de canciones del catálogo nativo desmarcadas en `CatalogEditorPage`. Modelo denylist en lugar de allowlist porque típicamente <50 URIs vs 800.
+- `dismissedTrackUris`: URIs descartadas globalmente desde el botón "X" de `ResultStep` ("A pedalear"). Aplicables a cualquier source. El livePool del wizard las filtra antes del matching.
 
 **Qué NO se sincroniza** (deliberadamente):
 
 - Estado del wizard ephemeral (paso actual, ruta procesada, lista casada, índices reemplazados): vive solo en `sessionStorage` y se borra al cerrar la pestaña. No tiene sentido sincronizarlo.
 - GPX subidos: pueden ser MB; el usuario ya los tiene en Strava/Komoot.
-- CSVs de música propios: futuro (Fase 3 del plan original).
 - Tokens de Spotify ni de Drive: nunca se exfiltran.
 
 **Arquitectura del motor de sync**:
@@ -435,15 +442,25 @@ Para que el usuario pueda llevar sus datos entre el móvil y el ordenador sin re
 export interface SyncedData {
   schemaVersion: 1;
   updatedAt: string;
-  _sectionMeta: { userInputs?: SectionMeta; musicPreferences?: SectionMeta; savedSessions?: SectionMeta };
+  _sectionMeta: {
+    userInputs?: SectionMeta;
+    musicPreferences?: SectionMeta;
+    savedSessions?: SectionMeta;
+    uploadedCsvs?: SectionMeta;
+    nativeCatalogPrefs?: SectionMeta;
+    dismissedTrackUris?: SectionMeta;
+  };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
   savedSessions: SavedSession[];
+  uploadedCsvs: UploadedCsvRecord[];
+  nativeCatalogPrefs: NativeCatalogPrefs | null;
+  dismissedTrackUris: string[];
 }
 ```
 
-- **Atomic LWW por sección** (`userInputs`, `musicPreferences`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
-- **Array merge por id con tombstones** (`savedSessions`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
+- **Atomic LWW por sección** (`userInputs`, `musicPreferences`, `nativeCatalogPrefs`, `dismissedTrackUris`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
+- **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
 - **Anti-regresión**: si local está vacío y remote tiene datos, aplica remote sin merge. Si local tiene <30% de la riqueza de remote (instalación nueva), también aplica remote directo.
 - **Anti-ciclo**: flag `_applyingRemote` evita que `pull` dispare `push` tras actualizar `cadenciaStore` con datos descargados.
 

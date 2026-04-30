@@ -14,7 +14,15 @@ const FAQS: readonly FaqItem[] = [
   },
   {
     q: '¿Qué se sincroniza exactamente?',
-    a: 'Solo tres cosas: (1) tus inputs fisiológicos: peso, FTP, FC máxima, FC reposo, año de nacimiento, sexo biológico, tipo y peso de bici. (2) Tus preferencias musicales: géneros favoritos, semilla de aleatorización, opción "Todo con energía". (3) Las sesiones que has guardado con un nombre desde el constructor de sesiones (botón "Guardar como mi sesión"). Nada más: ni tus rutas GPX, ni las playlists generadas, ni nada que envíes a Spotify.',
+    a: 'Seis cosas, todas tuyas: (1) tus inputs fisiológicos: peso, FTP, FC máxima, FC reposo, año de nacimiento, sexo, tipo y peso de bici. (2) Tus preferencias musicales: géneros favoritos, semilla de aleatorización, "Todo con energía". (3) Las sesiones indoor que guardaste con nombre desde el constructor (botón "Guardar como mi sesión"). (4) Las listas CSV de Spotify que has subido (Exportify). (5) Las personalizaciones del catálogo nativo (canciones desmarcadas en el editor). (6) Las canciones descartadas globalmente desde el botón "X" del paso "A pedalear". Nada más: ni tus rutas GPX, ni las playlists generadas, ni nada que envíes a Spotify.',
+  },
+  {
+    q: '¿Cómo descartar canciones que no me gustan?',
+    a: 'En el paso "A pedalear" (paso 5), cada canción tiene tres botones bajo el track: "Aleatorio" (sustituir por otra al azar), "Otro tema" (elegir manualmente de un dropdown) y "No la quiero" (descartar permanentemente). El botón "No la quiero" pide confirmación y luego: (a) la guarda en tu lista de descartes globales (sincronizada con Drive), (b) sustituye automáticamente el slot afectado con otra canción del catálogo, y (c) la canción descartada NO volverá a aparecer en futuras playlists. Puedes recuperarla cuando quieras desde Mi cuenta → Canciones descartadas.',
+  },
+  {
+    q: '¿Mis listas CSV propias se guardan también?',
+    a: 'Sí, desde Fase E (mayo 2026). Cuando subes un CSV en el paso "Música" o desde el editor del catálogo, Cadencia guarda el TEXTO del CSV en tu cadenciaStore (localStorage) y, si tienes Drive conectado, lo sincroniza con tu Drive privado. Tamaño típico: 50-300 KB por lista. Si subes la misma lista en dos dispositivos diferentes, ambas conviven (no se mergean — cada subida tiene su propio ID). Para borrar una lista: en /catalogo tab "Mis listas" o en /cuenta. La eliminación se propaga vía sync.',
   },
   {
     q: '¿Dónde se guardan los datos? ¿Los puede ver alguien?',
