@@ -473,7 +473,7 @@ function MyListsTab(): JSX.Element {
           <MaterialIcon name="library_music" size="large" className="text-gris-400 mb-2" />
           <p className="text-sm">No has subido ninguna lista todavía.</p>
           <p className="text-xs mt-2 text-gris-500">
-            Sube un CSV de Spotify para tener canciones tuyas en futuras playlists.
+            Sube un CSV de Spotify para tener canciones tuyas en futuras listas.
           </p>
         </div>
       ) : (
@@ -525,7 +525,7 @@ function MyListsTab(): JSX.Element {
           <>
             <p>
               <strong>"{pendingDelete?.name ?? ''}"</strong> se eliminará de tus
-              listas y dejará de estar disponible en futuras playlists.
+              listas y dejará de estar disponible en futuras sesiones.
             </p>
             <p className="mt-2 text-gris-600">
               Si tienes Drive conectado, el cambio se sincronizará a tus otros dispositivos.

@@ -92,7 +92,7 @@ export function MyAccountPage({ onClose }: MyAccountPageProps): JSX.Element {
           <>
             <p>
               Se borrarán <strong>todos tus datos de Cadencia</strong> en este
-              dispositivo: datos físicos, preferencias musicales, sesiones
+              dispositivo: peso, FTP, FC, preferencias musicales, sesiones
               guardadas, listas subidas, canciones descartadas y personalizaciones
               del catálogo.
             </p>
@@ -129,11 +129,11 @@ function UserDataSection({ data }: SectionProps): JSX.Element {
   const u = data.userInputs;
   const isEmpty = u === null || Object.values(u).every((v) => v === null);
   return (
-    <Card title="Mis datos físicos" titleIcon="person">
+    <Card title="Mis datos" titleIcon="person">
       {isEmpty ? (
         <EmptyHint
           icon="info"
-          text="No has guardado ningún dato físico todavía. Rellénalos en el primer paso del wizard."
+          text="No has guardado ningún dato todavía. Rellénalos al empezar una sesión, en el paso «Datos»."
         />
       ) : (
         <dl className="grid grid-cols-2 md:grid-cols-3 gap-y-2 gap-x-4 text-sm">
@@ -153,16 +153,6 @@ function UserDataSection({ data }: SectionProps): JSX.Element {
           />
         </dl>
       )}
-      <div className="mt-3 flex justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
-          iconLeft="edit"
-          onClick={() => navigateInApp('/')}
-        >
-          Editar en el wizard
-        </Button>
-      </div>
     </Card>
   );
 }
@@ -302,7 +292,7 @@ function UploadedCsvsSection({ data }: SectionProps): JSX.Element {
       {lists.length === 0 ? (
         <EmptyHint
           icon="upload_file"
-          text="No has subido ninguna lista. Súbelas desde el editor de catálogo o el paso «Música» del wizard."
+          text="No has subido ninguna lista. Súbelas desde el editor de catálogo o desde el paso «Música» de una sesión."
         />
       ) : (
         <ul className="space-y-2">
@@ -368,7 +358,7 @@ function DismissedTracksSection({ data }: SectionProps): JSX.Element {
           <p className="text-xs text-gris-500 mb-2">
             {dismissed.length}{' '}
             {dismissed.length === 1 ? 'canción' : 'canciones'} no aparecerán en
-            futuras playlists. Pulsa «Recuperar» para devolverla al catálogo.
+            futuras listas. Pulsa «Recuperar» para devolverla al catálogo.
           </p>
           <ul className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
             {dismissed.map((uri) => {
@@ -426,7 +416,7 @@ function DismissedTracksSection({ data }: SectionProps): JSX.Element {
           <p>
             Las {dismissed.length}{' '}
             {dismissed.length === 1 ? 'canción' : 'canciones'} que descartaste
-            volverán al catálogo y podrán aparecer en futuras playlists.
+            volverán al catálogo y podrán aparecer en futuras listas.
           </p>
         }
       />
@@ -442,7 +432,7 @@ function NativeCatalogSection({ data }: SectionProps): JSX.Element {
         {excludedCount === 0 ? (
           <span className="text-gris-500">
             No has personalizado el catálogo nativo. Todas sus canciones están
-            disponibles para tus playlists.
+            disponibles para tus listas.
           </span>
         ) : (
           <>

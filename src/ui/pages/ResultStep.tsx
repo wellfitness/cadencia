@@ -532,8 +532,8 @@ export function ResultStep({
         message={
           <>
             <p>
-              <strong>"{dismissTarget?.name ?? ''}"</strong> no volverá a aparecer en
-              ninguna playlist que generes con Cadencia.
+              <strong>«{dismissTarget?.name ?? ''}»</strong> no volverá a aparecer en
+              ninguna lista que generes con Cadencia.
             </p>
             <p className="mt-2 text-gris-600">
               Puedes recuperarla más tarde desde{' '}

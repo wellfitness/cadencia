@@ -14,15 +14,15 @@ const FAQS: readonly FaqItem[] = [
   },
   {
     q: '¿Qué se sincroniza exactamente?',
-    a: 'Seis cosas, todas tuyas: (1) tus inputs fisiológicos: peso, FTP, FC máxima, FC reposo, año de nacimiento, sexo, tipo y peso de bici. (2) Tus preferencias musicales: géneros favoritos, semilla de aleatorización, "Todo con energía". (3) Las sesiones indoor que guardaste con nombre desde el constructor (botón "Guardar como mi sesión"). (4) Las listas CSV de Spotify que has subido (Exportify). (5) Las personalizaciones del catálogo nativo (canciones desmarcadas en el editor). (6) Las canciones descartadas globalmente desde el botón "X" del paso "A pedalear". Nada más: ni tus rutas GPX, ni las playlists generadas, ni nada que envíes a Spotify.',
+    a: 'Seis cosas, todas tuyas: (1) tus datos fisiológicos: peso, FTP, FC máxima, FC reposo, año de nacimiento, sexo, tipo y peso de bici. (2) Tus preferencias musicales: géneros favoritos, semilla de aleatorización, «Todo con energía». (3) Las sesiones indoor que guardaste con nombre desde el constructor («Guardar como mi sesión»). (4) Las listas CSV de Spotify que has subido (Exportify). (5) Las personalizaciones del catálogo nativo (canciones desmarcadas en el editor). (6) Las canciones descartadas globalmente desde el botón «No la quiero» del paso «A pedalear». Nada más: ni tus rutas GPX, ni las listas generadas en Spotify, ni nada que envíes a Spotify.',
   },
   {
     q: '¿Cómo descartar canciones que no me gustan?',
-    a: 'En el paso "A pedalear" (paso 5), cada canción tiene tres botones bajo el track: "Aleatorio" (sustituir por otra al azar), "Otro tema" (elegir manualmente de un dropdown) y "No la quiero" (descartar permanentemente). El botón "No la quiero" pide confirmación y luego: (a) la guarda en tu lista de descartes globales (sincronizada con Drive), (b) sustituye automáticamente el slot afectado con otra canción del catálogo, y (c) la canción descartada NO volverá a aparecer en futuras playlists. Puedes recuperarla cuando quieras desde Mi cuenta → Canciones descartadas.',
+    a: 'En el paso «A pedalear» (paso 5), cada canción tiene tres botones debajo: «Aleatorio» (sustituir por otra al azar), «Otro tema» (elegir manualmente de un menú) y «No la quiero» (descartar permanentemente). El botón «No la quiero» pide confirmación y luego: (a) la guarda en tu lista de descartes globales (sincronizada con Drive), (b) sustituye automáticamente el hueco con otra canción del catálogo, y (c) la canción descartada NO volverá a aparecer en futuras listas. Puedes recuperarla cuando quieras desde Mi cuenta → Canciones descartadas.',
   },
   {
     q: '¿Mis listas CSV propias se guardan también?',
-    a: 'Sí, desde Fase E (mayo 2026). Cuando subes un CSV en el paso "Música" o desde el editor del catálogo, Cadencia guarda el TEXTO del CSV en tu cadenciaStore (localStorage) y, si tienes Drive conectado, lo sincroniza con tu Drive privado. Tamaño típico: 50-300 KB por lista. Si subes la misma lista en dos dispositivos diferentes, ambas conviven (no se mergean — cada subida tiene su propio ID). Para borrar una lista: en /catalogo tab "Mis listas" o en /cuenta. La eliminación se propaga vía sync.',
+    a: 'Sí. Cuando subes un CSV en el paso «Música» o desde el editor del catálogo, Cadencia guarda el texto del CSV en este dispositivo y, si tienes Drive conectado, lo sincroniza con tu Drive privado. Tamaño típico: 50-300 KB por lista. Si subes la misma lista en dos dispositivos distintos, ambas conviven como entradas independientes. Para borrar una lista: en el editor del catálogo, pestaña «Mis listas», o desde «Mi cuenta».',
   },
   {
     q: '¿Dónde se guardan los datos? ¿Los puede ver alguien?',
@@ -30,7 +30,7 @@ const FAQS: readonly FaqItem[] = [
   },
   {
     q: '¿Cómo conecto Drive?',
-    a: 'En el paso "Datos" del wizard, busca la tarjeta "Sincronizar con Google Drive" y pulsa "Conectar mi Google Drive". Se abrirá un popup oficial de Google donde te pedirá autorizar a Cadencia el acceso a su carpeta privada (drive.appdata). Acepta y listo: el badge cambia a "Sincronizado" y a partir de ese momento todos tus cambios se subirán automáticamente.',
+    a: 'Ve a "Mi cuenta" desde el pie de la página o el menú, busca la tarjeta "Sincronizar entre dispositivos" y pulsa "Conectar mi Google Drive". Se abrirá una ventana emergente oficial de Google donde te pedirá autorizar a Cadencia el acceso a su carpeta privada (drive.appdata). Acepta y listo: la etiqueta cambia a "Sincronizado" y a partir de ese momento todos tus cambios se subirán automáticamente.',
   },
   {
     q: '¿Cuándo se sincroniza?',
@@ -46,7 +46,7 @@ const FAQS: readonly FaqItem[] = [
   },
   {
     q: '¿Por qué un permiso tan pequeño? ¿No podría acceder a más cosas?',
-    a: 'Es deliberado. Cadencia solo pide el scope drive.appdata, que es el más restrictivo: limita el acceso a una carpeta oculta y exclusiva de la app. NO podemos leer tus documentos, fotos, hojas de cálculo ni ningún otro archivo de tu Drive. Cuando autorizas, Google te lo deja bien claro en el popup.',
+    a: 'Es deliberado. Cadencia solo pide el permiso drive.appdata, que es el más restrictivo: limita el acceso a una carpeta oculta y exclusiva de la aplicación. NO podemos leer tus documentos, fotos, hojas de cálculo ni ningún otro archivo de tu Drive. Cuando autorizas, Google te lo deja bien claro en la ventana de consentimiento.',
   },
   {
     q: '¿Cuánto espacio ocupa en mi Drive?',
@@ -88,21 +88,21 @@ export function SincronizarDriveArticle(): JSX.Element {
 
       <Card title="Cómo activar la sincronización" titleIcon="cloud_sync">
         <ol className="list-decimal list-inside space-y-2 text-sm text-gris-700 leading-relaxed">
-          <li>Abre Cadencia y avanza al paso 1 (Datos).</li>
+          <li>Abre Cadencia y entra a <strong>«Mi cuenta»</strong> desde el pie de página.</li>
           <li>
-            Localiza la tarjeta <strong>"Sincronizar con Google Drive"</strong> al
-            final del formulario.
+            Localiza la tarjeta <strong>«Sincronizar entre dispositivos»</strong> en
+            la parte superior.
           </li>
           <li>
-            Pulsa <strong>"Conectar mi Google Drive"</strong>. Google abrirá un
-            popup oficial.
+            Pulsa <strong>«Conectar mi Google Drive»</strong>. Google abrirá una
+            ventana emergente oficial.
           </li>
           <li>
             Acepta el permiso <code>drive.appdata</code> (acceso solo a la carpeta
-            privada de la app, no al resto de tu Drive).
+            privada de la aplicación, no al resto de tu Drive).
           </li>
           <li>
-            El badge cambia a <strong>"Sincronizado"</strong>. A partir de ahora,
+            La etiqueta cambia a <strong>«Sincronizado»</strong>. A partir de ahora,
             todo se sincroniza automáticamente en segundo plano.
           </li>
         </ol>
