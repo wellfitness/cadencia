@@ -1,9 +1,22 @@
-import { useEffect, useId, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { loadNativeTracks, serializeTracksToCsv, type Track } from '@core/tracks';
 import { Button } from '@ui/components/Button';
+import { ConfirmDialog } from '@ui/components/ConfirmDialog';
+import { FileDropzone } from '@ui/components/FileDropzone';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TrackPreviewButton } from '@ui/components/TrackPreviewButton';
+import { SyncStatusBadge } from '@ui/components/sync/SyncStatusBadge';
 import { downloadTextFile } from '@ui/utils/downloadFile';
+import {
+  getNativeCatalogPrefs,
+  setNativeCatalogPrefs,
+} from '@core/csvs/nativeCatalogPrefs';
+import {
+  createUploadedCsv,
+  deleteUploadedCsv,
+} from '@core/csvs/uploadedCsvs';
+import { useCadenciaData } from '@ui/state/cadenciaStore';
+import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
 
 export interface CatalogEditorPageProps {
   /** Callback que vuelve al wizard. Lo inyecta App tras detectar la ruta. */
@@ -25,13 +38,35 @@ export interface CatalogEditorPageProps {
  * usuario cierra sin descargar, las marcas se pierden. Coherente con que
  * los CSVs subidos tampoco se persisten en `App` (solo viven en memoria).
  */
+type Tab = 'native' | 'mine';
+
+function readInitialTab(): Tab {
+  if (typeof window === 'undefined') return 'native';
+  const params = new URLSearchParams(window.location.search);
+  return params.get('tab') === 'mine' ? 'mine' : 'native';
+}
+
 export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Element {
   const allTracks = useMemo(() => loadNativeTracks(), []);
   const totalCount = allTracks.length;
 
-  const [included, setIncluded] = useState<ReadonlySet<string>>(
-    () => new Set(allTracks.map((t) => t.uri)),
-  );
+  const [activeTab, setActiveTab] = useState<Tab>(() => readInitialTab());
+
+  // Hidratar `included` desde la denylist persistida: incluido = NO esta
+  // en excludedUris. Modelo runtime sigue siendo allowlist (mas ergonomico
+  // para la UI: "marcada = me la quedo"), pero la fuente de verdad
+  // persistente es denylist (mas compacta).
+  const [included, setIncluded] = useState<ReadonlySet<string>>(() => {
+    const persistedExcluded = new Set(getNativeCatalogPrefs()?.excludedUris ?? []);
+    return new Set(
+      allTracks.filter((t) => !persistedExcluded.has(t.uri)).map((t) => t.uri),
+    );
+  });
+  // Estado UI del save: 'idle' por defecto, 'saving' durante el debounce,
+  // 'saved' tras escribir al store. Auto-vuelve a 'idle' tras 1.5s.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [searchText, setSearchText] = useState<string>('');
   const [selectedSources, setSelectedSources] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -46,6 +81,36 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
     document.title = 'Personalizar catálogo · Cadencia';
     return () => {
       document.title = previous;
+    };
+  }, []);
+
+  // Auto-save debounceado del estado included -> denylist persistente.
+  // 300ms de espera para agrupar toggles rapidos en un solo push a Drive.
+  // En el primer mount NO disparamos save (initialMount.current bloquea):
+  // hidratar desde el store ya nos da el estado correcto, escribir igual
+  // al store seria un no-op que ademas dispararia un push innecesario.
+  const initialMount = useRef(true);
+  useEffect(() => {
+    if (initialMount.current) {
+      initialMount.current = false;
+      return;
+    }
+    setSaveStatus('saving');
+    const id = setTimeout(() => {
+      const excludedUris = allTracks
+        .filter((t) => !included.has(t.uri))
+        .map((t) => t.uri);
+      setNativeCatalogPrefs({ excludedUris });
+      setSaveStatus('saved');
+      if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
+    }, 300);
+    return () => clearTimeout(id);
+  }, [included, allTracks]);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
     };
   }, []);
 
@@ -180,88 +245,294 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-lg md:text-xl font-display font-bold text-gris-900 truncate">
-                Personalizar catálogo nativo
+                Personalizar catálogo
               </h1>
-              <p className="text-xs text-gris-500 truncate">
-                Desmarca lo que no te encaje y descarga tu CSV propio.
+              <p className="text-xs text-gris-500 truncate flex items-center gap-1.5">
+                <SaveStatusIndicator status={saveStatus} />
               </p>
             </div>
-            <Button
-              variant="primary"
-              iconLeft="download"
-              onClick={handleDownload}
-              disabled={includedCount === 0}
-              fullWidth
-              className="md:w-auto"
-            >
-              Descargar CSV ({includedCount})
-            </Button>
+            {activeTab === 'native' && (
+              <Button
+                variant="secondary"
+                iconLeft="download"
+                onClick={handleDownload}
+                disabled={includedCount === 0}
+                fullWidth
+                className="md:w-auto"
+              >
+                Exportar CSV ({includedCount})
+              </Button>
+            )}
           </div>
 
-          {/* Fila 2: progreso visual del allowlist. Comunica de un vistazo
-              cuántas siguen marcadas, cuántas se descartan y el % global. */}
-          <AllowlistProgress
-            includedCount={includedCount}
-            excludedCount={excludedCount}
-            totalCount={totalCount}
-            includedPct={includedPct}
-            visibleCount={visibleCount}
-            filtersActive={filtersActive}
-          />
+          {/* Tabs: cataogo nativo (denylist persistente con autoguardado) */}
+          {/* vs mis listas (uploadedCsvs persistentes). */}
+          <div className="flex gap-1 border-b border-gris-200" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'native'}
+              onClick={() => setActiveTab('native')}
+              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 ${
+                activeTab === 'native'
+                  ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+                  : 'text-gris-600 hover:text-gris-800'
+              }`}
+            >
+              <MaterialIcon name="library_music" size="small" />
+              Catálogo nativo · {includedCount}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'mine'}
+              onClick={() => setActiveTab('mine')}
+              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 ${
+                activeTab === 'mine'
+                  ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+                  : 'text-gris-600 hover:text-gris-800'
+              }`}
+            >
+              <MaterialIcon name="upload_file" size="small" />
+              Mis listas
+            </button>
+          </div>
 
-          {/* Filtros + acciones masivas, plegables en móvil para no saturar
-              el header sticky. En desktop quedan abiertos por defecto. */}
-          <FiltersPanel
-            searchText={searchText}
-            onSearchTextChange={setSearchText}
-            allSources={allSources}
-            selectedSources={selectedSources}
-            onToggleSource={toggleSource}
-            bpmMin={bpmMin}
-            bpmMax={bpmMax}
-            onBpmMinChange={setBpmMin}
-            onBpmMaxChange={setBpmMax}
-            filtersActive={filtersActive}
-            onClearFilters={clearFilters}
-            visibleCount={visibleCount}
-            visibleIncludedCount={visibleIncludedCount}
-            onMarkAllVisible={markAllVisible}
-            onUnmarkAllVisible={unmarkAllVisible}
-          />
+          {/* Filas siguientes solo aplican al tab nativo (progreso y filtros) */}
+          {activeTab === 'native' && (
+            <>
+              <AllowlistProgress
+                includedCount={includedCount}
+                excludedCount={excludedCount}
+                totalCount={totalCount}
+                includedPct={includedPct}
+                visibleCount={visibleCount}
+                filtersActive={filtersActive}
+              />
+              <FiltersPanel
+                searchText={searchText}
+                onSearchTextChange={setSearchText}
+                allSources={allSources}
+                selectedSources={selectedSources}
+                onToggleSource={toggleSource}
+                bpmMin={bpmMin}
+                bpmMax={bpmMax}
+                onBpmMinChange={setBpmMin}
+                onBpmMaxChange={setBpmMax}
+                filtersActive={filtersActive}
+                onClearFilters={clearFilters}
+                visibleCount={visibleCount}
+                visibleIncludedCount={visibleIncludedCount}
+                onMarkAllVisible={markAllVisible}
+                onUnmarkAllVisible={unmarkAllVisible}
+              />
+            </>
+          )}
         </div>
       </header>
 
       <main className="flex-1">
         <div className="mx-auto w-full max-w-5xl px-4 py-4 md:py-6">
-          {visibleCount === 0 ? (
-            <EmptyState
-              filtersActive={filtersActive}
-              onClearFilters={clearFilters}
-            />
+          {activeTab === 'native' ? (
+            visibleCount === 0 ? (
+              <EmptyState
+                filtersActive={filtersActive}
+                onClearFilters={clearFilters}
+              />
+            ) : (
+              <>
+                {allVisibleUnchecked && (
+                  <AllVisibleUncheckedBanner onMarkAllVisible={markAllVisible} />
+                )}
+                <ul
+                  className="space-y-1.5 md:space-y-1"
+                  role="list"
+                  aria-label={`${visibleCount} canciones`}
+                >
+                  {filteredTracks.map((t) => (
+                    <li key={t.uri}>
+                      <TrackRow
+                        track={t}
+                        checked={included.has(t.uri)}
+                        onToggle={() => toggleIncluded(t.uri)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )
           ) : (
-            <>
-              {allVisibleUnchecked && (
-                <AllVisibleUncheckedBanner onMarkAllVisible={markAllVisible} />
-              )}
-              <ul
-                className="space-y-1.5 md:space-y-1"
-                role="list"
-                aria-label={`${visibleCount} canciones`}
-              >
-                {filteredTracks.map((t) => (
-                  <li key={t.uri}>
-                    <TrackRow
-                      track={t}
-                      checked={included.has(t.uri)}
-                      onToggle={() => toggleIncluded(t.uri)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </>
+            <MyListsTab />
           )}
         </div>
       </main>
+    </div>
+  );
+}
+
+interface SaveStatusIndicatorProps {
+  status: 'idle' | 'saving' | 'saved';
+}
+
+function SaveStatusIndicator({ status }: SaveStatusIndicatorProps): JSX.Element {
+  if (status === 'saving') {
+    return (
+      <span className="inline-flex items-center gap-1 text-tulipTree-700">
+        <MaterialIcon name="sync" size="small" />
+        <span>Guardando…</span>
+      </span>
+    );
+  }
+  if (status === 'saved') {
+    return (
+      <span className="inline-flex items-center gap-1 text-turquesa-700">
+        <MaterialIcon name="check_circle" size="small" />
+        <span>Guardado</span>
+        <SyncStatusBadge className="ml-1" />
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-gris-500">
+      <MaterialIcon name="cloud_done" size="small" />
+      <span>Tus cambios se guardan automáticamente</span>
+    </span>
+  );
+}
+
+/**
+ * Tab "Mis listas": gestion de uploadedCsvs persistentes en cadenciaStore.
+ * Subir nuevo, ver listado, borrar (con confirm).
+ */
+function MyListsTab(): JSX.Element {
+  const cadenciaData = useCadenciaData();
+  const lists = useMemo(
+    () => hydrateUploadedCsvs(cadenciaData.uploadedCsvs),
+    [cadenciaData.uploadedCsvs],
+  );
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+
+  const handleFile = async (file: File): Promise<void> => {
+    setUploadError(null);
+    try {
+      const text = await file.text();
+      // createUploadedCsv hace su propio parse para trackCount; aqui no
+      // duplicamos validacion — si el csv es invalido, trackCount sera 0
+      // y la card del listado lo mostrara.
+      createUploadedCsv({ name: file.name, csvText: text });
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Error al leer el archivo');
+    }
+  };
+
+  const handleConfirmDelete = (): void => {
+    if (!pendingDelete) return;
+    deleteUploadedCsv(pendingDelete.id);
+    setPendingDelete(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-dashed border-gris-300 bg-white p-4">
+        <h3 className="text-sm font-semibold text-gris-800 mb-2 flex items-center gap-1.5">
+          <MaterialIcon name="upload_file" size="small" className="text-turquesa-600" />
+          Subir nueva lista
+        </h3>
+        <FileDropzone
+          accept=".csv,text/csv"
+          acceptedLabel="CSV"
+          onFile={(f) => void handleFile(f)}
+          idlePrompt="Arrastra tu CSV de Spotify (Exportify) o pulsa para elegir"
+        />
+        {uploadError && (
+          <p className="mt-2 text-xs text-rosa-700" role="alert">
+            {uploadError}
+          </p>
+        )}
+        <p className="mt-2 text-xs text-gris-500">
+          ¿Cómo exportar tu lista?{' '}
+          <a
+            href="/ayuda/musica"
+            className="text-turquesa-700 hover:underline"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.href = '/ayuda/musica';
+            }}
+          >
+            Consulta la guía
+          </a>
+          .
+        </p>
+      </div>
+
+      {lists.length === 0 ? (
+        <div className="text-center text-gris-600 py-8 px-4 rounded-lg border border-dashed border-gris-300 bg-gris-50">
+          <MaterialIcon name="library_music" size="large" className="text-gris-400 mb-2" />
+          <p className="text-sm">No has subido ninguna lista todavía.</p>
+          <p className="text-xs mt-2 text-gris-500">
+            Sube un CSV de Spotify para tener canciones tuyas en futuras playlists.
+          </p>
+        </div>
+      ) : (
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3" role="list">
+          {lists.map((l) => (
+            <li
+              key={l.id}
+              className="rounded-lg border-2 border-gris-200 bg-white p-3 hover:border-turquesa-400 transition-colors"
+            >
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <h4 className="font-display text-sm md:text-base text-gris-800 leading-tight truncate">
+                  {l.name}
+                </h4>
+                <span className="text-[11px] text-gris-500 tabular-nums whitespace-nowrap">
+                  {l.trackCount} {l.trackCount === 1 ? 'canción' : 'canciones'}
+                </span>
+              </div>
+              {l.error !== undefined && (
+                <p className="text-xs text-rosa-700 mb-1" role="alert">
+                  {l.error}
+                </p>
+              )}
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingDelete({ id: l.id, name: l.name })}
+                  aria-label={`Borrar lista ${l.name}`}
+                  className="px-3 py-1.5 rounded-md border border-gris-300 text-gris-600 hover:bg-rosa-50 hover:border-rosa-300 hover:text-rosa-700 text-xs min-h-[36px] inline-flex items-center gap-1.5"
+                >
+                  <MaterialIcon name="delete_outline" size="small" />
+                  Borrar
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Borrar lista de música"
+        icon="delete_outline"
+        confirmLabel="Borrar"
+        confirmVariant="critical"
+        cancelLabel="Cancelar"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+        message={
+          <>
+            <p>
+              <strong>"{pendingDelete?.name ?? ''}"</strong> se eliminará de tus
+              listas y dejará de estar disponible en futuras playlists.
+            </p>
+            <p className="mt-2 text-gris-600">
+              Si tienes Drive conectado, el cambio se sincronizará a tus otros dispositivos.
+            </p>
+          </>
+        }
+      />
     </div>
   );
 }
