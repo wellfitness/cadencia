@@ -8,6 +8,9 @@ export function emptySyncedData(): SyncedData {
     userInputs: null,
     musicPreferences: null,
     savedSessions: [],
+    uploadedCsvs: [],
+    nativeCatalogPrefs: null,
+    dismissedTrackUris: [],
   };
 }
 

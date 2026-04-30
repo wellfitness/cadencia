@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mergeData } from './merge';
 import { emptySyncedData } from './schema';
-import type { SavedSession, SyncedData } from './types';
+import type { SavedSession, SyncedData, UploadedCsvRecord } from './types';
 import { EMPTY_USER_INPUTS } from '../user/userInputs';
 
 function session(
@@ -19,6 +19,24 @@ function session(
   };
   if (deletedAt !== undefined) s.deletedAt = deletedAt;
   return s;
+}
+
+function csv(
+  id: string,
+  name: string,
+  updatedAt: string,
+  deletedAt?: string,
+): UploadedCsvRecord {
+  const c: UploadedCsvRecord = {
+    id,
+    name,
+    csvText: 'Track URI,Name\nspotify:track:foo,Foo',
+    trackCount: 1,
+    createdAt: '2026-04-01T00:00:00Z',
+    updatedAt,
+  };
+  if (deletedAt !== undefined) c.deletedAt = deletedAt;
+  return c;
 }
 
 function userInputsAt(weightKg: number, ts: string): SyncedData {
@@ -112,5 +130,86 @@ describe('mergeData — savedSessions array merge', () => {
     ];
     const { merged } = mergeData(local, remote);
     expect(merged.savedSessions[0]?.deletedAt).toBeUndefined();
+  });
+});
+
+describe('mergeData — uploadedCsvs array merge', () => {
+  it('union: items presentes en cualquier lado aparecen en merged', () => {
+    const local = emptySyncedData();
+    local.uploadedCsvs = [csv('a', 'mi-rock.csv', '2026-04-29T10:00:00Z')];
+    local._sectionMeta.uploadedCsvs = { updatedAt: '2026-04-29T10:00:00Z' };
+    const remote = emptySyncedData();
+    remote.uploadedCsvs = [csv('b', 'mi-pop.csv', '2026-04-29T11:00:00Z')];
+    remote._sectionMeta.uploadedCsvs = { updatedAt: '2026-04-29T11:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.uploadedCsvs.map((c) => c.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('item con mismo id: LWW por updatedAt del item', () => {
+    const local = emptySyncedData();
+    local.uploadedCsvs = [csv('a', 'old-name.csv', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.uploadedCsvs = [csv('a', 'new-name.csv', '2026-04-29T11:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    expect(merged.uploadedCsvs[0]?.name).toBe('new-name.csv');
+  });
+
+  it('tombstone se propaga si tiene timestamp mayor', () => {
+    const local = emptySyncedData();
+    local.uploadedCsvs = [csv('a', 'foo.csv', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.uploadedCsvs = [
+      csv('a', 'foo.csv', '2026-04-29T11:00:00Z', '2026-04-29T11:00:00Z'),
+    ];
+    const { merged } = mergeData(local, remote);
+    expect(merged.uploadedCsvs[0]?.deletedAt).toBe('2026-04-29T11:00:00Z');
+  });
+});
+
+describe('mergeData — nativeCatalogPrefs atomic LWW', () => {
+  it('local mas reciente gana', () => {
+    const local = emptySyncedData();
+    local.nativeCatalogPrefs = { excludedUris: ['spotify:track:1'] };
+    local._sectionMeta.nativeCatalogPrefs = { updatedAt: '2026-04-29T10:00:00Z' };
+    const remote = emptySyncedData();
+    remote.nativeCatalogPrefs = { excludedUris: ['spotify:track:2'] };
+    remote._sectionMeta.nativeCatalogPrefs = { updatedAt: '2026-04-29T09:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.nativeCatalogPrefs?.excludedUris).toEqual(['spotify:track:1']);
+  });
+
+  it('remote mas reciente gana', () => {
+    const local = emptySyncedData();
+    local.nativeCatalogPrefs = { excludedUris: ['spotify:track:1'] };
+    local._sectionMeta.nativeCatalogPrefs = { updatedAt: '2026-04-29T09:00:00Z' };
+    const remote = emptySyncedData();
+    remote.nativeCatalogPrefs = { excludedUris: ['spotify:track:2'] };
+    remote._sectionMeta.nativeCatalogPrefs = { updatedAt: '2026-04-29T10:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.nativeCatalogPrefs?.excludedUris).toEqual(['spotify:track:2']);
+  });
+});
+
+describe('mergeData — dismissedTrackUris atomic LWW', () => {
+  it('local mas reciente gana sobre array completo', () => {
+    const local = emptySyncedData();
+    local.dismissedTrackUris = ['spotify:track:a', 'spotify:track:b'];
+    local._sectionMeta.dismissedTrackUris = { updatedAt: '2026-04-29T10:00:00Z' };
+    const remote = emptySyncedData();
+    remote.dismissedTrackUris = ['spotify:track:c'];
+    remote._sectionMeta.dismissedTrackUris = { updatedAt: '2026-04-29T09:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.dismissedTrackUris).toEqual(['spotify:track:a', 'spotify:track:b']);
+  });
+
+  it('remote mas reciente gana sobre array completo', () => {
+    const local = emptySyncedData();
+    local.dismissedTrackUris = ['spotify:track:a'];
+    local._sectionMeta.dismissedTrackUris = { updatedAt: '2026-04-29T09:00:00Z' };
+    const remote = emptySyncedData();
+    remote.dismissedTrackUris = ['spotify:track:b', 'spotify:track:c'];
+    remote._sectionMeta.dismissedTrackUris = { updatedAt: '2026-04-29T10:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.dismissedTrackUris).toEqual(['spotify:track:b', 'spotify:track:c']);
   });
 });

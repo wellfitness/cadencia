@@ -4,8 +4,8 @@ const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Elimina tombstones (`deletedAt` mas antiguos que TOMBSTONE_MAX_AGE_MS)
- * del array savedSessions. Devuelve un nuevo objeto si hubo cambios, el
- * mismo si no.
+ * del array savedSessions y uploadedCsvs. Devuelve un nuevo objeto si
+ * hubo cambios, el mismo si no.
  *
  * 30 dias es el plazo razonable para que cualquier dispositivo que el
  * usuario use ocasionalmente tenga oportunidad de recibir el tombstone
@@ -18,10 +18,20 @@ export function cleanExpiredTombstones(
   now: number = Date.now(),
 ): SyncedData {
   const cutoff = now - TOMBSTONE_MAX_AGE_MS;
-  const filtered = data.savedSessions.filter((s) => {
+  const filteredSessions = data.savedSessions.filter((s) => {
     if (!s.deletedAt) return true;
     return new Date(s.deletedAt).getTime() > cutoff;
   });
-  if (filtered.length === data.savedSessions.length) return data;
-  return { ...data, savedSessions: filtered };
+  const filteredCsvs = data.uploadedCsvs.filter((c) => {
+    if (!c.deletedAt) return true;
+    return new Date(c.deletedAt).getTime() > cutoff;
+  });
+  const sessionsChanged = filteredSessions.length !== data.savedSessions.length;
+  const csvsChanged = filteredCsvs.length !== data.uploadedCsvs.length;
+  if (!sessionsChanged && !csvsChanged) return data;
+  return {
+    ...data,
+    savedSessions: filteredSessions,
+    uploadedCsvs: filteredCsvs,
+  };
 }

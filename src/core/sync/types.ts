@@ -31,6 +31,45 @@ export interface SavedSession {
 }
 
 /**
+ * CSV de musica subido por el usuario, persistido y sincronizado.
+ *
+ * Guardamos el TEXTO crudo del CSV (re-parseable con `parseTrackCsv` en
+ * cada device) en vez de la lista de tracks parseados. Razones:
+ *  - Tamano manejable: un CSV de Exportify pesa 50-300 KB.
+ *  - Source of truth honesta: los datos de tempo/energy/valence quedan
+ *    fijados al momento de subir el CSV, ajenos a cambios futuros que
+ *    Spotify haga en su catalogo.
+ *  - Re-parseo determinista: parseTrackCsv aplica los mismos filtros y
+ *    normalizaciones en cualquier device.
+ */
+export interface UploadedCsvRecord {
+  /** UUID v4. Estable. */
+  id: string;
+  /** Nombre original del archivo cuando el usuario lo subio. */
+  name: string;
+  /** Texto crudo del CSV. Re-parseable con parseTrackCsv. */
+  csvText: string;
+  /** Cuantas filas validas parseo el ultimo parse (cache informativa). */
+  trackCount: number;
+  createdAt: string;
+  updatedAt: string;
+  /** Tombstone para borrado logico (mismo patron que SavedSession). */
+  deletedAt?: string;
+}
+
+/**
+ * Preferencias del editor de catalogo sobre el catalogo nativo bundled.
+ *
+ * Modelo denylist: guardamos solo las URIs que el usuario ha excluido
+ * (tipicamente <50). Mucho mas compacto que persistir 800 incluidas, y
+ * los deltas en sync son pequenos.
+ */
+export interface NativeCatalogPrefs {
+  /** URIs del catalogo nativo (all.csv) que el usuario ha desmarcado. */
+  excludedUris: string[];
+}
+
+/**
  * El blob completo que se persiste en localStorage y se sincroniza con
  * Drive. Cada seccion tiene su propio meta para LWW granular.
  */
@@ -42,10 +81,22 @@ export interface SyncedData {
     userInputs?: SectionMeta;
     musicPreferences?: SectionMeta;
     savedSessions?: SectionMeta;
+    uploadedCsvs?: SectionMeta;
+    nativeCatalogPrefs?: SectionMeta;
+    dismissedTrackUris?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
   savedSessions: SavedSession[];
+  /** Listas de musica subidas por el usuario, persistentes y sincronizadas. */
+  uploadedCsvs: UploadedCsvRecord[];
+  /** Preferencias sobre el catalogo nativo (denylist). */
+  nativeCatalogPrefs: NativeCatalogPrefs | null;
+  /**
+   * URIs de canciones descartadas globalmente desde ResultStep ("A pedalear").
+   * Se filtran del livePool antes del matching, independientemente de la fuente.
+   */
+  dismissedTrackUris: string[];
 }
 
 export type SyncStatus =

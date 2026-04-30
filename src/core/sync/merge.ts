@@ -1,4 +1,4 @@
-import type { SavedSession, SyncedData } from './types';
+import type { SavedSession, SyncedData, UploadedCsvRecord } from './types';
 import { emptySyncedData } from './schema';
 
 /**
@@ -19,7 +19,12 @@ export interface MergeResult {
   conflicts: MergeConflict[];
 }
 
-const ATOMIC_SECTIONS = ['userInputs', 'musicPreferences'] as const;
+const ATOMIC_SECTIONS = [
+  'userInputs',
+  'musicPreferences',
+  'nativeCatalogPrefs',
+  'dismissedTrackUris',
+] as const;
 type AtomicSection = (typeof ATOMIC_SECTIONS)[number];
 
 function getMetaTime(data: SyncedData, section: AtomicSection): number {
@@ -70,27 +75,50 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
   // Array merge por id, LWW por item. Tombstones (deletedAt) participan
   // como una version mas: gana la mas reciente. Una version sin deletedAt
   // mas nueva que un tombstone "resucita" el item.
-  const byId = new Map<string, SavedSession>();
-  for (const item of local.savedSessions) byId.set(item.id, item);
+  const sessionsById = new Map<string, SavedSession>();
+  for (const item of local.savedSessions) sessionsById.set(item.id, item);
   for (const remoteItem of remote.savedSessions) {
-    const localItem = byId.get(remoteItem.id);
+    const localItem = sessionsById.get(remoteItem.id);
     if (!localItem) {
-      byId.set(remoteItem.id, remoteItem);
+      sessionsById.set(remoteItem.id, remoteItem);
       continue;
     }
     const localTime = new Date(localItem.updatedAt).getTime();
     const remoteTime = new Date(remoteItem.updatedAt).getTime();
-    byId.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
+    sessionsById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
   }
-  merged.savedSessions = Array.from(byId.values());
+  merged.savedSessions = Array.from(sessionsById.values());
 
-  // Meta de la seccion: max de los item.updatedAt
   const sessionTimes = merged.savedSessions
     .map((s) => new Date(s.updatedAt).getTime())
     .filter((t) => Number.isFinite(t));
   if (sessionTimes.length > 0) {
     merged._sectionMeta.savedSessions = {
       updatedAt: new Date(Math.max(...sessionTimes)).toISOString(),
+    };
+  }
+
+  // Mismo patron de array-merge para uploadedCsvs.
+  const csvsById = new Map<string, UploadedCsvRecord>();
+  for (const item of local.uploadedCsvs) csvsById.set(item.id, item);
+  for (const remoteItem of remote.uploadedCsvs) {
+    const localItem = csvsById.get(remoteItem.id);
+    if (!localItem) {
+      csvsById.set(remoteItem.id, remoteItem);
+      continue;
+    }
+    const localTime = new Date(localItem.updatedAt).getTime();
+    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    csvsById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
+  }
+  merged.uploadedCsvs = Array.from(csvsById.values());
+
+  const csvTimes = merged.uploadedCsvs
+    .map((c) => new Date(c.updatedAt).getTime())
+    .filter((t) => Number.isFinite(t));
+  if (csvTimes.length > 0) {
+    merged._sectionMeta.uploadedCsvs = {
+      updatedAt: new Date(Math.max(...csvTimes)).toISOString(),
     };
   }
 

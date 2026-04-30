@@ -20,6 +20,11 @@ export function calculateDataRichness(data: SyncedData): number {
     score += Object.keys(data.musicPreferences).length;
   }
   score += data.savedSessions.filter((s) => !s.deletedAt).length;
+  score += data.uploadedCsvs.filter((c) => !c.deletedAt).length;
+  if (data.nativeCatalogPrefs) {
+    score += data.nativeCatalogPrefs.excludedUris.length;
+  }
+  score += data.dismissedTrackUris.length;
   return score;
 }
 
