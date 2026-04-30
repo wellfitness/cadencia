@@ -9,6 +9,8 @@ import { useCadenciaData, clearCadenciaData } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
 import { listSavedSessions, deleteSavedSession } from '@core/sessions/saved';
 import { calculateTotalDurationSec } from '@core/segmentation';
+import { expandRecurrences, type EventInstance } from '@core/calendar';
+import type { SavedSession } from '@core/sync/types';
 import { navigateInApp } from '@ui/utils/navigation';
 import { BIKE_TYPE_LABELS } from '@core/power';
 import { getTopGenres, loadNativeTracks } from '@core/tracks';
@@ -62,17 +64,19 @@ export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Elem
 
       <main className="flex-1">
         <div className="mx-auto w-full max-w-3xl px-4 py-4 md:py-6 space-y-4 md:space-y-5">
+          <UserDataSection data={data} />
+
+          <SavedSessionsSection />
+
+          <PlannedEventsSection />
+
+          <CatalogSection data={data} />
+
           <PersistenceSection data={data} />
 
           <Card title="Sincronización entre dispositivos" titleIcon="cloud_sync">
             <GoogleSyncCard />
           </Card>
-
-          <UserDataSection data={data} />
-
-          <SavedSessionsSection />
-
-          <CatalogSection data={data} />
 
           <DangerZoneSection
             onWipe={() => setConfirmWipe(true)}
@@ -356,6 +360,151 @@ function SavedSessionsSection(): JSX.Element {
       />
     </Card>
   );
+}
+
+/**
+ * Resumen del calendario de planificacion: muestra las proximas N
+ * instancias (incluyendo recurrentes expandidas) con un link a
+ * `/calendario` para gestion completa.
+ *
+ * Esta seccion es informativa: la edicion / creacion / borrado de
+ * eventos vive en `/calendario`. Aqui solo damos visibilidad rapida
+ * desde el hub de preferencias.
+ */
+function PlannedEventsSection(): JSX.Element {
+  const data = useCadenciaData();
+  // Re-deriva al cambiar el store (otros dispositivos via sync, o crear/
+  // editar/borrar en este mismo dispositivo desde /calendario).
+  const sessions = useMemo(
+    () => listSavedSessions(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data.savedSessions],
+  );
+
+  // Proximos 60 dias, primeras 5 instancias.
+  const upcoming = useMemo<EventInstance[]>(() => {
+    const today = todayLocalISOForPrefs();
+    const horizon = addDaysISOForPrefs(today, 60);
+    return expandRecurrences(data.plannedEvents, today, horizon).slice(0, 5);
+  }, [data.plannedEvents]);
+
+  const sessionsById = useMemo(() => {
+    const m = new Map<string, SavedSession>();
+    for (const s of sessions) m.set(s.id, s);
+    return m;
+  }, [sessions]);
+
+  return (
+    <Card title="Mi calendario" titleIcon="calendar_month">
+      {upcoming.length === 0 ? (
+        <EmptyHint
+          icon="event_available"
+          text="Sin entrenamientos planificados. Abre el calendario para añadir tu primera entrada."
+        />
+      ) : (
+        <ul className="space-y-2">
+          {upcoming.map((inst) => (
+            <UpcomingEventRow
+              key={`${inst.event.id}-${inst.date}`}
+              instance={inst}
+              sessionsById={sessionsById}
+            />
+          ))}
+        </ul>
+      )}
+      <div className="mt-3 flex justify-end">
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft="open_in_new"
+          onClick={() => navigateInApp('/calendario')}
+        >
+          Abrir calendario
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+function UpcomingEventRow({
+  instance,
+  sessionsById,
+}: {
+  instance: EventInstance;
+  sessionsById: Map<string, SavedSession>;
+}): JSX.Element {
+  const { event, date, isRecurringInstance } = instance;
+  const isIndoor = event.type === 'indoor';
+  const session = isIndoor ? sessionsById.get(event.savedSessionId) : null;
+  const sessionDeleted = isIndoor && !session;
+  const title = isIndoor ? (sessionDeleted ? 'Sesión borrada' : (session?.name ?? '')) : event.name;
+  const dateLabel = formatShortDateForPrefs(date);
+
+  return (
+    <li className="flex items-center justify-between gap-2 p-2.5 rounded-md border border-gris-200">
+      <div className="flex items-start gap-2 flex-1 min-w-0">
+        <MaterialIcon
+          name={isIndoor ? 'directions_bike' : 'map'}
+          size="small"
+          className={`${isIndoor ? 'text-turquesa-600' : 'text-tulipTree-600'} mt-0.5 shrink-0`}
+        />
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-sm font-semibold truncate ${
+              sessionDeleted ? 'text-rosa-700' : 'text-gris-800'
+            }`}
+          >
+            {title}
+            {isRecurringInstance && (
+              <MaterialIcon
+                name="repeat"
+                size="small"
+                className="inline ml-1 text-tulipTree-600"
+              />
+            )}
+          </p>
+          <p className="text-xs text-gris-500">{dateLabel}</p>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function todayLocalISOForPrefs(): string {
+  const d = new Date();
+  const y = d.getFullYear().toString().padStart(4, '0');
+  const m = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDaysISOForPrefs(iso: string, delta: number): string {
+  const parts = iso.split('-');
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  const date = new Date(y, m - 1, d + delta);
+  const yy = date.getFullYear().toString().padStart(4, '0');
+  const mm = (date.getMonth() + 1).toString().padStart(2, '0');
+  const dd = date.getDate().toString().padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function formatShortDateForPrefs(iso: string): string {
+  const today = todayLocalISOForPrefs();
+  if (iso === today) return 'Hoy';
+  const parts = iso.split('-');
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  const date = new Date(y, m - 1, d);
+  return date
+    .toLocaleDateString('es-ES', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    })
+    .replace(/^\w/, (c) => c.toUpperCase());
 }
 
 /**

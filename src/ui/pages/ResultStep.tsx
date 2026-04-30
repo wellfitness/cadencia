@@ -395,11 +395,54 @@ export function ResultStep({
         </div>
       )}
       {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
+      <Card title="Crear en Spotify" titleIcon="playlist_add">
+        <div className="space-y-3">
+          <Input
+            label="Nombre de la lista"
+            type="text"
+            value={effectivePlaylistName}
+            onChange={(e) => onPlaylistNameChange(e.target.value)}
+            helper="Aparecerá tal cual en tu Spotify (puedes cambiarlo después)."
+          />
+          {error !== null && (
+            <p
+              role="alert"
+              className="text-sm text-rosa-600 font-medium flex items-center gap-2"
+            >
+              <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
+              {error}
+            </p>
+          )}
+          {!hasSpotifySession && (
+            <p className="text-xs text-gris-500">
+              Se creará una lista en tu cuenta de Spotify. Si la quieres privada, márcala
+              como tal desde la propia app de Spotify (Spotify exige permiso de listas
+              públicas para añadir canciones, aunque solo las usemos para tu ruta).
+            </p>
+          )}
+          {hasSpotifySession && (
+            <div className="pt-3 mt-1 border-t border-gris-100 flex items-center justify-between gap-2">
+              <span className="text-xs text-gris-700 flex items-center gap-1.5 font-medium">
+                <MaterialIcon name="check_circle" size="small" className="text-success" />
+                Cuenta de Spotify conectada
+              </span>
+              <button
+                type="button"
+                onClick={handleSpotifyLogout}
+                className="text-xs text-rosa-600 hover:text-rosa-700 hover:underline font-medium"
+              >
+                Cerrar sesión y volver a autorizar
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
+
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 mb-3">
           <p className="text-sm text-gris-600">
             <strong className="text-gris-800 tabular-nums">{validUriCount}</strong> temas para{' '}
-            <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong> de ruta
+            <strong className="text-gris-800 tabular-nums">{totalMinutes} min</strong>
           </p>
           {replacedCount > 0 && (
             <span className="text-xs text-turquesa-700 flex items-center gap-1 shrink-0">
@@ -462,49 +505,6 @@ export function ResultStep({
           )}
         </div>
       )}
-
-      <Card title="Crear en Spotify" titleIcon="playlist_add">
-        <div className="space-y-3">
-          <Input
-            label="Nombre de la lista"
-            type="text"
-            value={effectivePlaylistName}
-            onChange={(e) => onPlaylistNameChange(e.target.value)}
-            helper="Aparecerá tal cual en tu Spotify (puedes cambiarlo después)."
-          />
-          {error !== null && (
-            <p
-              role="alert"
-              className="text-sm text-rosa-600 font-medium flex items-center gap-2"
-            >
-              <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
-              {error}
-            </p>
-          )}
-          {!hasSpotifySession && (
-            <p className="text-xs text-gris-500">
-              Se creará una lista en tu cuenta de Spotify. Si la quieres privada, márcala
-              como tal desde la propia app de Spotify (Spotify exige permiso de listas
-              públicas para añadir canciones, aunque solo las usemos para tu ruta).
-            </p>
-          )}
-          {hasSpotifySession && (
-            <div className="pt-3 mt-1 border-t border-gris-100 flex items-center justify-between gap-2">
-              <span className="text-xs text-gris-700 flex items-center gap-1.5 font-medium">
-                <MaterialIcon name="check_circle" size="small" className="text-success" />
-                Cuenta de Spotify conectada
-              </span>
-              <button
-                type="button"
-                onClick={handleSpotifyLogout}
-                className="text-xs text-rosa-600 hover:text-rosa-700 hover:underline font-medium"
-              >
-                Cerrar sesión y volver a autorizar
-              </button>
-            </div>
-          )}
-        </div>
-      </Card>
 
       <FooterActions
         onBack={onBack}
@@ -658,16 +658,25 @@ function FooterActions({
               Descargar .zwo
             </Button>
           )}
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack} fullWidth>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            fullWidth
+            aria-label="Atrás"
+            title="Atrás"
+          />
         </div>
       }
       desktop={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           {onDownloadZwo !== undefined && (
             <Button
               variant="secondary"

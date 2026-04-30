@@ -64,7 +64,7 @@ export function UserDataStep({
   };
 
   const submitDisabled = !validation.ok;
-  const nextLabel = 'Siguiente: Plan';
+  const nextLabel = 'Plan';
 
   // P3: copy reescrito.
   const subtitle =
@@ -182,15 +182,21 @@ function FooterActions({
     <WizardStepFooter
       mobile={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           <Button
             variant="primary"
             iconRight="arrow_forward"
             disabled={submitDisabled}
             onClick={onSubmit}
             fullWidth
+            aria-label={nextLabel}
+            title={nextLabel}
           >
             {nextLabel}
           </Button>
@@ -198,11 +204,15 @@ function FooterActions({
       }
       desktop={
         <div className="flex items-center justify-between gap-3 w-full">
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={onCancel}>
+            <Button variant="secondary" iconLeft="restart_alt" onClick={onCancel}>
               Limpiar
             </Button>
             <Button
@@ -210,6 +220,8 @@ function FooterActions({
               iconRight="arrow_forward"
               disabled={submitDisabled}
               onClick={onSubmit}
+              aria-label={nextLabel}
+              title={nextLabel}
             >
               {nextLabel}
             </Button>

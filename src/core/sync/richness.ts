@@ -25,6 +25,7 @@ export function calculateDataRichness(data: SyncedData): number {
     score += data.nativeCatalogPrefs.excludedUris.length;
   }
   score += data.dismissedTrackUris.length;
+  score += data.plannedEvents.filter((e) => !e.deletedAt).length;
   return score;
 }
 

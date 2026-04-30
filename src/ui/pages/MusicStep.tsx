@@ -425,32 +425,44 @@ function FooterActions({ onBack, onNext, canGoNext }: FooterActionsProps): JSX.E
     <WizardStepFooter
       mobile={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           <Button
             variant="primary"
             iconRight="arrow_forward"
             disabled={!canGoNext}
             onClick={onNext}
             fullWidth
+            aria-label="¡A pedalear!"
+            title="¡A pedalear!"
           >
-            Siguiente: ¡A pedalear!
+            ¡A pedalear!
           </Button>
         </>
       }
       desktop={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           <Button
             variant="primary"
             iconRight="arrow_forward"
             disabled={!canGoNext}
             onClick={onNext}
+            aria-label="¡A pedalear!"
+            title="¡A pedalear!"
           >
-            Siguiente: ¡A pedalear!
+            ¡A pedalear!
           </Button>
         </>
       }

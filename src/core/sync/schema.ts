@@ -11,6 +11,7 @@ export function emptySyncedData(): SyncedData {
     uploadedCsvs: [],
     nativeCatalogPrefs: null,
     dismissedTrackUris: [],
+    plannedEvents: [],
   };
 }
 

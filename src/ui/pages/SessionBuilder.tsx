@@ -525,9 +525,13 @@ function FooterActions({
     <WizardStepFooter
       mobile={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           {canSave && (
             <Button
               variant="accent"
@@ -556,9 +560,7 @@ function FooterActions({
               onClick={onExport}
               aria-label="Descargar sesión en formato .zwo"
               title="Descargar para Zwift / TrainingPeaks Virtual / TrainerRoad / Wahoo SYSTM"
-            >
-              .zwo
-            </Button>
+            />
           )}
           <Button
             variant="primary"
@@ -566,16 +568,22 @@ function FooterActions({
             disabled={!canContinue}
             onClick={onContinue}
             fullWidth
+            aria-label="Música"
+            title="Música"
           >
-            Siguiente: Música
+            Música
           </Button>
         </>
       }
       desktop={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           {canSave && (
             <Button
               variant="accent"
@@ -611,8 +619,10 @@ function FooterActions({
             iconRight="arrow_forward"
             disabled={!canContinue}
             onClick={onContinue}
+            aria-label="Música"
+            title="Música"
           >
-            Siguiente: Música
+            Música
           </Button>
         </>
       }

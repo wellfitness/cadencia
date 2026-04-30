@@ -19,6 +19,7 @@ import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
 import { SessionBuilder } from '@ui/pages/SessionBuilder';
+import type { PlannedRouteContext } from '@ui/state/wizardStorage';
 
 export interface RouteStepProps {
   validatedInputs: ValidatedUserInputs;
@@ -36,6 +37,13 @@ export interface RouteStepProps {
   initialMeta?: RouteMeta | undefined;
   /** Plantilla activa de la SessionBuilder (null si edita desde cero). */
   initialActiveTemplateId?: string | null;
+  /**
+   * Contexto inyectado cuando el usuario llega aqui desde una entrada
+   * outdoor del calendario. Se renderiza como banner informativo en la
+   * fase 'idle' del GpxRouteFlow para recordar que ruta planificada hay
+   * que subir. Sin efecto en el sub-flujo de sesion indoor.
+   */
+  plannedRouteContext?: PlannedRouteContext;
   onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
   /** Callback cuando el plan de sesion editable cambia. */
   onSessionPlanChange: (plan: EditableSessionPlan | null) => void;
@@ -60,6 +68,7 @@ export function RouteStep({
   initialSegments,
   initialMeta,
   initialActiveTemplateId = null,
+  plannedRouteContext,
   onProcessed,
   onSessionPlanChange,
   onActiveTemplateIdChange,
@@ -91,6 +100,7 @@ export function RouteStep({
       validatedInputs={validatedInputs}
       initialSegments={initialSegments ?? null}
       initialMeta={initialMeta ?? null}
+      plannedRouteContext={plannedRouteContext ?? null}
       onProcessed={onProcessed}
       onBack={onBack}
       onNext={onNext}
@@ -102,6 +112,7 @@ interface GpxRouteFlowProps {
   validatedInputs: ValidatedUserInputs;
   initialSegments: readonly ClassifiedSegment[] | null;
   initialMeta: RouteMeta | null;
+  plannedRouteContext: PlannedRouteContext | null;
   onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
   onBack: () => void;
   onNext: () => void;
@@ -111,6 +122,7 @@ function GpxRouteFlow({
   validatedInputs,
   initialSegments,
   initialMeta,
+  plannedRouteContext,
   onProcessed,
   onBack,
   onNext,
@@ -189,6 +201,28 @@ function GpxRouteFlow({
       />
       {phase === 'idle' && (
         <>
+          {plannedRouteContext !== null && (
+            <Card variant="info" title="Ruta planificada" titleIcon="event">
+              <p className="text-gris-800 font-semibold mb-1">{plannedRouteContext.name}</p>
+              {plannedRouteContext.notes !== undefined && plannedRouteContext.notes.length > 0 && (
+                <p className="text-sm text-gris-700 mb-2">{plannedRouteContext.notes}</p>
+              )}
+              {plannedRouteContext.externalUrl !== undefined && (
+                <a
+                  href={plannedRouteContext.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-turquesa-700 hover:underline font-medium"
+                >
+                  <MaterialIcon name="open_in_new" size="small" />
+                  Abrir la ruta planificada en navegador
+                </a>
+              )}
+              <p className="text-xs text-gris-600 mt-2">
+                Sube ahora el GPX correspondiente desde Strava, Komoot o donde la tengas guardada.
+              </p>
+            </Card>
+          )}
           <FileDropzone
             onFile={(f) => void processFile(f)}
             onError={(msg) => {
@@ -364,9 +398,13 @@ function FooterActions({
         canReset ? (
           <div className="flex flex-col gap-2 w-full">
             <div className="flex items-center justify-between gap-2">
-              <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-                Atrás
-              </Button>
+              <Button
+                variant="secondary"
+                iconLeft="arrow_back"
+                onClick={onBack}
+                aria-label="Atrás"
+                title="Atrás"
+              />
               <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
                 Otro archivo
               </Button>
@@ -377,32 +415,44 @@ function FooterActions({
               disabled={!canGoNext}
               onClick={onNext}
               fullWidth
+              aria-label="Música"
+              title="Música"
             >
-              Siguiente: Música
+              Música
             </Button>
           </div>
         ) : (
           <>
-            <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-              Atrás
-            </Button>
+            <Button
+              variant="secondary"
+              iconLeft="arrow_back"
+              onClick={onBack}
+              aria-label="Atrás"
+              title="Atrás"
+            />
             <Button
               variant="primary"
               iconRight="arrow_forward"
               disabled={!canGoNext}
               onClick={onNext}
               fullWidth
+              aria-label="Música"
+              title="Música"
             >
-              Siguiente: Música
+              Música
             </Button>
           </>
         )
       }
       desktop={
         <>
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Atrás
-          </Button>
+          <Button
+            variant="secondary"
+            iconLeft="arrow_back"
+            onClick={onBack}
+            aria-label="Atrás"
+            title="Atrás"
+          />
           {canReset && (
             <Button variant="secondary" iconLeft="refresh" onClick={onReset}>
               Subir otra ruta
@@ -413,8 +463,10 @@ function FooterActions({
             iconRight="arrow_forward"
             disabled={!canGoNext}
             onClick={onNext}
+            aria-label="Música"
+            title="Música"
           >
-            Siguiente: Música
+            Música
           </Button>
         </>
       }

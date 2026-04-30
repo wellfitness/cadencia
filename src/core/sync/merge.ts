@@ -1,4 +1,9 @@
-import type { SavedSession, SyncedData, UploadedCsvRecord } from './types';
+import type {
+  PlannedEvent,
+  SavedSession,
+  SyncedData,
+  UploadedCsvRecord,
+} from './types';
 import { emptySyncedData } from './schema';
 
 /**
@@ -119,6 +124,30 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
   if (csvTimes.length > 0) {
     merged._sectionMeta.uploadedCsvs = {
       updatedAt: new Date(Math.max(...csvTimes)).toISOString(),
+    };
+  }
+
+  // Mismo patron de array-merge para plannedEvents.
+  const eventsById = new Map<string, PlannedEvent>();
+  for (const item of local.plannedEvents) eventsById.set(item.id, item);
+  for (const remoteItem of remote.plannedEvents) {
+    const localItem = eventsById.get(remoteItem.id);
+    if (!localItem) {
+      eventsById.set(remoteItem.id, remoteItem);
+      continue;
+    }
+    const localTime = new Date(localItem.updatedAt).getTime();
+    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    eventsById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
+  }
+  merged.plannedEvents = Array.from(eventsById.values());
+
+  const eventTimes = merged.plannedEvents
+    .map((e) => new Date(e.updatedAt).getTime())
+    .filter((t) => Number.isFinite(t));
+  if (eventTimes.length > 0) {
+    merged._sectionMeta.plannedEvents = {
+      updatedAt: new Date(Math.max(...eventTimes)).toISOString(),
     };
   }
 

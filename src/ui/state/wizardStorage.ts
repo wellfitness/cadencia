@@ -23,6 +23,18 @@ export type RouteSourceType = 'gpx' | 'session';
  */
 export type MusicSourceMode = 'mine' | 'both';
 
+/**
+ * Contexto inyectado al wizard cuando el usuario carga una entrada outdoor
+ * planificada del calendario. Se muestra como banner en `RouteStep` con la
+ * info de la ruta planificada para recordar al usuario que debe subir el
+ * GPX correspondiente. Desaparece cuando se sube el GPX.
+ */
+export interface PlannedRouteContext {
+  name: string;
+  notes?: string;
+  externalUrl?: string;
+}
+
 export interface WizardState {
   currentStep: number;
   completedSteps: readonly number[];
@@ -46,6 +58,13 @@ export interface WizardState {
   replacedIndices?: readonly number[];
   /** Nombre custom de la playlist tecleado por el usuario en ResultStep. */
   playlistName?: string;
+  /**
+   * Contexto de ruta planificada (cuando el usuario llega al wizard
+   * desde una entrada outdoor del calendario). Persiste en sessionStorage
+   * para sobrevivir refresh del paso `RouteStep` antes de que el usuario
+   * suba el GPX.
+   */
+  plannedRouteContext?: PlannedRouteContext;
 }
 
 // v2: ampliacion del schema con activeTemplateId, musicSourceMode, replacedIndices,
@@ -121,6 +140,23 @@ function isWizardState(value: unknown): value is WizardState {
       v['musicSourceMode'] === 'mine' ||
       v['musicSourceMode'] === 'both') &&
     (v['replacedIndices'] === undefined || Array.isArray(v['replacedIndices'])) &&
-    (v['playlistName'] === undefined || typeof v['playlistName'] === 'string')
+    (v['playlistName'] === undefined || typeof v['playlistName'] === 'string') &&
+    (v['plannedRouteContext'] === undefined ||
+      (typeof v['plannedRouteContext'] === 'object' && v['plannedRouteContext'] !== null))
   );
+}
+
+/**
+ * Devuelve true si el usuario tiene wizard en curso con datos significativos
+ * que se perderian si se sobrescribe (ej: plan editado, GPX subido). Usado
+ * por el flujo "cargar evento del calendario" para decidir si mostrar el
+ * dialog de descarte.
+ */
+export function hasUnsavedWizardProgress(): boolean {
+  const state = loadWizardState();
+  if (state === null) return false;
+  if (state.routeSegments !== null && state.routeSegments.length > 0) return true;
+  if (state.matchedList !== null && state.matchedList.length > 0) return true;
+  if (state.sessionPlan !== undefined) return true;
+  return false;
 }

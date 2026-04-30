@@ -1,6 +1,9 @@
 import type { UserInputsRaw } from '../user/userInputs';
 import type { MatchPreferences } from '../matching';
 import type { EditableSessionPlan } from '../segmentation';
+import type { PlannedEvent } from '../calendar/types';
+
+export type { PlannedEvent } from '../calendar/types';
 
 export const SCHEMA_VERSION = 1;
 
@@ -84,6 +87,7 @@ export interface SyncedData {
     uploadedCsvs?: SectionMeta;
     nativeCatalogPrefs?: SectionMeta;
     dismissedTrackUris?: SectionMeta;
+    plannedEvents?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
@@ -97,6 +101,12 @@ export interface SyncedData {
    * Se filtran del livePool antes del matching, independientemente de la fuente.
    */
   dismissedTrackUris: string[];
+  /**
+   * Calendario de planificacion: entradas indoor/outdoor con fecha y
+   * recurrencia opcional. Mismo patron de array merge LWW + tombstones
+   * que `savedSessions`.
+   */
+  plannedEvents: PlannedEvent[];
 }
 
 export type SyncStatus =

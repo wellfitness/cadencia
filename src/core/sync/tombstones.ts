@@ -26,12 +26,18 @@ export function cleanExpiredTombstones(
     if (!c.deletedAt) return true;
     return new Date(c.deletedAt).getTime() > cutoff;
   });
+  const filteredEvents = data.plannedEvents.filter((e) => {
+    if (!e.deletedAt) return true;
+    return new Date(e.deletedAt).getTime() > cutoff;
+  });
   const sessionsChanged = filteredSessions.length !== data.savedSessions.length;
   const csvsChanged = filteredCsvs.length !== data.uploadedCsvs.length;
-  if (!sessionsChanged && !csvsChanged) return data;
+  const eventsChanged = filteredEvents.length !== data.plannedEvents.length;
+  if (!sessionsChanged && !csvsChanged && !eventsChanged) return data;
   return {
     ...data,
     savedSessions: filteredSessions,
     uploadedCsvs: filteredCsvs,
+    plannedEvents: filteredEvents,
   };
 }

@@ -38,6 +38,7 @@ function normalize(data: SyncedData): SyncedData {
     uploadedCsvs: data.uploadedCsvs ?? [],
     nativeCatalogPrefs: data.nativeCatalogPrefs ?? null,
     dismissedTrackUris: data.dismissedTrackUris ?? [],
+    plannedEvents: data.plannedEvents ?? [],
   };
 }
 

@@ -20,7 +20,9 @@ import { Stepper, type StepperStep } from '@ui/components/Stepper';
 import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { TodayBadge } from '@ui/components/TodayBadge';
 import type { RouteSourceChoice } from '@ui/components/SourceSelector';
+import { CalendarPage } from '@ui/pages/CalendarPage';
 import { CatalogEditorPage } from '@ui/pages/CatalogEditorPage';
 import { HelpRouter } from '@ui/pages/help/HelpRouter';
 import { Landing } from '@ui/pages/Landing';
@@ -77,6 +79,9 @@ export function App(): JSX.Element {
     // /cuenta queda como alias retrocompatible por si algun link antiguo
     // (Drive consent screen, marcadores) lleva ahi.
     return <MyPreferencesPage onClose={() => navigateBack('/')} />;
+  }
+  if (pathname === '/calendario') {
+    return <CalendarPage onClose={() => navigateBack('/')} />;
   }
   if (pathname.startsWith('/ayuda')) {
     return <HelpRouter pathname={pathname} />;
@@ -561,6 +566,9 @@ function WizardApp(): JSX.Element {
             initialSegments={routeSegments ?? undefined}
             initialMeta={routeMeta ?? undefined}
             initialActiveTemplateId={activeTemplateId}
+            {...(persisted?.plannedRouteContext !== undefined
+              ? { plannedRouteContext: persisted.plannedRouteContext }
+              : {})}
             onProcessed={handleRouteProcessed}
             onSessionPlanChange={handleSessionPlanChange}
             onActiveTemplateIdChange={setActiveTemplateId}
@@ -724,19 +732,35 @@ function Header(): JSX.Element {
     <header className="border-b border-gris-200 bg-white">
       <div className="mx-auto w-full max-w-4xl px-4 py-4 flex items-center justify-between gap-3">
         <Logo variant="full" size="md" />
-        <a
-          href="/preferencias"
-          onClick={(e) => {
-            e.preventDefault();
-            navigateInApp('/preferencias');
-          }}
-          className="inline-flex items-center gap-1.5 text-sm text-gris-700 hover:text-turquesa-700 hover:bg-turquesa-50 rounded-md px-2 py-1.5 min-h-[36px] transition-colors"
-          aria-label="Mis preferencias"
-          title="Mis preferencias"
-        >
-          <MaterialIcon name="manage_accounts" size="small" className="text-gris-500" />
-          <span className="hidden sm:inline">Mis preferencias</span>
-        </a>
+        <div className="flex items-center gap-2">
+          <TodayBadge />
+          <a
+            href="/calendario"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/calendario');
+            }}
+            className="inline-flex items-center gap-1.5 text-sm text-gris-700 hover:text-turquesa-700 hover:bg-turquesa-50 rounded-md px-2 py-1.5 min-h-[36px] transition-colors"
+            aria-label="Calendario"
+            title="Calendario"
+          >
+            <MaterialIcon name="calendar_month" size="small" className="text-gris-500" />
+            <span className="hidden sm:inline">Calendario</span>
+          </a>
+          <a
+            href="/preferencias"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/preferencias');
+            }}
+            className="inline-flex items-center gap-1.5 text-sm text-gris-700 hover:text-turquesa-700 hover:bg-turquesa-50 rounded-md px-2 py-1.5 min-h-[36px] transition-colors"
+            aria-label="Mis preferencias"
+            title="Mis preferencias"
+          >
+            <MaterialIcon name="manage_accounts" size="small" className="text-gris-500" />
+            <span className="hidden sm:inline">Mis preferencias</span>
+          </a>
+        </div>
       </div>
     </header>
   );

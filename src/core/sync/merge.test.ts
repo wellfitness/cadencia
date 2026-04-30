@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mergeData } from './merge';
 import { emptySyncedData } from './schema';
-import type { SavedSession, SyncedData, UploadedCsvRecord } from './types';
+import type { PlannedEvent, SavedSession, SyncedData, UploadedCsvRecord } from './types';
 import { EMPTY_USER_INPUTS } from '../user/userInputs';
 
 function session(
@@ -187,6 +187,71 @@ describe('mergeData — nativeCatalogPrefs atomic LWW', () => {
     remote._sectionMeta.nativeCatalogPrefs = { updatedAt: '2026-04-29T10:00:00Z' };
     const { merged } = mergeData(local, remote);
     expect(merged.nativeCatalogPrefs?.excludedUris).toEqual(['spotify:track:2']);
+  });
+});
+
+describe('mergeData — plannedEvents (array merge LWW por id)', () => {
+  function event(
+    id: string,
+    date: string,
+    updatedAt: string,
+    deletedAt?: string,
+  ): PlannedEvent {
+    const e: PlannedEvent = {
+      id,
+      type: 'outdoor',
+      date,
+      name: `Evento ${id}`,
+      recurrence: null,
+      skippedDates: [],
+      createdAt: '2026-04-01T00:00:00Z',
+      updatedAt,
+    };
+    if (deletedAt !== undefined) e.deletedAt = deletedAt;
+    return e;
+  }
+
+  it('union cuando local y remote tienen eventos distintos', () => {
+    const local = emptySyncedData();
+    local.plannedEvents = [event('a', '2026-05-05', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.plannedEvents = [event('b', '2026-05-06', '2026-04-29T10:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    expect(merged.plannedEvents).toHaveLength(2);
+    expect(merged.plannedEvents.map((e) => e.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('mismo id: gana el de updatedAt mas reciente', () => {
+    const local = emptySyncedData();
+    local.plannedEvents = [event('a', '2026-05-05', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.plannedEvents = [event('a', '2026-05-09', '2026-04-29T11:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    expect(merged.plannedEvents).toHaveLength(1);
+    expect(merged.plannedEvents[0]?.date).toBe('2026-05-09');
+  });
+
+  it('tombstone propaga a otros dispositivos', () => {
+    const local = emptySyncedData();
+    local.plannedEvents = [event('a', '2026-05-05', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.plannedEvents = [
+      event('a', '2026-05-05', '2026-04-29T11:00:00Z', '2026-04-29T11:00:00Z'),
+    ];
+    const { merged } = mergeData(local, remote);
+    expect(merged.plannedEvents[0]?.deletedAt).toBe('2026-04-29T11:00:00Z');
+  });
+
+  it('actualiza _sectionMeta.plannedEvents al max de updatedAt', () => {
+    const local = emptySyncedData();
+    local.plannedEvents = [event('a', '2026-05-05', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.plannedEvents = [event('b', '2026-05-06', '2026-04-29T12:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    // El motor reformatea timestamps con `.toISOString()` (incluye .000Z).
+    expect(new Date(merged._sectionMeta.plannedEvents!.updatedAt).getTime()).toBe(
+      new Date('2026-04-29T12:00:00Z').getTime(),
+    );
   });
 });
 
