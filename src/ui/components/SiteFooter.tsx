@@ -218,26 +218,6 @@ export function SiteFooter(): JSX.Element {
             Centro de ayuda
           </a>
           <a
-            href="/ayuda/sesion-indoor"
-            onClick={(e) => {
-              e.preventDefault();
-              navigateInApp('/ayuda/sesion-indoor');
-            }}
-            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
-          >
-            Cómo construir una sesión
-          </a>
-          <a
-            href="/ayuda/plantillas"
-            onClick={(e) => {
-              e.preventDefault();
-              navigateInApp('/ayuda/plantillas');
-            }}
-            className="block text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
-          >
-            Plantillas y cuándo usarlas
-          </a>
-          <a
             href="/preferencias"
             onClick={(e) => {
               e.preventDefault();
@@ -269,8 +249,6 @@ export function SiteFooter(): JSX.Element {
           >
             Contacto
           </a>
-
-          <h4 className="text-white text-base font-semibold mt-4 mb-2">Proyecto</h4>
           <a
             href="https://github.com/wellfitness/cadencia"
             target="_blank"
@@ -280,22 +258,22 @@ export function SiteFooter(): JSX.Element {
             <MaterialIcon name="code" size="small" decorative />
             GitHub
           </a>
-          <a
-            href="https://github.com/wellfitness/cadencia/blob/main/LICENSE"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-gris-300 py-2.5 hover:text-turquesa-400 transition-colors"
-          >
-            <MaterialIcon name="gavel" size="small" decorative />
-            Licencia PolyForm Noncommercial
-          </a>
         </div>
       </div>
 
       {/* Bottom bar */}
       <div className="max-w-6xl mx-auto mt-8 pt-6 border-t border-turquesa-400 text-center">
         <p className="text-sm text-white">
-          © 2026 MOVIMIENTO FUNCIONAL. Código abierto bajo Licencia PolyForm Noncommercial.
+          © 2026 MOVIMIENTO FUNCIONAL. Código abierto bajo{' '}
+          <a
+            href="https://github.com/wellfitness/cadencia/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-turquesa-400 hover:text-turquesa-300 hover:underline transition-colors"
+          >
+            Licencia PolyForm Noncommercial
+          </a>
+          .
         </p>
       </div>
     </footer>
