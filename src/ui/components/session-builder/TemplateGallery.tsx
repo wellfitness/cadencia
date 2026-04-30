@@ -172,7 +172,14 @@ export function TemplateGallery({
             ¿Qué plantilla elegir? Consulta la guía
             <MaterialIcon name="arrow_forward" size="small" decorative />
           </a>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+          {/* Grid: 4 cols en bike (8 plantillas → 2 filas), 3 cols en run
+              (6 plantillas → 2 filas exactas). Asi evitamos huecos vacios en
+              la rejilla cuando sport === 'run'. */}
+          <div
+            className={`grid grid-cols-2 gap-2 md:gap-3 ${
+              sport === 'run' ? 'md:grid-cols-3' : 'md:grid-cols-4'
+            }`}
+          >
             {templates.map((template) => (
               <TemplateCard
                 key={template.id}
