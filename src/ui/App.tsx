@@ -35,7 +35,7 @@ import { ResultStep } from '@ui/pages/ResultStep';
 import { TVModeRoute } from '@ui/pages/TVModeRoute';
 import { writeHandoff } from '@core/tv/tvHandoff';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
-import type { UploadedCsv } from '@ui/state/uploadedCsv';
+import { hydrateUploadedCsvs, type UploadedCsv } from '@ui/state/uploadedCsv';
 import { navigateBack, navigateInApp, usePathname } from '@ui/utils/navigation';
 import {
   loadWizardState,
@@ -43,7 +43,8 @@ import {
   type MusicSourceMode,
   type RouteSourceType,
 } from '@ui/state/wizardStorage';
-import { loadCadenciaData, updateSection } from '@ui/state/cadenciaStore';
+import { loadCadenciaData, updateSection, useCadenciaData } from '@ui/state/cadenciaStore';
+import { createUploadedCsv, deleteUploadedCsv } from '@core/csvs/uploadedCsvs';
 
 const STEPS: readonly StepperStep[] = [
   { label: 'Tipo', icon: 'tune' },
@@ -277,23 +278,42 @@ function WizardApp(): JSX.Element {
     persisted?.musicSourceMode ?? 'both',
   );
 
-  // CSVs subidos por el usuario en runtime. Vive solo en memoria — no se
-  // persiste en sessionStorage para no inflarlo con tracks parseados (varios
-  // MB). Sobrevive a remountajes del paso Musica pero no a un refresh.
-  const [uploadedCsvs, setUploadedCsvs] = useState<readonly UploadedCsv[]>([]);
+  // CSVs subidos por el usuario. Desde Fase E viven persistidos en
+  // cadenciaStore (csvText raw) y se sincronizan con Drive si esta
+  // conectado. Aqui los hidratamos al view-model con tracks parseados.
+  // El hook useCadenciaData re-renderiza cuando llega un push remoto o
+  // un cambio local, manteniendo el livePool reactivo.
+  const cadenciaData = useCadenciaData();
+  const uploadedCsvs = useMemo<readonly UploadedCsv[]>(
+    () => hydrateUploadedCsvs(cadenciaData.uploadedCsvs),
+    [cadenciaData.uploadedCsvs],
+  );
 
   // Nombre custom de la playlist tecleado en ResultStep. Persistido para que
   // el usuario no tenga que reescribirlo si vuelve a Datos/Musica y vuelve.
   const [playlistName, setPlaylistName] = useState<string>(persisted?.playlistName ?? '');
 
   // Catalogo activo del paso Musica (solo CSVs propios o ambos combinados).
-  // Memoizado a partir del modo y los CSVs subidos: una sola fuente de verdad
-  // que alimenta tanto el matching como el dropdown de "Otro tema" en Result.
+  // Filtra dismissedTrackUris (descartes globales desde ResultStep) y
+  // excludedUris del nativo (denylist del editor de catalogo). Una sola
+  // fuente de verdad que alimenta tanto el matching como el dropdown de
+  // "Otro tema" en Result.
   const livePool = useMemo<readonly Track[]>(() => {
+    const dismissed = new Set(cadenciaData.dismissedTrackUris);
+    const excludedNative = new Set(cadenciaData.nativeCatalogPrefs?.excludedUris ?? []);
     const userTracks: Track[] = uploadedCsvs.flatMap((c) => [...c.tracks]);
-    if (musicSourceMode === 'mine') return dedupeByUri(userTracks);
-    return dedupeByUri([...loadNativeTracks(), ...userTracks]);
-  }, [musicSourceMode, uploadedCsvs]);
+    const native = loadNativeTracks().filter((t) => !excludedNative.has(t.uri));
+    const merged =
+      musicSourceMode === 'mine'
+        ? dedupeByUri(userTracks)
+        : dedupeByUri([...native, ...userTracks]);
+    return merged.filter((t) => !dismissed.has(t.uri));
+  }, [
+    musicSourceMode,
+    uploadedCsvs,
+    cadenciaData.dismissedTrackUris,
+    cadenciaData.nativeCatalogPrefs,
+  ]);
 
   // crossZoneMode derivado del sourceType: GPX usa solapamiento (un track
   // cubre tramos consecutivos de la misma zona), sesion indoor usa discreto
@@ -402,12 +422,13 @@ function WizardApp(): JSX.Element {
 
   const handleSourceTypeSelect = (next: RouteSourceChoice): void => {
     if (sourceType !== next) {
-      // Si cambia la rama, limpiamos los datos derivados de la rama anterior
+      // Si cambia la rama, limpiamos los datos derivados de la rama anterior.
+      // NOTA: uploadedCsvs YA NO se limpia aqui — son persistentes en
+      // cadenciaStore desde Fase E y deben sobrevivir a cambios de rama.
       setRouteSegments(null);
       setRouteMeta(null);
       setMatchedList(null);
       setReplacedIndices(new Set());
-      setUploadedCsvs([]);
       setPlaylistName('');
       // Si dejamos la rama indoor, limpiamos el plan y la plantilla activa
       if (next !== 'session') {
@@ -458,7 +479,8 @@ function WizardApp(): JSX.Element {
     setMatchedList(null);
     setMusicPreferences({ ...EMPTY_PREFERENCES, seed: makeRandomSeed() });
     setReplacedIndices(new Set());
-    setUploadedCsvs([]);
+    // uploadedCsvs persiste deliberadamente: las listas del usuario son
+    // del usuario, no de la sesion — sobreviven a "Crear otra playlist".
     setPlaylistName('');
     setMusicSourceMode('both');
     setSessionPlan(null);
@@ -576,7 +598,12 @@ function WizardApp(): JSX.Element {
             sourceMode={musicSourceMode}
             onSourceModeChange={setMusicSourceMode}
             uploadedCsvs={uploadedCsvs}
-            onUploadedCsvsChange={setUploadedCsvs}
+            onCsvUploaded={(csvText, name) => {
+              createUploadedCsv({ csvText, name });
+              // El cambio en cadenciaStore dispara 'cadencia-data-saved',
+              // useCadenciaData re-renderiza, livePool se recalcula.
+            }}
+            onCsvRemoved={(id) => deleteUploadedCsv(id)}
             matched={matchedList}
             onAdvance={handleMatchedAdvance}
             onBack={handleBack}

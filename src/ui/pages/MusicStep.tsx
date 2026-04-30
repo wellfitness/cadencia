@@ -34,9 +34,17 @@ export interface MusicStepProps {
   /** Fuente del catalogo (mine / both). Controlada desde App. */
   sourceMode: MusicSourceMode;
   onSourceModeChange: (next: MusicSourceMode) => void;
-  /** CSVs subidos por el usuario. Viven en App (in-memory) para que persistan al ir y volver. */
+  /**
+   * CSVs subidos por el usuario. Desde Fase E viven persistidos en
+   * cadenciaStore y se sincronizan con Drive si el usuario lo conecto.
+   * El array que llega es reactivo: re-render al detectar cambios en
+   * el store (locales o remotos).
+   */
   uploadedCsvs: readonly UploadedCsv[];
-  onUploadedCsvsChange: (next: readonly UploadedCsv[]) => void;
+  /** Persistir un CSV nuevo. Recibe el csvText raw y el nombre del archivo. */
+  onCsvUploaded: (csvText: string, name: string) => void;
+  /** Borrar un CSV (tombstone). Se propaga via sync. */
+  onCsvRemoved: (id: string) => void;
   /** Matching base calculado en App. null antes del primer calculo. */
   matched: readonly MatchedSegment[] | null;
   /** Avanza al siguiente paso. El matching ya esta sincronizado en App. */
@@ -61,7 +69,8 @@ export function MusicStep({
   sourceMode,
   onSourceModeChange,
   uploadedCsvs,
-  onUploadedCsvsChange,
+  onCsvUploaded,
+  onCsvRemoved,
   matched,
   onAdvance,
   onBack,
@@ -90,46 +99,29 @@ export function MusicStep({
     setUploadError(null);
     try {
       const text = await file.text();
-      const parsed = parseTrackCsv(text, 'user');
-      if (parsed.length === 0) {
-        onUploadedCsvsChange([
-          ...uploadedCsvs,
-          {
-            id: crypto.randomUUID(),
-            name: file.name,
-            trackCount: 0,
-            tracks: [],
-            error: 'CSV sin canciones válidas',
-          },
-        ]);
+      // Validacion de UX: parseamos antes de persistir para dar feedback
+      // inmediato si el CSV esta vacio o tiene formato roto. La persistencia
+      // (createUploadedCsv) hace su propio parseo para trackCount.
+      try {
+        const parsed = parseTrackCsv(text, 'user');
+        if (parsed.length === 0) {
+          setUploadError(`"${file.name}" no tiene canciones válidas. Verifica el formato del CSV.`);
+          return;
+        }
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : 'CSV invalido';
+        setUploadError(`"${file.name}": ${msg}`);
         return;
       }
-      onUploadedCsvsChange([
-        ...uploadedCsvs,
-        {
-          id: crypto.randomUUID(),
-          name: file.name,
-          trackCount: parsed.length,
-          tracks: parsed,
-        },
-      ]);
+      onCsvUploaded(text, file.name);
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Error al leer el CSV';
-      onUploadedCsvsChange([
-        ...uploadedCsvs,
-        {
-          id: crypto.randomUUID(),
-          name: file.name,
-          trackCount: 0,
-          tracks: [],
-          error: message,
-        },
-      ]);
+      const message = e instanceof Error ? e.message : 'Error al leer el archivo';
+      setUploadError(`"${file.name}": ${message}`);
     }
   };
 
   const handleRemoveCsv = (id: string): void => {
-    onUploadedCsvsChange(uploadedCsvs.filter((c) => c.id !== id));
+    onCsvRemoved(id);
   };
 
   const setGenres = (genres: string[]): void => {
