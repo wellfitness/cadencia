@@ -6,9 +6,7 @@ import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { GoogleSyncCard } from '@ui/components/sync/GoogleSyncCard';
 import { useCadenciaData, clearCadenciaData } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
-import { loadNativeTracks, type Track } from '@core/tracks';
 import { listSavedSessions, deleteSavedSession } from '@core/sessions/saved';
-import { removeDismissedUri, clearAllDismissed } from '@core/csvs/dismissed';
 import { calculateTotalDurationSec } from '@core/segmentation';
 import { navigateInApp } from '@ui/utils/navigation';
 import { BIKE_TYPE_LABELS } from '@core/power';
@@ -328,98 +326,36 @@ function UploadedCsvsSection({ data }: SectionProps): JSX.Element {
 }
 
 function DismissedTracksSection({ data }: SectionProps): JSX.Element {
-  // Resolvemos cada URI descartada a su Track (cruzando native + uploaded
-  // hidratado) para mostrar nombre+artistas. Si no se encuentra (track
-  // borrado del catalogo), mostramos solo la URI con nota.
-  const native = useMemo(() => loadNativeTracks(), []);
-  const uploaded = useMemo(
-    () => hydrateUploadedCsvs(data.uploadedCsvs),
-    [data.uploadedCsvs],
-  );
-  const trackByUri = useMemo<Map<string, Track>>(() => {
-    const m = new Map<string, Track>();
-    for (const t of native) m.set(t.uri, t);
-    for (const list of uploaded) for (const t of list.tracks) m.set(t.uri, t);
-    return m;
-  }, [native, uploaded]);
-
-  const [confirmClearAll, setConfirmClearAll] = useState<boolean>(false);
   const dismissed = data.dismissedTrackUris;
-
   return (
     <Card title="Canciones descartadas" titleIcon="block">
-      {dismissed.length === 0 ? (
-        <EmptyHint
-          icon="check_circle"
-          text="No has descartado ninguna canción todavía. Si una canción no te gusta, puedes descartarla desde el paso «A pedalear»."
-        />
-      ) : (
-        <>
-          <p className="text-xs text-gris-500 mb-2">
-            {dismissed.length}{' '}
-            {dismissed.length === 1 ? 'canción' : 'canciones'} no aparecerán en
-            futuras listas. Pulsa «Recuperar» para devolverla al catálogo.
-          </p>
-          <ul className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-            {dismissed.map((uri) => {
-              const t = trackByUri.get(uri);
-              return (
-                <li
-                  key={uri}
-                  className="flex items-center justify-between gap-2 p-2 rounded-md border border-gris-200"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gris-800 truncate">
-                      {t?.name ?? <span className="italic text-gris-500">Track no encontrado</span>}
-                    </p>
-                    <p className="text-xs text-gris-500 truncate">
-                      {t ? t.artists.join(', ') : uri}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeDismissedUri(uri)}
-                    aria-label={`Recuperar ${t?.name ?? uri}`}
-                    className="px-2 py-1 rounded-md border border-turquesa-300 text-turquesa-700 hover:bg-turquesa-50 text-xs font-semibold min-h-[36px] inline-flex items-center gap-1"
-                  >
-                    <MaterialIcon name="undo" size="small" />
-                    Recuperar
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft="undo"
-              onClick={() => setConfirmClearAll(true)}
-            >
-              Recuperar todas
-            </Button>
-          </div>
-        </>
+      <p className="text-sm text-gris-700">
+        {dismissed.length === 0 ? (
+          <span className="text-gris-500">
+            No has descartado ninguna canción todavía. Si una canción no te
+            gusta, puedes descartarla desde el paso «A pedalear» con el botón
+            «No la quiero».
+          </span>
+        ) : (
+          <>
+            Tienes <strong>{dismissed.length}</strong>{' '}
+            {dismissed.length === 1 ? 'canción descartada' : 'canciones descartadas'}.
+            Las gestionas (revisar y recuperar) desde el editor del catálogo.
+          </>
+        )}
+      </p>
+      {dismissed.length > 0 && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            iconRight="arrow_forward"
+            onClick={() => navigateInApp('/catalogo?tab=dismissed')}
+          >
+            Revisar canciones descartadas
+          </Button>
+        </div>
       )}
-      <ConfirmDialog
-        open={confirmClearAll}
-        title="Recuperar todas las canciones descartadas"
-        icon="undo"
-        confirmLabel="Sí, recuperar todas"
-        confirmVariant="primary"
-        onConfirm={() => {
-          clearAllDismissed();
-          setConfirmClearAll(false);
-        }}
-        onCancel={() => setConfirmClearAll(false)}
-        message={
-          <p>
-            Las {dismissed.length}{' '}
-            {dismissed.length === 1 ? 'canción' : 'canciones'} que descartaste
-            volverán al catálogo y podrán aparecer en futuras listas.
-          </p>
-        }
-      />
     </Card>
   );
 }

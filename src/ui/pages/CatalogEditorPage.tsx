@@ -15,6 +15,7 @@ import {
   createUploadedCsv,
   deleteUploadedCsv,
 } from '@core/csvs/uploadedCsvs';
+import { removeDismissedUri, clearAllDismissed } from '@core/csvs/dismissed';
 import { useCadenciaData } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
 
@@ -38,12 +39,15 @@ export interface CatalogEditorPageProps {
  * usuario cierra sin descargar, las marcas se pierden. Coherente con que
  * los CSVs subidos tampoco se persisten en `App` (solo viven en memoria).
  */
-type Tab = 'native' | 'mine';
+type Tab = 'native' | 'mine' | 'dismissed';
 
 function readInitialTab(): Tab {
   if (typeof window === 'undefined') return 'native';
   const params = new URLSearchParams(window.location.search);
-  return params.get('tab') === 'mine' ? 'mine' : 'native';
+  const t = params.get('tab');
+  if (t === 'mine') return 'mine';
+  if (t === 'dismissed') return 'dismissed';
+  return 'native';
 }
 
 export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Element {
@@ -265,15 +269,16 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
             )}
           </div>
 
-          {/* Tabs: cataogo nativo (denylist persistente con autoguardado) */}
-          {/* vs mis listas (uploadedCsvs persistentes). */}
-          <div className="flex gap-1 border-b border-gris-200" role="tablist">
+          {/* Pestañas: catalogo nativo (denylist persistente con autoguardado), */}
+          {/* mis listas (uploadedCsvs persistentes), descartes globales        */}
+          {/* (dismissedTrackUris desde ResultStep).                            */}
+          <div className="flex gap-1 border-b border-gris-200 overflow-x-auto" role="tablist">
             <button
               type="button"
               role="tab"
               aria-selected={activeTab === 'native'}
               onClick={() => setActiveTab('native')}
-              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 ${
+              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'native'
                   ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
                   : 'text-gris-600 hover:text-gris-800'
@@ -287,7 +292,7 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
               role="tab"
               aria-selected={activeTab === 'mine'}
               onClick={() => setActiveTab('mine')}
-              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 ${
+              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
                 activeTab === 'mine'
                   ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
                   : 'text-gris-600 hover:text-gris-800'
@@ -295,6 +300,20 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
             >
               <MaterialIcon name="upload_file" size="small" />
               Mis listas
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'dismissed'}
+              onClick={() => setActiveTab('dismissed')}
+              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'dismissed'
+                  ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+                  : 'text-gris-600 hover:text-gris-800'
+              }`}
+            >
+              <MaterialIcon name="block" size="small" />
+              Descartadas
             </button>
           </div>
 
@@ -333,8 +352,8 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
 
       <main className="flex-1">
         <div className="mx-auto w-full max-w-5xl px-4 py-4 md:py-6">
-          {activeTab === 'native' ? (
-            visibleCount === 0 ? (
+          {activeTab === 'native' &&
+            (visibleCount === 0 ? (
               <EmptyState
                 filtersActive={filtersActive}
                 onClearFilters={clearFilters}
@@ -360,10 +379,9 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
                   ))}
                 </ul>
               </>
-            )
-          ) : (
-            <MyListsTab />
-          )}
+            ))}
+          {activeTab === 'mine' && <MyListsTab />}
+          {activeTab === 'dismissed' && <DismissedTab />}
         </div>
       </main>
     </div>
@@ -1094,6 +1112,116 @@ function TrackRow({ track, checked, onToggle }: TrackRowProps): JSX.Element {
           </span>
         )}
       </label>
+    </div>
+  );
+}
+
+/**
+ * Pestaña «Descartadas»: lista de canciones que el usuario descartó
+ * globalmente desde el botón "No la quiero" del paso «A pedalear».
+ * Cada item se puede recuperar individualmente o todas a la vez.
+ *
+ * Cruza las URIs descartadas con el catálogo nativo + listas subidas
+ * para resolver el nombre/artistas. Si una URI no se encuentra en ningún
+ * sitio (track borrado tras un cambio de catálogo nativo), se muestra
+ * el URI crudo con una nota.
+ */
+function DismissedTab(): JSX.Element {
+  const data = useCadenciaData();
+  const native = useMemo(() => loadNativeTracks(), []);
+  const uploaded = useMemo(
+    () => hydrateUploadedCsvs(data.uploadedCsvs),
+    [data.uploadedCsvs],
+  );
+  const trackByUri = useMemo<Map<string, Track>>(() => {
+    const m = new Map<string, Track>();
+    for (const t of native) m.set(t.uri, t);
+    for (const list of uploaded) for (const t of list.tracks) m.set(t.uri, t);
+    return m;
+  }, [native, uploaded]);
+
+  const [confirmClearAll, setConfirmClearAll] = useState<boolean>(false);
+  const dismissed = data.dismissedTrackUris;
+
+  if (dismissed.length === 0) {
+    return (
+      <div className="text-center text-gris-600 py-12 px-4 rounded-lg border border-dashed border-gris-300 bg-gris-50">
+        <MaterialIcon name="check_circle" size="large" className="text-gris-400 mb-2" />
+        <p className="text-sm">No has descartado ninguna canción todavía.</p>
+        <p className="text-xs mt-2 text-gris-500">
+          Si una canción no te gusta, puedes descartarla desde el paso «A pedalear»
+          con el botón «No la quiero». Aparecerán aquí para que puedas recuperarlas
+          cuando quieras.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <p className="text-sm text-gris-700">
+          <strong className="text-gris-900 tabular-nums">{dismissed.length}</strong>{' '}
+          {dismissed.length === 1 ? 'canción descartada' : 'canciones descartadas'} ·
+          no aparecerán en futuras listas.
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          iconLeft="undo"
+          onClick={() => setConfirmClearAll(true)}
+        >
+          Recuperar todas
+        </Button>
+      </div>
+      <ul className="space-y-1.5" role="list">
+        {dismissed.map((uri) => {
+          const t = trackByUri.get(uri);
+          return (
+            <li
+              key={uri}
+              className="flex items-center justify-between gap-2 p-2.5 rounded-md border border-gris-200 bg-white"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gris-800 truncate">
+                  {t?.name ?? <span className="italic text-gris-500">Canción no encontrada en el catálogo actual</span>}
+                </p>
+                <p className="text-xs text-gris-500 truncate">
+                  {t ? t.artists.join(', ') : uri}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeDismissedUri(uri)}
+                aria-label={`Recuperar ${t?.name ?? uri}`}
+                className="px-3 py-1.5 rounded-md border border-turquesa-300 text-turquesa-700 hover:bg-turquesa-50 text-xs font-semibold min-h-[36px] inline-flex items-center gap-1 whitespace-nowrap"
+              >
+                <MaterialIcon name="undo" size="small" />
+                Recuperar
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <ConfirmDialog
+        open={confirmClearAll}
+        title="Recuperar todas las canciones descartadas"
+        icon="undo"
+        confirmLabel="Sí, recuperar todas"
+        confirmVariant="primary"
+        onConfirm={() => {
+          clearAllDismissed();
+          setConfirmClearAll(false);
+        }}
+        onCancel={() => setConfirmClearAll(false)}
+        message={
+          <p>
+            Las {dismissed.length}{' '}
+            {dismissed.length === 1 ? 'canción' : 'canciones'} que descartaste
+            volverán al catálogo y podrán aparecer en futuras listas.
+          </p>
+        }
+      />
     </div>
   );
 }
