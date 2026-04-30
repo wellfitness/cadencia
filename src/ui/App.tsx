@@ -578,7 +578,6 @@ function WizardApp(): JSX.Element {
             meta={routeMeta}
             tracks={livePool}
             preferences={musicPreferences}
-            onPreferencesChange={setMusicPreferences}
             sourceMode={musicSourceMode}
             onSourceModeChange={setMusicSourceMode}
             uploadedCsvs={uploadedCsvs}

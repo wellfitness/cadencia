@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useMemo, useState } from 'react';
 import {
   analyzePoolCoverage,
   type CrossZoneMode,
@@ -7,13 +7,12 @@ import {
   type PoolCoverage,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import { getTopGenres, parseTrackCsv, type Track } from '@core/tracks';
+import { parseTrackCsv, type Track } from '@core/tracks';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { ExportifyHowto } from '@ui/components/ExportifyHowto';
 import { FileDropzone } from '@ui/components/FileDropzone';
-import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistPreviewRow } from '@ui/components/PlaylistPreviewRow';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
@@ -28,9 +27,12 @@ export interface MusicStepProps {
   meta: RouteMeta;
   /** Catalogo activo combinado (predefinido + uploads del usuario) calculado en App. */
   tracks: readonly Track[];
-  /** Preferencias controladas: el reducer vive en App para sobrevivir remountajes. */
+  /**
+   * Preferencias musicales del usuario (generos preferidos + "todo con
+   * energia"). Read-only desde MusicStep — la edicion vive en
+   * /preferencias para que sean ajustes persistentes.
+   */
   preferences: MatchPreferences;
-  onPreferencesChange: (next: MatchPreferences) => void;
   /** Fuente del catalogo (mine / both). Controlada desde App. */
   sourceMode: MusicSourceMode;
   onSourceModeChange: (next: MusicSourceMode) => void;
@@ -65,7 +67,6 @@ export function MusicStep({
   meta,
   tracks,
   preferences,
-  onPreferencesChange,
   sourceMode,
   onSourceModeChange,
   uploadedCsvs,
@@ -79,8 +80,6 @@ export function MusicStep({
   // Unico state local que sobrevive: errores transitorios de subida de CSV.
   // Todo lo demas viene controlado desde App.
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
 
   // Pre-check de cobertura: cuantos tracks unicos hace falta por zona
   // para cumplir la regla "cero repeticiones" sin huecos.
@@ -122,13 +121,6 @@ export function MusicStep({
 
   const handleRemoveCsv = (id: string): void => {
     onCsvRemoved(id);
-  };
-
-  const setGenres = (genres: string[]): void => {
-    onPreferencesChange({ ...preferences, preferredGenres: genres });
-  };
-  const setAllEnergetic = (e: ChangeEvent<HTMLInputElement>): void => {
-    onPreferencesChange({ ...preferences, allEnergetic: e.target.checked });
   };
 
   const totalMinutes = Math.round(meta.totalDurationSec / 60);
@@ -182,11 +174,11 @@ export function MusicStep({
           />
           <span className="flex-1 min-w-0">
             <span className="block text-sm font-semibold text-gris-800">
-              Personalizar catálogo nativo
+              Editar mi catálogo
             </span>
             <span className="block text-xs text-gris-500">
-              Descarta canciones que no te gusten y descárgalas como tu CSV propio para
-              subirlo después.
+              Sube tus listas de Spotify, desmarca canciones del catálogo predefinido
+              y revisa las que descartaste. Todo se guarda en tu navegador.
             </span>
           </span>
           <MaterialIcon
@@ -275,38 +267,7 @@ export function MusicStep({
         )}
       </Card>
 
-      <Card title="Tus preferencias" titleIcon="tune">
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm font-semibold text-gris-700 mb-2">
-              Géneros que te van
-            </p>
-            <p className="text-xs text-gris-500 mb-3">
-              Marca los que te gusten. Si no marcas ninguno, usamos todo el catálogo.
-            </p>
-            <GenrePills
-              availableGenres={topGenres}
-              selectedGenres={preferences.preferredGenres}
-              onChange={setGenres}
-            />
-          </div>
-          <label className="flex items-start gap-3 cursor-pointer min-h-[44px]">
-            <input
-              type="checkbox"
-              checked={preferences.allEnergetic}
-              onChange={setAllEnergetic}
-              className="mt-1 w-5 h-5 accent-turquesa-600 cursor-pointer"
-            />
-            <div>
-              <p className="text-sm font-semibold text-gris-700">Todo con energía</p>
-              <p className="text-xs text-gris-500">
-                Sube el listón en zonas suaves (Z1-Z2) para que ningún tramo se sienta
-                blando.
-              </p>
-            </div>
-          </label>
-        </div>
-      </Card>
+      <PreferencesSummary preferences={preferences} />
 
       {!coverage.ok && (
         <PoolCoverageWarning
@@ -494,5 +455,60 @@ function FooterActions({ onBack, onNext, canGoNext }: FooterActionsProps): JSX.E
         </>
       }
     />
+  );
+}
+
+interface PreferencesSummaryProps {
+  preferences: MatchPreferences;
+}
+
+/**
+ * Resumen read-only de las preferencias musicales del usuario (generos
+ * preferidos + "todo con energia"). La edicion vive en /preferencias →
+ * Catalogo de musica para que sean ajustes que perduran entre sesiones,
+ * no algo que el usuario tenga que volver a marcar cada vez.
+ */
+function PreferencesSummary({ preferences }: PreferencesSummaryProps): JSX.Element {
+  const hasGenres = preferences.preferredGenres.length > 0;
+  return (
+    <Card title="Tus preferencias" titleIcon="tune">
+      <div className="text-sm text-gris-700 space-y-2">
+        {hasGenres ? (
+          <p>
+            <strong>Géneros preferidos:</strong>{' '}
+            <span className="inline-flex flex-wrap gap-1 align-middle">
+              {preferences.preferredGenres.map((g) => (
+                <span
+                  key={g}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-turquesa-100 text-turquesa-800"
+                >
+                  {g}
+                </span>
+              ))}
+            </span>
+          </p>
+        ) : (
+          <p className="text-gris-500">
+            No has marcado géneros preferidos. Usaremos todo tu catálogo.
+          </p>
+        )}
+        {preferences.allEnergetic && (
+          <p className="text-xs text-gris-600">
+            <MaterialIcon name="bolt" size="small" className="text-turquesa-600 mr-1" />
+            «Todo con energía» activado.
+          </p>
+        )}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => navigateInApp('/preferencias')}
+          className="inline-flex items-center gap-1 text-sm text-turquesa-700 font-semibold hover:text-turquesa-800 hover:underline min-h-[36px]"
+        >
+          <MaterialIcon name="edit" size="small" />
+          Editar mis preferencias
+        </button>
+      </div>
+    </Card>
   );
 }

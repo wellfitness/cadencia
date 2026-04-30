@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import { Card } from '@ui/components/Card';
 import { Button } from '@ui/components/Button';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
+import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { GoogleSyncCard } from '@ui/components/sync/GoogleSyncCard';
 import { useCadenciaData, clearCadenciaData } from '@ui/state/cadenciaStore';
@@ -10,6 +11,8 @@ import { listSavedSessions, deleteSavedSession } from '@core/sessions/saved';
 import { calculateTotalDurationSec } from '@core/segmentation';
 import { navigateInApp } from '@ui/utils/navigation';
 import { BIKE_TYPE_LABELS } from '@core/power';
+import { getTopGenres, loadNativeTracks } from '@core/tracks';
+import { EMPTY_PREFERENCES, type MatchPreferences } from '@core/matching';
 import {
   isPersistentStorageEnabled,
   loadUserInputsFromSession,
@@ -365,120 +368,138 @@ function SavedSessionsSection(): JSX.Element {
  * el editor con sus tres pestañas.
  */
 function CatalogSection({ data }: SectionProps): JSX.Element {
-  const lists = useMemo(
+  const uploadedLists = useMemo(
     () => hydrateUploadedCsvs(data.uploadedCsvs),
     [data.uploadedCsvs],
   );
   const dismissedCount = data.dismissedTrackUris.length;
   const excludedCount = data.nativeCatalogPrefs?.excludedUris.length ?? 0;
-  const prefs = data.musicPreferences;
-  const hasPrefs =
-    prefs !== null &&
-    (prefs.preferredGenres.length > 0 || prefs.allEnergetic === true);
-  const nothingAtAll =
-    lists.length === 0 &&
-    dismissedCount === 0 &&
-    excludedCount === 0 &&
-    !hasPrefs;
+
+  // Top 12 generos del pool actual (nativo + tus listas, dedup por
+  // implicito ya que getTopGenres trabaja sobre la lista que le pases).
+  // Memo unico por mount: loadNativeTracks esta cacheado a nivel modulo
+  // y los uploaded ya estan hidratados.
+  const topGenres = useMemo(() => {
+    const allTracks = [
+      ...loadNativeTracks(),
+      ...uploadedLists.flatMap((l) => [...l.tracks]),
+    ];
+    return getTopGenres(allTracks, 12);
+  }, [uploadedLists]);
+
+  const prefs: MatchPreferences = data.musicPreferences ?? EMPTY_PREFERENCES;
+
+  const handleGenresChange = (preferredGenres: string[]): void => {
+    updateSection('musicPreferences', { ...prefs, preferredGenres });
+  };
+  const handleAllEnergeticChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    updateSection('musicPreferences', { ...prefs, allEnergetic: e.target.checked });
+  };
 
   return (
     <Card title="Catálogo de música" titleIcon="library_music">
-      {nothingAtAll ? (
-        <EmptyHint
-          icon="info"
-          text="Aún no has personalizado tu música. En el paso «Música» de una sesión eliges géneros y subes tus listas; en el editor del catálogo decides qué canciones del catálogo predefinido quieres conservar."
-        />
-      ) : (
-        <ul className="space-y-2 text-sm text-gris-700">
-          {hasPrefs && prefs !== null && (
-            <li className="flex items-start gap-2">
-              <MaterialIcon
-                name="music_note"
-                size="small"
-                className="text-turquesa-600 mt-0.5 shrink-0"
-              />
-              <div className="flex-1 min-w-0 space-y-1">
-                {prefs.preferredGenres.length > 0 && (
-                  <p>
-                    <strong>Géneros preferidos:</strong>{' '}
-                    <span className="inline-flex flex-wrap gap-1 align-middle">
-                      {prefs.preferredGenres.map((g) => (
-                        <span
-                          key={g}
-                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-turquesa-100 text-turquesa-800"
-                        >
-                          {g}
-                        </span>
-                      ))}
-                    </span>
-                  </p>
-                )}
-                {prefs.allEnergetic && (
-                  <p className="text-xs text-gris-600">
-                    «Todo con energía» activado
-                  </p>
-                )}
-              </div>
-            </li>
-          )}
-          {lists.length > 0 && (
-            <li className="flex items-start gap-2">
-              <MaterialIcon
-                name="upload_file"
-                size="small"
-                className="text-turquesa-600 mt-0.5 shrink-0"
-              />
-              <span>
-                <strong>
-                  {lists.length} {lists.length === 1 ? 'lista subida' : 'listas subidas'}
-                </strong>
-                {': '}
-                <span className="text-gris-500">
-                  {lists
-                    .slice(0, 3)
-                    .map((l) => l.name)
-                    .join(', ')}
-                  {lists.length > 3 && ` y ${lists.length - 3} más`}
+      {/* Bloque editable: generos preferidos + "todo con energia". Al
+          cambiar, se persiste inmediatamente en cadenciaStore (y a Drive
+          si esta conectado). */}
+      <div className="space-y-3 pb-3 border-b border-gris-100">
+        <div>
+          <p className="text-sm font-semibold text-gris-700 mb-1">
+            Géneros que te van
+          </p>
+          <p className="text-xs text-gris-500 mb-2">
+            Marca los que te gusten. Si no marcas ninguno, usamos todo el catálogo.
+          </p>
+          <GenrePills
+            availableGenres={topGenres}
+            selectedGenres={prefs.preferredGenres}
+            onChange={handleGenresChange}
+          />
+        </div>
+        <label className="flex items-start gap-3 cursor-pointer min-h-[44px]">
+          <input
+            type="checkbox"
+            checked={prefs.allEnergetic}
+            onChange={handleAllEnergeticChange}
+            className="mt-1 w-5 h-5 accent-turquesa-600 cursor-pointer"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gris-700">Todo con energía</p>
+            <p className="text-xs text-gris-500">
+              Sube el listón en zonas suaves (Z1-Z2) para que ningún tramo se
+              sienta blando.
+            </p>
+          </div>
+        </label>
+      </div>
+
+      {/* Resumen de tu catalogo: listas, descartes, personalizaciones. */}
+      <div className="pt-3">
+        {uploadedLists.length === 0 && dismissedCount === 0 && excludedCount === 0 ? (
+          <p className="text-sm text-gris-500">
+            Aún no has subido listas propias ni personalizado el catálogo predefinido.
+          </p>
+        ) : (
+          <ul className="space-y-2 text-sm text-gris-700">
+            {uploadedLists.length > 0 && (
+              <li className="flex items-start gap-2">
+                <MaterialIcon
+                  name="upload_file"
+                  size="small"
+                  className="text-turquesa-600 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>
+                    {uploadedLists.length}{' '}
+                    {uploadedLists.length === 1 ? 'lista subida' : 'listas subidas'}
+                  </strong>
+                  {': '}
+                  <span className="text-gris-500">
+                    {uploadedLists
+                      .slice(0, 3)
+                      .map((l) => l.name)
+                      .join(', ')}
+                    {uploadedLists.length > 3 && ` y ${uploadedLists.length - 3} más`}
+                  </span>
                 </span>
-              </span>
-            </li>
-          )}
-          {dismissedCount > 0 && (
-            <li className="flex items-start gap-2">
-              <MaterialIcon
-                name="block"
-                size="small"
-                className="text-rosa-600 mt-0.5 shrink-0"
-              />
-              <span>
-                <strong>
-                  {dismissedCount}{' '}
-                  {dismissedCount === 1 ? 'canción descartada' : 'canciones descartadas'}
-                </strong>
-                <span className="text-gris-500"> · no aparecerán en futuras listas</span>
-              </span>
-            </li>
-          )}
-          {excludedCount > 0 && (
-            <li className="flex items-start gap-2">
-              <MaterialIcon
-                name="tune"
-                size="small"
-                className="text-tulipTree-600 mt-0.5 shrink-0"
-              />
-              <span>
-                <strong>
-                  {excludedCount}{' '}
-                  {excludedCount === 1
-                    ? 'canción desmarcada'
-                    : 'canciones desmarcadas'}{' '}
-                  del catálogo predefinido
-                </strong>
-              </span>
-            </li>
-          )}
-        </ul>
-      )}
+              </li>
+            )}
+            {dismissedCount > 0 && (
+              <li className="flex items-start gap-2">
+                <MaterialIcon
+                  name="block"
+                  size="small"
+                  className="text-rosa-600 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>
+                    {dismissedCount}{' '}
+                    {dismissedCount === 1 ? 'canción descartada' : 'canciones descartadas'}
+                  </strong>
+                  <span className="text-gris-500"> · no aparecerán en futuras listas</span>
+                </span>
+              </li>
+            )}
+            {excludedCount > 0 && (
+              <li className="flex items-start gap-2">
+                <MaterialIcon
+                  name="tune"
+                  size="small"
+                  className="text-tulipTree-600 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>
+                    {excludedCount}{' '}
+                    {excludedCount === 1
+                      ? 'canción desmarcada'
+                      : 'canciones desmarcadas'}{' '}
+                    del catálogo predefinido
+                  </strong>
+                </span>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
       <div className="mt-3 flex justify-end">
         <Button
           variant="secondary"

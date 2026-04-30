@@ -124,12 +124,12 @@ export function PlaylistTrackRow({
       {showPicker && (
         <div className="mt-2 pt-2 border-t border-gris-100 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <RandomPickButton
+            <AlternativesPicker
               alternatives={alternatives ?? []}
               onSelect={onReplaceWith}
               rowIndex={index}
             />
-            <AlternativesPicker
+            <RandomPickButton
               alternatives={alternatives ?? []}
               onSelect={onReplaceWith}
               rowIndex={index}
@@ -144,7 +144,7 @@ export function PlaylistTrackRow({
                 title="No la quiero en futuras playlists"
                 className="!text-rosa-600 hover:!bg-rosa-50 hover:!border-rosa-300"
               >
-                No la quiero
+                <span className="hidden sm:inline">No la quiero</span>
               </Button>
             )}
           </div>
@@ -197,7 +197,7 @@ function RandomPickButton({
       aria-label={`Elegir un tema al azar para el tramo ${rowIndex}`}
       title="Sustituir por un tema aleatorio de las alternativas"
     >
-      Aleatorio
+      <span className="hidden sm:inline">Aleatorio</span>
     </Button>
   );
 }
@@ -376,14 +376,18 @@ function AlternativesPicker({
         variant="secondary"
         size="sm"
         iconLeft="refresh"
-        iconRight={open ? 'expand_less' : 'expand_more'}
         onClick={() => setOpen((prev) => !prev)}
         aria-label={`Cambiar tema del tramo ${rowIndex}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
       >
-        Otro tema
+        <span className="hidden sm:inline">Otro tema</span>
+        <MaterialIcon
+          name={open ? 'expand_less' : 'expand_more'}
+          size="small"
+          className="hidden sm:inline-flex"
+        />
       </Button>
       {popover}
     </div>
