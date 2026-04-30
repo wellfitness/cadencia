@@ -29,6 +29,12 @@ export interface PlaylistTrackRowProps {
    * en modo GPX; en sesión indoor los datos de elevación son 0.
    */
   showSlope?: boolean;
+  /**
+   * Callback opcional para descartar globalmente la cancion actual. Si se
+   * proporciona, se renderiza un boton "X" junto a "Otro tema". El padre
+   * decide la UX (modal de confirmacion + sustitucion automatica del slot).
+   */
+  onDismiss?: (uri: string, name: string) => void;
 }
 
 const QUALITY_LABEL: Record<MatchedSegment['matchQuality'], string | null> = {
@@ -51,6 +57,7 @@ export function PlaylistTrackRow({
   replaced = false,
   onGoToMusicStep,
   showSlope = false,
+  onDismiss,
 }: PlaylistTrackRowProps): JSX.Element {
   const { track, zone, matchQuality } = matched;
   const qualityLabel = QUALITY_LABEL[matchQuality];
@@ -127,6 +134,19 @@ export function PlaylistTrackRow({
               onSelect={onReplaceWith}
               rowIndex={index}
             />
+            {onDismiss !== undefined && (
+              <Button
+                variant="secondary"
+                size="sm"
+                iconLeft="block"
+                onClick={() => onDismiss(track.uri, track.name)}
+                aria-label={`Descartar definitivamente ${track.name}`}
+                title="No la quiero en futuras playlists"
+                className="!text-rosa-600 hover:!bg-rosa-50 hover:!border-rosa-300"
+              >
+                No la quiero
+              </Button>
+            )}
           </div>
           {qualityLabel && (
             <span

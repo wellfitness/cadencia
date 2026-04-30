@@ -38,12 +38,15 @@ import {
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
+import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { Input } from '@ui/components/Input';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistTrackRow } from '@ui/components/PlaylistTrackRow';
 import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
+import { addDismissedUri } from '@core/csvs/dismissed';
+import { navigateInApp } from '@ui/utils/navigation';
 
 export interface ResultStepProps {
   validation: ValidationResult;
@@ -177,6 +180,20 @@ export function ResultStep({
       });
   }, [clientId]);
 
+  // Estado del modal de descarte global. Cuando hay un target, mostramos
+  // ConfirmDialog. Tras confirmar: persistimos la URI en cadenciaStore
+  // (sincronizado con Drive) y sustituimos el slot afectado en la playlist
+  // actual con `replaceTrackInSegment` para no dejar huecos visibles.
+  // (Declarados ANTES del early return de clientId para no violar
+  // rules-of-hooks.)
+  const [dismissTarget, setDismissTarget] = useState<{
+    uri: string;
+    name: string;
+  } | null>(null);
+  // Contador local de descartes en esta sesion del wizard. Util para el
+  // toast informativo "Has descartado N · Ver descartes en Mi cuenta".
+  const [sessionDismissCount, setSessionDismissCount] = useState<number>(0);
+
   if (clientId === null) {
     return <MissingClientIdMessage onBack={onBack} />;
   }
@@ -188,6 +205,43 @@ export function ResultStep({
     const next = new Set(replacedIndices);
     next.add(index);
     onReplacedIndicesChange(next);
+  };
+
+  const handleRequestDismiss = (uri: string, name: string): void => {
+    setDismissTarget({ uri, name });
+  };
+
+  const handleConfirmDismiss = (): void => {
+    if (!dismissTarget) return;
+    const { uri } = dismissTarget;
+    addDismissedUri(uri);
+
+    // Sustituir el slot afectado (y todos los slots que repitan el mismo URI
+    // en modo overlap). Tras dismiss, el track ya NO esta en livePool
+    // (filtrado en App.tsx), pero matched es el state previo: hay que llamar
+    // replaceTrackInSegment slot-a-slot para que el motor escoja una
+    // alternativa libre.
+    let working: readonly MatchedSegment[] = matched;
+    const newReplacedIndices = new Set(replacedIndices);
+    const indices: number[] = [];
+    matched.forEach((m, i) => {
+      if (m.track && m.track.uri === uri) indices.push(i);
+    });
+    for (const idx of indices) {
+      const result = replaceTrackInSegment(working, idx, tracks, preferences, uri);
+      if (result.replaced) {
+        working = result.matched;
+        newReplacedIndices.add(idx);
+      }
+    }
+    onMatchedChange([...working]);
+    onReplacedIndicesChange(newReplacedIndices);
+    setSessionDismissCount((n) => n + indices.length);
+    setDismissTarget(null);
+  };
+
+  const handleCancelDismiss = (): void => {
+    setDismissTarget(null);
   };
 
   const handleCreatePlaylist = async (): Promise<void> => {
@@ -365,6 +419,7 @@ export function ResultStep({
                   index={i + 1}
                   alternatives={alternativesByIndex[i] ?? []}
                   onReplaceWith={(uri) => handleReplaceWith(i, uri)}
+                  onDismiss={handleRequestDismiss}
                   replaced={replacedIndices.has(i)}
                   showSlope={crossZoneMode === 'overlap'}
                   {...(onGoToMusicStep !== undefined ? { onGoToMusicStep } : {})}
@@ -464,6 +519,52 @@ export function ResultStep({
           ? { onDownloadZwo: handleDownloadZwo }
           : {})}
       />
+
+      <ConfirmDialog
+        open={dismissTarget !== null}
+        title="Descartar canción"
+        icon="block"
+        confirmLabel="Descartar"
+        confirmVariant="critical"
+        cancelLabel="Cancelar"
+        onConfirm={handleConfirmDismiss}
+        onCancel={handleCancelDismiss}
+        message={
+          <>
+            <p>
+              <strong>"{dismissTarget?.name ?? ''}"</strong> no volverá a aparecer en
+              ninguna playlist que generes con Cadencia.
+            </p>
+            <p className="mt-2 text-gris-600">
+              Puedes recuperarla más tarde desde{' '}
+              <strong>Mi cuenta → Canciones descartadas</strong>.
+            </p>
+          </>
+        }
+      />
+
+      {sessionDismissCount > 0 && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 max-w-md w-[calc(100%-2rem)] rounded-lg border border-turquesa-300 bg-turquesa-50 px-4 py-2.5 shadow-md flex items-center gap-2"
+        >
+          <MaterialIcon name="block" size="small" className="text-turquesa-700 shrink-0" />
+          <p className="text-xs text-turquesa-900 flex-1 min-w-0">
+            Has descartado {sessionDismissCount}{' '}
+            {sessionDismissCount === 1 ? 'canción' : 'canciones'} en esta sesión.
+          </p>
+          <a
+            href="/cuenta"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/cuenta');
+            }}
+            className="text-xs font-semibold text-turquesa-700 hover:underline whitespace-nowrap"
+          >
+            Ver descartes
+          </a>
+        </div>
+      )}
     </WizardStep>
   );
 }
