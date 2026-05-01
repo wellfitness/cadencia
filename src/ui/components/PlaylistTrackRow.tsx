@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { AlternativeCandidate, MatchedSegment } from '@core/matching';
 import { Button } from './Button';
@@ -213,6 +213,16 @@ interface PopoverPosition {
   left: number;
 }
 
+// Normaliza para búsqueda diacritic-insensitive: "Avíccii" matchea "avicii",
+// "café" matchea "cafe". El público hispanohablante teclea con/sin tildes
+// indistintamente.
+function normalizeForSearch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '');
+}
+
 function AlternativesPicker({
   alternatives,
   onSelect,
@@ -220,10 +230,26 @@ function AlternativesPicker({
 }: AlternativesPickerProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
+  const [query, setQuery] = useState('');
   const anchorRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
   const isEmpty = alternatives.length === 0;
+
+  // Filtrado client-side por nombre o artistas. Mantiene el orden original
+  // por score (es solo `Array.filter`), por lo que las "mejores" alternativas
+  // siguen apareciendo arriba aunque el usuario escriba.
+  const filtered = useMemo(() => {
+    const trimmed = query.trim();
+    if (trimmed === '') return alternatives;
+    const needle = normalizeForSearch(trimmed);
+    return alternatives.filter((alt) => {
+      if (normalizeForSearch(alt.track.name).includes(needle)) return true;
+      if (normalizeForSearch(alt.track.artists.join(' ')).includes(needle)) return true;
+      return false;
+    });
+  }, [alternatives, query]);
 
   // Calcula y mantiene la posicion del popover anclada al boton. El popover
   // vive en un portal a document.body para no ser recortado por ancestros
@@ -259,6 +285,22 @@ function AlternativesPicker({
     return () => {
       window.removeEventListener('scroll', update, true);
       window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
+  // Reset del filtro al cerrar: si el usuario reabre el dropdown vuelve al
+  // ranking original sin tener que limpiar el campo a mano. El autofocus se
+  // hace en el siguiente tick para que React haya renderizado el input antes.
+  useEffect(() => {
+    if (!open) {
+      setQuery('');
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(handle);
     };
   }, [open]);
 
@@ -323,6 +365,41 @@ function AlternativesPicker({
               </div>
             ) : (
               <>
+                <div className="sticky top-0 z-10 bg-white border-b border-gris-100 px-2 py-2">
+                  <label className="block">
+                    <span className="sr-only">Buscar por título o artista</span>
+                    <div className="relative">
+                      <MaterialIcon
+                        name="search"
+                        size="small"
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gris-400 pointer-events-none"
+                      />
+                      <input
+                        ref={searchInputRef}
+                        type="search"
+                        value={query}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                          setQuery(e.target.value)
+                        }
+                        placeholder="Buscar por título o artista…"
+                        className="w-full pl-8 pr-8 py-1.5 text-sm rounded-md border border-gris-300 bg-white focus:outline-none focus:ring-2 focus:ring-turquesa-400 focus:border-turquesa-400 min-h-[36px]"
+                      />
+                      {query !== '' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuery('');
+                            searchInputRef.current?.focus();
+                          }}
+                          aria-label="Limpiar búsqueda"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 text-gris-400 hover:text-rosa-600 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-turquesa-400"
+                        >
+                          <MaterialIcon name="close" size="small" />
+                        </button>
+                      )}
+                    </div>
+                  </label>
+                </div>
                 {isFallback && (
                   <div className="px-3 py-2 border-b border-gris-100 bg-tulipTree-50/60 flex items-center gap-1.5">
                     <MaterialIcon
@@ -335,34 +412,42 @@ function AlternativesPicker({
                     </p>
                   </div>
                 )}
-                <ul className="py-1">
-                  {alternatives.map((alt) => (
-                    <li key={alt.track.uri}>
-                      <div className="flex items-center gap-2 px-2">
-                        <TrackPreviewButton uri={alt.track.uri} />
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={false}
-                          onClick={() => handleSelect(alt.track.uri)}
-                          className="flex-1 text-left px-1 py-2 min-h-[44px] flex items-center gap-3 rounded hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gris-800 truncate">
-                              {alt.track.name}
-                            </p>
-                            <p className="text-xs text-gris-500 truncate">
-                              {alt.track.artists.join(', ')}
-                            </p>
-                          </div>
-                          <span className="text-xs text-gris-500 tabular-nums shrink-0">
-                            {Math.round(alt.track.tempoBpm)} bpm
-                          </span>
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                {filtered.length === 0 ? (
+                  <div className="px-3 py-4 text-center">
+                    <p className="text-xs text-gris-600">
+                      Sin resultados para «{query}»
+                    </p>
+                  </div>
+                ) : (
+                  <ul className="py-1">
+                    {filtered.map((alt) => (
+                      <li key={alt.track.uri}>
+                        <div className="flex items-center gap-2 px-2">
+                          <TrackPreviewButton uri={alt.track.uri} />
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={false}
+                            onClick={() => handleSelect(alt.track.uri)}
+                            className="flex-1 text-left px-1 py-2 min-h-[44px] flex items-center gap-3 rounded hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gris-800 truncate">
+                                {alt.track.name}
+                              </p>
+                              <p className="text-xs text-gris-500 truncate">
+                                {alt.track.artists.join(', ')}
+                              </p>
+                            </div>
+                            <span className="text-xs text-gris-500 tabular-nums shrink-0">
+                              {Math.round(alt.track.tempoBpm)} bpm
+                            </span>
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </>
             )}
           </div>,
