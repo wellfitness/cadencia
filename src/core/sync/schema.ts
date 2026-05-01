@@ -12,6 +12,7 @@ export function emptySyncedData(): SyncedData {
     nativeCatalogPrefs: null,
     dismissedTrackUris: [],
     plannedEvents: [],
+    playlistHistory: [],
   };
 }
 
@@ -35,5 +36,7 @@ export function isSyncedData(value: unknown): value is SyncedData {
     Array.isArray(v['uploadedCsvs']) &&
     Array.isArray(v['dismissedTrackUris']) &&
     Array.isArray(v['plannedEvents'])
+    // playlistHistory NO se valida aqui (back-compat con blobs antiguos
+    // que no la traen). normalize() en cadenciaStore la rellena con [].
   );
 }

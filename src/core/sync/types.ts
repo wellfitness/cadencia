@@ -2,8 +2,10 @@ import type { UserInputsRaw } from '../user/userInputs';
 import type { MatchPreferences } from '../matching';
 import type { EditableSessionPlan } from '../segmentation';
 import type { PlannedEvent } from '../calendar/types';
+import type { PlaylistHistoryEntry } from '../playlist/historyTypes';
 
 export type { PlannedEvent } from '../calendar/types';
+export type { PlaylistHistoryEntry, PlaylistHistoryTrack } from '../playlist/historyTypes';
 
 export const SCHEMA_VERSION = 1;
 
@@ -88,6 +90,7 @@ export interface SyncedData {
     nativeCatalogPrefs?: SectionMeta;
     dismissedTrackUris?: SectionMeta;
     plannedEvents?: SectionMeta;
+    playlistHistory?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
@@ -107,6 +110,12 @@ export interface SyncedData {
    * que `savedSessions`.
    */
   plannedEvents: PlannedEvent[];
+  /**
+   * Historial de playlists creadas en Spotify: snapshot frozen de cada
+   * generacion confirmada. Mismo patron de array merge LWW + tombstones
+   * que `savedSessions`. Alimenta la pestana de Estadisticas en /catalogo.
+   */
+  playlistHistory: PlaylistHistoryEntry[];
 }
 
 export type SyncStatus =

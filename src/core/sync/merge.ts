@@ -1,5 +1,6 @@
 import type {
   PlannedEvent,
+  PlaylistHistoryEntry,
   SavedSession,
   SyncedData,
   UploadedCsvRecord,
@@ -186,6 +187,30 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
   if (eventTimes.length > 0) {
     merged._sectionMeta.plannedEvents = {
       updatedAt: new Date(maxOf(eventTimes)).toISOString(),
+    };
+  }
+
+  // Mismo patron de array-merge para playlistHistory.
+  const historyById = new Map<string, PlaylistHistoryEntry>();
+  for (const item of local.playlistHistory) historyById.set(item.id, item);
+  for (const remoteItem of remote.playlistHistory) {
+    const localItem = historyById.get(remoteItem.id);
+    if (!localItem) {
+      historyById.set(remoteItem.id, remoteItem);
+      continue;
+    }
+    const localTime = new Date(localItem.updatedAt).getTime();
+    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    historyById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
+  }
+  merged.playlistHistory = Array.from(historyById.values());
+
+  const historyTimes = merged.playlistHistory
+    .map((h) => new Date(h.updatedAt).getTime())
+    .filter((t) => Number.isFinite(t));
+  if (historyTimes.length > 0) {
+    merged._sectionMeta.playlistHistory = {
+      updatedAt: new Date(maxOf(historyTimes)).toISOString(),
     };
   }
 

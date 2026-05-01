@@ -15,9 +15,10 @@ import {
   createUploadedCsv,
   deleteUploadedCsv,
 } from '@core/csvs/uploadedCsvs';
-import { removeDismissedUri, clearAllDismissed } from '@core/csvs/dismissed';
+import { addDismissedUri, removeDismissedUri, clearAllDismissed } from '@core/csvs/dismissed';
 import { useCadenciaData } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
+import { StatsTab } from '@ui/components/catalog/StatsTab';
 
 export interface CatalogEditorPageProps {
   /** Callback que vuelve al wizard. Lo inyecta App tras detectar la ruta. */
@@ -39,7 +40,7 @@ export interface CatalogEditorPageProps {
  * usuario cierra sin descargar, las marcas se pierden. Coherente con que
  * los CSVs subidos tampoco se persisten en `App` (solo viven en memoria).
  */
-type Tab = 'native' | 'mine' | 'dismissed';
+type Tab = 'native' | 'mine' | 'dismissed' | 'stats';
 
 function readInitialTab(): Tab {
   if (typeof window === 'undefined') return 'native';
@@ -47,14 +48,30 @@ function readInitialTab(): Tab {
   const t = params.get('tab');
   if (t === 'mine') return 'mine';
   if (t === 'dismissed') return 'dismissed';
+  if (t === 'stats') return 'stats';
   return 'native';
 }
 
 export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Element {
-  const allTracks = useMemo(() => loadNativeTracks(), []);
+  const allTracksRaw = useMemo(() => loadNativeTracks(), []);
+  // Las descartadas globalmente viven en su propia pestana — no las repetimos
+  // en la pestana nativa. Subscripcion reactiva: si descartas/recuperas
+  // una cancion, la lista nativa se actualiza sin recargar la pagina.
+  const dismissedTrackUris = useCadenciaData().dismissedTrackUris;
+  const dismissedSet = useMemo(
+    () => new Set(dismissedTrackUris),
+    [dismissedTrackUris],
+  );
+  const allTracks = useMemo(
+    () => allTracksRaw.filter((t) => !dismissedSet.has(t.uri)),
+    [allTracksRaw, dismissedSet],
+  );
   const totalCount = allTracks.length;
 
   const [activeTab, setActiveTab] = useState<Tab>(() => readInitialTab());
+  const [dismissTarget, setDismissTarget] = useState<{ uri: string; name: string } | null>(
+    null,
+  );
 
   // Hidratar `included` desde la denylist persistida: incluido = NO esta
   // en excludedUris. Modelo runtime sigue siendo allowlist (mas ergonomico
@@ -101,7 +118,11 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
     }
     setSaveStatus('saving');
     const id = setTimeout(() => {
-      const excludedUris = allTracks
+      // La denylist se computa sobre allTracksRaw (no sobre allTracks
+      // filtrado por descartes), para preservar las marcas de exclusion del
+      // catalogo nativo aunque el usuario tenga tracks descartados ahora —
+      // si los recupera, su estado de "incluido/excluido" sobrevive.
+      const excludedUris = allTracksRaw
         .filter((t) => !included.has(t.uri))
         .map((t) => t.uri);
       setNativeCatalogPrefs({ excludedUris });
@@ -110,7 +131,7 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
       savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 1500);
     }, 300);
     return () => clearTimeout(id);
-  }, [included, allTracks]);
+  }, [included, allTracksRaw]);
 
   useEffect(() => {
     return () => {
@@ -209,6 +230,20 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
     const toDownload = allTracks.filter((t) => included.has(t.uri));
     const csv = serializeTracksToCsv(toDownload);
     downloadTextFile('cadencia-mi-catalogo.csv', 'text/csv;charset=utf-8', csv);
+  };
+
+  const handleRequestDismiss = (uri: string, name: string): void => {
+    setDismissTarget({ uri, name });
+  };
+
+  const handleConfirmDismiss = (): void => {
+    if (!dismissTarget) return;
+    addDismissedUri(dismissTarget.uri);
+    setDismissTarget(null);
+  };
+
+  const handleCancelDismiss = (): void => {
+    setDismissTarget(null);
   };
 
   const filtersActive =
@@ -315,6 +350,20 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
               <MaterialIcon name="block" size="small" />
               Descartadas
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'stats'}
+              onClick={() => setActiveTab('stats')}
+              className={`px-4 py-2 text-sm min-h-[44px] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
+                activeTab === 'stats'
+                  ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+                  : 'text-gris-600 hover:text-gris-800'
+              }`}
+            >
+              <MaterialIcon name="insights" size="small" />
+              Estadísticas
+            </button>
           </div>
 
           {/* Filas siguientes solo aplican al tab nativo (progreso y filtros) */}
@@ -374,6 +423,9 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
                         track={t}
                         checked={included.has(t.uri)}
                         onToggle={() => toggleIncluded(t.uri)}
+                        onRequestDismiss={() =>
+                          handleRequestDismiss(t.uri, t.name)
+                        }
                       />
                     </li>
                   ))}
@@ -382,8 +434,25 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
             ))}
           {activeTab === 'mine' && <MyListsTab />}
           {activeTab === 'dismissed' && <DismissedTab />}
+          {activeTab === 'stats' && <StatsTab />}
         </div>
       </main>
+      <ConfirmDialog
+        open={dismissTarget !== null}
+        title="No la quiero más"
+        icon="block"
+        confirmLabel="Sí, descártala"
+        confirmVariant="critical"
+        onConfirm={handleConfirmDismiss}
+        onCancel={handleCancelDismiss}
+        message={
+          <p>
+            <strong>{dismissTarget?.name}</strong> dejará de aparecer en futuras
+            listas, sea cual sea el catálogo. Puedes recuperarla cuando quieras
+            desde la pestaña «Descartadas».
+          </p>
+        }
+      />
     </div>
   );
 }
@@ -1003,6 +1072,12 @@ interface TrackRowProps {
   track: Track;
   checked: boolean;
   onToggle: () => void;
+  /**
+   * Descarta el track GLOBALMENTE (cross-source, persistido en
+   * dismissedTrackUris). Distinto del checkbox, que solo afecta a la
+   * denylist del catalogo nativo.
+   */
+  onRequestDismiss: () => void;
 }
 
 /**
@@ -1013,8 +1088,18 @@ interface TrackRowProps {
  *   junto al BPM. Triple señal visual (no solo color) para WCAG.
  * - Géneros se truncan con overflow-hidden + flex-nowrap para que no
  *   rompan layout en móvil; en hover la fila se eleva sutilmente.
+ * - Boton "No la quiero" a la derecha: descarte global persistente
+ *   (cross-source). Distinto del checkbox: el checkbox solo excluye del
+ *   catalogo nativo bundled; este boton descarta la cancion en CUALQUIER
+ *   source futura. La cancion desaparece de la pestana nativa y aparece
+ *   en "Descartadas" con un boton "Recuperar".
  */
-function TrackRow({ track, checked, onToggle }: TrackRowProps): JSX.Element {
+function TrackRow({
+  track,
+  checked,
+  onToggle,
+  onRequestDismiss,
+}: TrackRowProps): JSX.Element {
   const checkboxId = useId();
   const visibleGenres = track.genres.slice(0, 3);
   const extraGenres = track.genres.length - visibleGenres.length;
@@ -1112,6 +1197,16 @@ function TrackRow({ track, checked, onToggle }: TrackRowProps): JSX.Element {
           </span>
         )}
       </label>
+
+      <button
+        type="button"
+        onClick={onRequestDismiss}
+        aria-label={`No quiero ${track.name} en ninguna lista`}
+        title="No la quiero en ninguna lista (descarte global)"
+        className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-md text-rosa-600 hover:bg-rosa-50 hover:text-rosa-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rosa-400"
+      >
+        <MaterialIcon name="do_not_disturb_on" size="small" />
+      </button>
     </div>
   );
 }

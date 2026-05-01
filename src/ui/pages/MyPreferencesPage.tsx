@@ -5,7 +5,7 @@ import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { GoogleSyncCard } from '@ui/components/sync/GoogleSyncCard';
-import { useCadenciaData, clearCadenciaData } from '@ui/state/cadenciaStore';
+import { useCadenciaData, clearCadenciaData, usePlaylistHistory } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
 import { listSavedSessions, deleteSavedSession } from '@core/sessions/saved';
 import { calculateTotalDurationSec } from '@core/segmentation';
@@ -649,6 +649,7 @@ function CatalogSection({ data }: SectionProps): JSX.Element {
           </ul>
         )}
       </div>
+      <PlaylistHistoryStat />
       <div className="mt-3 flex justify-end">
         <Button
           variant="secondary"
@@ -660,6 +661,32 @@ function CatalogSection({ data }: SectionProps): JSX.Element {
         </Button>
       </div>
     </Card>
+  );
+}
+
+/**
+ * Mini-stat: nº de listas creadas en Spotify desde Cadencia. Si N=0,
+ * el componente no renderiza nada (el onboarding ya vive en /catalogo
+ * pestana Estadisticas).
+ */
+function PlaylistHistoryStat(): JSX.Element | null {
+  const history = usePlaylistHistory();
+  if (history.length === 0) return null;
+  return (
+    <div className="pt-3 mt-3 border-t border-gris-100">
+      <button
+        type="button"
+        onClick={() => navigateInApp('/catalogo?tab=stats')}
+        className="text-sm text-turquesa-700 hover:text-turquesa-800 hover:underline inline-flex items-center gap-1.5"
+      >
+        <MaterialIcon name="insights" size="small" />
+        <span>
+          Has creado <strong className="tabular-nums">{history.length}</strong>{' '}
+          {history.length === 1 ? 'lista' : 'listas'} en Spotify desde Cadencia ·
+          ver estadísticas
+        </span>
+      </button>
+    </div>
   );
 }
 

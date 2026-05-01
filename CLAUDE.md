@@ -81,7 +81,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
 | 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
 
-Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con pestañas nativo/listas-propias/descartadas y persistencia automática), `MyPreferencesPage` (`/preferencias`, vista consolidada de los datos guardados del usuario; alias `/cuenta` por retrocompatibilidad), `CalendarPage` (`/calendario`, planificación de entrenamientos en vista lista o mes), `HelpRouter` (`/ayuda/*`).
+Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con cuatro pestañas — catálogo nativo, listas propias, descartadas y **estadísticas** del historial real de playlists creadas — con persistencia automática), `MyPreferencesPage` (`/preferencias`, vista consolidada de los datos guardados del usuario; alias `/cuenta` por retrocompatibilidad), `CalendarPage` (`/calendario`, planificación de entrenamientos en vista lista o mes), `HelpRouter` (`/ayuda/*`).
 
 El **header del wizard** incluye un botón directo «Mis preferencias» (icono `manage_accounts`) y un `TodayBadge` que muestra el próximo entreno planificado y permite cargarlo de un click sin pasar por el calendario.
 
@@ -112,7 +112,13 @@ src/
       userInputs.ts           # Tipo UserInputsRaw (incluye `sport: 'bike' | 'run'`) + EMPTY
       validation.ts           # validateUserInputs(raw, currentYear, mode) — ramifica run vs bike+gpx vs bike+session
       storage.ts              # sessionStorage wrapper + localStorage opt-in legacy
-    playlist/                 # Builders de nombre y descripción de la playlist Spotify
+    playlist/                 # Builders de nombre y descripción de la playlist Spotify,
+                              # historial real de creaciones y stats agregadas
+      builder.ts              # buildPlaylistName, buildPlaylistDescription, extractUris
+      historyTypes.ts         # PlaylistHistoryEntry, PlaylistHistoryTrack
+      history.ts              # createPlaylistHistoryEntry, list/get/delete (tombstone), clearAll
+      historyStats.ts         # computeSummary, computeTopTracks, computeTopArtists,
+                              # computeTopGenresByDuration (ponderado por duración)
     sessionFormats/           # Import/export de planes en formatos externos (zwo.ts → Zwift Workout)
     sync/                     # Motor de sincronización (puro, agnóstico de Drive)
       types.ts                # SyncedData, SectionMeta, SavedSession
@@ -491,8 +497,9 @@ Para que el usuario pueda llevar sus datos entre el móvil y el ordenador sin re
 - `savedSessions`: planes de sesión indoor que el usuario haya guardado con un nombre desde el botón "Guardar como mi sesión" en `SessionBuilder`.
 - `uploadedCsvs`: listas CSV propias subidas por el usuario. Persistimos el `csvText` raw (re-parseable con `parseTrackCsv` en cada device) en lugar de los tracks parseados — más compacto, source-of-truth honesta y resistente a cambios futuros del catálogo de Spotify.
 - `nativeCatalogPrefs`: denylist (`excludedUris`) de canciones del catálogo nativo desmarcadas en `CatalogEditorPage`. Modelo denylist en lugar de allowlist porque típicamente <50 URIs vs 800.
-- `dismissedTrackUris`: URIs descartadas globalmente desde el botón "X" de `ResultStep` ("A pedalear"). Aplicables a cualquier source. El livePool del wizard las filtra antes del matching.
+- `dismissedTrackUris`: URIs descartadas globalmente. Dos puntos de entrada: (a) botón «No la quiero» en cada track de `ResultStep`; (b) botón rojo de cada fila del catálogo nativo en `CatalogEditorPage` (icono `do_not_disturb_on`). Aplicables a cualquier source. El livePool del wizard las filtra antes del matching y la pestaña «Catálogo nativo» las oculta de su lista (siguen accesibles en «Descartadas» con su botón «Recuperar»). Distinto del checkbox de inclusión/exclusión del catálogo nativo, que solo afecta a la denylist `nativeCatalogPrefs.excludedUris` (catálogo bundled), mientras que `dismissedTrackUris` es cross-source.
 - `plannedEvents`: entradas del **calendario de planificación** (`/calendario`) — entrenamientos futuros que el usuario ha programado. Pueden ser puntuales o recurrentes semanales (`recurrence.daysOfWeek`), de tipo `indoor` (referencia a una `SavedSession` por id) o `outdoor` (nombre + URL externa opcional, sin GPX persistido). Borrado lógico vía `deletedAt` con expiry 30 días. Ver «Calendario de planificación» abajo.
+- `playlistHistory`: historial de las playlists creadas en Spotify. Snapshot frozen capturado solo tras éxito de `createPlaylistWithTracks` en `ResultStep` (no en generaciones intermedias o abandonadas). Cada entrada lleva los tracks que llegaron a Spotify (uri, name, artist joineado, genres, tempoBpm, zona, duración del segmento, matchQuality, `wasReplaced` per-track), zoneDurations agregadas, deporte, modo (gpx/session) y la seed del motor. Mismo patrón de array merge LWW + tombstones que `savedSessions`. Alimenta la pestaña **Estadísticas** (`/catalogo?tab=stats`): top 20 tracks, top 15 artistas, top 10 géneros (ponderado por duración), distribución de zonas, ratio de sustituciones manuales y vista cronológica de las últimas 30 listas creadas. Funciones puras en `src/core/playlist/historyStats.ts`.
 
 **Qué NO se sincroniza** (deliberadamente):
 
@@ -517,6 +524,7 @@ export interface SyncedData {
     nativeCatalogPrefs?: SectionMeta;
     dismissedTrackUris?: SectionMeta;
     plannedEvents?: SectionMeta;
+    playlistHistory?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
@@ -525,11 +533,12 @@ export interface SyncedData {
   nativeCatalogPrefs: NativeCatalogPrefs | null;
   dismissedTrackUris: string[];
   plannedEvents: PlannedEvent[];
+  playlistHistory: PlaylistHistoryEntry[];
 }
 ```
 
 - **Atomic LWW por sección** (`userInputs`, `musicPreferences`, `nativeCatalogPrefs`, `dismissedTrackUris`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
-- **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`, `plannedEvents`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
+- **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`, `plannedEvents`, `playlistHistory`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
 - **Anti-regresión**: si local está vacío y remote tiene datos, aplica remote sin merge. Si local tiene <30% de la riqueza de remote (instalación nueva), también aplica remote directo.
 - **Anti-ciclo**: flag `_applyingRemote` evita que `pull` dispare `push` tras actualizar `cadenciaStore` con datos descargados.
 

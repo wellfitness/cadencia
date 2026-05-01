@@ -60,6 +60,7 @@ export function calculateDataRichness(data: SyncedData): number {
   score += logRichness(data.savedSessions.filter((s) => !s.deletedAt).length);
   score += logRichness(data.uploadedCsvs.filter((c) => !c.deletedAt).length);
   score += logRichness(data.plannedEvents.filter((e) => !e.deletedAt).length);
+  score += logRichness(data.playlistHistory.filter((h) => !h.deletedAt).length);
 
   if (data.nativeCatalogPrefs) {
     score += logRichness(data.nativeCatalogPrefs.excludedUris.length);

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { emptySyncedData, isSyncedData } from '@core/sync/schema';
-import type { SyncedData } from '@core/sync/types';
+import type { PlaylistHistoryEntry, SyncedData } from '@core/sync/types';
 
 const STORAGE_KEY = 'cadencia:data:v1';
 
@@ -39,6 +39,7 @@ function normalize(data: SyncedData): SyncedData {
     nativeCatalogPrefs: data.nativeCatalogPrefs ?? null,
     dismissedTrackUris: data.dismissedTrackUris ?? [],
     plannedEvents: data.plannedEvents ?? [],
+    playlistHistory: data.playlistHistory ?? [],
   };
 }
 
@@ -119,4 +120,26 @@ export function useCadenciaData(): SyncedData {
     return () => window.removeEventListener('cadencia-data-saved', handler);
   }, []);
   return data;
+}
+
+/**
+ * Hook reactivo que devuelve las entradas vivas del historial de playlists,
+ * mas reciente primero. Memoiza por `_sectionMeta.playlistHistory.updatedAt`
+ * para evitar re-renders cuando cambian otras secciones (ej. el usuario
+ * modifica userInputs y eso disparaba un re-compute innecesario de la
+ * pestana de Estadisticas).
+ */
+export function usePlaylistHistory(): readonly PlaylistHistoryEntry[] {
+  const data = useCadenciaData();
+  const sectionTimestamp = data._sectionMeta.playlistHistory?.updatedAt ?? '';
+  return useMemo(() => {
+    return data.playlistHistory
+      .filter((h) => !h.deletedAt)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // sectionTimestamp es la senal de invalidacion: cuando cambia, el
+    // useMemo recomputa. data.playlistHistory cambia en cada saveCadenciaData
+    // pero la mayoria son no-ops para esta seccion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionTimestamp]);
 }

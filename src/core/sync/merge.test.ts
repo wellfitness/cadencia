@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mergeData } from './merge';
 import { emptySyncedData } from './schema';
-import type { PlannedEvent, SavedSession, SyncedData, UploadedCsvRecord } from './types';
+import type {
+  PlannedEvent,
+  PlaylistHistoryEntry,
+  SavedSession,
+  SyncedData,
+  UploadedCsvRecord,
+} from './types';
 import { EMPTY_USER_INPUTS } from '../user/userInputs';
 
 function session(
@@ -276,5 +282,69 @@ describe('mergeData — dismissedTrackUris atomic LWW', () => {
     remote._sectionMeta.dismissedTrackUris = { updatedAt: '2026-04-29T10:00:00Z' };
     const { merged } = mergeData(local, remote);
     expect(merged.dismissedTrackUris).toEqual(['spotify:track:b', 'spotify:track:c']);
+  });
+});
+
+describe('mergeData — playlistHistory (array merge LWW por id)', () => {
+  function historyEntry(
+    id: string,
+    updatedAt: string,
+    deletedAt?: string,
+  ): PlaylistHistoryEntry {
+    const e: PlaylistHistoryEntry = {
+      id,
+      createdAt: '2026-04-01T00:00:00Z',
+      updatedAt,
+      sport: 'bike',
+      mode: 'session',
+      totalDurationSec: 60,
+      zoneDurations: { 1: 0, 2: 60, 3: 0, 4: 0, 5: 0, 6: 0 },
+      seed: 42,
+      tracks: [],
+    };
+    if (deletedAt !== undefined) e.deletedAt = deletedAt;
+    return e;
+  }
+
+  it('union cuando local y remote tienen entradas distintas', () => {
+    const local = emptySyncedData();
+    local.playlistHistory = [historyEntry('a', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.playlistHistory = [historyEntry('b', '2026-04-29T10:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    expect(merged.playlistHistory).toHaveLength(2);
+    expect(merged.playlistHistory.map((h) => h.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('mismo id: gana el de updatedAt mas reciente', () => {
+    const local = emptySyncedData();
+    local.playlistHistory = [historyEntry('a', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.playlistHistory = [historyEntry('a', '2026-04-29T11:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    expect(merged.playlistHistory).toHaveLength(1);
+    expect(merged.playlistHistory[0]?.updatedAt).toBe('2026-04-29T11:00:00Z');
+  });
+
+  it('tombstone propaga a otros dispositivos', () => {
+    const local = emptySyncedData();
+    local.playlistHistory = [historyEntry('a', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.playlistHistory = [
+      historyEntry('a', '2026-04-29T11:00:00Z', '2026-04-29T11:00:00Z'),
+    ];
+    const { merged } = mergeData(local, remote);
+    expect(merged.playlistHistory[0]?.deletedAt).toBe('2026-04-29T11:00:00Z');
+  });
+
+  it('actualiza _sectionMeta.playlistHistory al max de updatedAt', () => {
+    const local = emptySyncedData();
+    local.playlistHistory = [historyEntry('a', '2026-04-29T10:00:00Z')];
+    const remote = emptySyncedData();
+    remote.playlistHistory = [historyEntry('b', '2026-04-29T12:00:00Z')];
+    const { merged } = mergeData(local, remote);
+    expect(new Date(merged._sectionMeta.playlistHistory!.updatedAt).getTime()).toBe(
+      new Date('2026-04-29T12:00:00Z').getTime(),
+    );
   });
 });

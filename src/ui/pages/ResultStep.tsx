@@ -11,6 +11,7 @@ import {
   buildPlaylistName,
   extractUris,
 } from '@core/playlist';
+import { createPlaylistHistoryEntry } from '@core/playlist/history';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
 import { exportZwo, gpxToEditableSessionPlan, sanitizeFilename } from '@core/sessionFormats';
 import { loadNativeTracks, type Track } from '@core/tracks';
@@ -289,6 +290,26 @@ export function ResultStep({
       });
       setCreated(playlist);
       setPhase('done');
+      // Snapshot al historial: solo tras exito de la API. Captura los gustos
+      // REALES del usuario (lo que llevo a Spotify), incluyendo sus
+      // sustituciones manuales con "Otro tema".
+      try {
+        const sportFromSegments = matched[0]?.sport;
+        if (sportFromSegments) {
+          createPlaylistHistoryEntry({
+            sport: sportFromSegments,
+            mode: sourceType,
+            matched,
+            replacedIndices,
+            seed: preferences.seed ?? null,
+            spotifyPlaylistId: playlist.id,
+          });
+        }
+      } catch {
+        // Falta de espacio en localStorage o cualquier otro fallo NO debe
+        // romper el flujo principal: la playlist YA esta en Spotify y eso
+        // es lo importante. El historial es secundario.
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado al crear la lista');
       setPhase('error');
