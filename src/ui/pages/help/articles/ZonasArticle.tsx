@@ -25,7 +25,7 @@ export function ZonasArticle(): JSX.Element {
       <Card variant="info" className="my-6" title="¿Y las zonas Alta / Baja?" titleIcon="info">
         <p className="text-sm text-gris-700 leading-relaxed">
           Algunas literaturas subdividen Z3, Z4 y Z5 en Alta y Baja para ganar resolución.
-          Las 6 zonas de Cadencia se corresponden con la versión <strong>"Alta"</strong>{' '}
+          Las 6 zonas de Cadencia se corresponden con la versión <strong>«Alta»</strong>{' '}
           cuando la fuente subdivide:
         </p>
         <ul className="list-disc pl-6 mt-2 text-sm text-gris-700 space-y-1">
@@ -61,8 +61,8 @@ export function ZonasArticle(): JSX.Element {
         </li>
         <li>
           Si no tienes nada, el <strong>RPE</strong> (escala 1-10 de percepción del esfuerzo)
-          siempre vale: Z2 es "puedo conversar", Z4 es "frases cortas", Z6 es "imposible
-          hablar". También universal a los dos deportes.
+          siempre vale: Z2 es «puedo conversar», Z4 es «frases cortas», Z6 es «imposible
+          hablar». También universal a los dos deportes.
         </li>
       </ul>
       <p>

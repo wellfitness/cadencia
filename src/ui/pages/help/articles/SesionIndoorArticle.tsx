@@ -77,12 +77,12 @@ export function SesionIndoorArticle(): JSX.Element {
         Cómo funciona el constructor
       </h2>
       <p>
-        En el asistente, cuando eliges modo "Sesión indoor", entras al constructor visual.
+        En el asistente, cuando eliges modo «Sesión indoor», entras al constructor visual.
         Tienes tres formas de empezar:
       </p>
       <ul className="list-disc pl-6 space-y-2">
         <li>
-          <strong>Una plantilla</strong>: 8 sesiones validadas científicamente que puedes
+          <strong>Una plantilla</strong>: 8 sesiones con respaldo en la literatura que puedes
           modificar después (ver <em>Plantillas y cuándo usarlas</em>).
         </li>
         <li>

@@ -36,7 +36,7 @@ export function GpxRunningArticle(): JSX.Element {
           (publicado en el <em>Journal of Applied Physiology</em>), un fit de quinto grado
           ajustado a los datos de 10 corredores en cinta entre −45 % y +45 % de pendiente.
           El polinomio captura una propiedad sorprendente: el coste energético tiene forma
-          de "U" en bajada — bajar una pendiente del −20 % es lo más eficiente posible,
+          de «U» en bajada — bajar una pendiente del −20 % es lo más eficiente posible,
           casi la mitad que el llano, pero a partir de ahí baja peor por la carga
           excéntrica (frenar) y vuelve a subir.
         </p>
@@ -46,7 +46,7 @@ export function GpxRunningArticle(): JSX.Element {
         Cómo se traduce pendiente a zona
       </h2>
       <p>
-        La app calcula un "multiplicador metabólico" — cuántas veces te cuesta esa
+        La app calcula un «multiplicador metabólico» — cuántas veces te cuesta esa
         pendiente comparada con correr en llano — y lo mapea a una zona Z1-Z6:
       </p>
       <ul className="list-disc pl-6 space-y-2">
@@ -54,7 +54,7 @@ export function GpxRunningArticle(): JSX.Element {
           <strong>Bajada moderada o llano fácil</strong> → Z1 (recovery, mínimo metabólico).
         </li>
         <li>
-          <strong>Llano</strong> → Z2 (base aeróbica, "puedo conversar").
+          <strong>Llano</strong> → Z2 (base aeróbica, «puedo conversar»).
         </li>
         <li>
           <strong>Subida del 2-5 %</strong> → Z3 (tempo).
@@ -77,7 +77,7 @@ export function GpxRunningArticle(): JSX.Element {
 
       <Card variant="tip" className="my-6" title="¿Y si mi GPX trae ruido del GPS?" titleIcon="warning">
         <p className="text-sm text-gris-700 leading-relaxed">
-          Pendientes fuera del rango razonable (más allá de ±50 %) se "clampan"
+          Pendientes fuera del rango razonable (más allá de ±50 %) se «clampan»
           automáticamente al límite — suelen ser ruido del GPS y no esfuerzos reales.
           Además, antes del cálculo de pendiente, la app suaviza la traza de elevación
           para evitar que pequeños saltos del altímetro inflen la zona del bloque
@@ -99,7 +99,7 @@ export function GpxRunningArticle(): JSX.Element {
         información complementaria — la app la muestra para el contexto pero la zona la
         decide la pendiente, no el ritmo. Esto significa que rodar despacio por una zona
         montañosa puede generar una sesión con más Z4-Z5 del que esperabas: tus piernas
-        están trabajando duro aunque el reloj diga que vas "despacio".
+        están trabajando duro aunque el reloj diga que vas «despacio».
       </p>
 
       <div className="mt-6">

@@ -64,7 +64,7 @@ export function SesionRunningArticle(): JSX.Element {
       </p>
       <ul className="list-disc pl-6 space-y-2">
         <li>
-          <strong>Una plantilla</strong>: 6 sesiones validadas científicamente que puedes
+          <strong>Una plantilla</strong>: 6 sesiones con respaldo en la literatura que puedes
           modificar después (ver <em>Plantillas de running y cuándo usarlas</em>).
         </li>
         <li>
@@ -80,7 +80,7 @@ export function SesionRunningArticle(): JSX.Element {
 
       <Card variant="info" className="my-6" title="¿Y la cadencia de pedaleo?" titleIcon="info">
         <p className="text-sm text-gris-700 leading-relaxed">
-          En running no hay perfil de cadencia tipo "llano / escalada / sprint" como en
+          En running no hay perfil de cadencia tipo «llano / escalada / sprint» como en
           ciclismo. La cadencia natural de zancada es bastante uniforme (160-180 spm) sea
           cual sea la zona. Por eso el constructor de running no te pide ese campo: solo
           zona y duración. La música encaja con la zona del bloque (ver{' '}

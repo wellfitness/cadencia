@@ -80,10 +80,10 @@ export function MusicaArticle(): JSX.Element {
       </ul>
 
       <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-6 mb-3">
-        "Todo con energía"
+        «Todo con energía»
       </h2>
       <p>
-        Si activas esta opción en el paso "Música", el ideal de energía de Z1 y Z2 sube a
+        Si activas esta opción en el paso «Música», el ideal de energía de Z1 y Z2 sube a
         0,70. Te emparejará canciones más vibrantes en las zonas suaves — útil cuando
         quieres sentirte arriba durante todo el entrenamiento, no solo en los intervalos
         duros.

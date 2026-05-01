@@ -22,7 +22,7 @@ export function IntervalosArticle(): JSX.Element {
         <li>
           <strong>TTA</strong> (Tiempo Total Acumulado): la suma de todos los intervalos de
           trabajo de la sesión en esa zona — ignora calentamiento, recuperaciones y vuelta
-          a la calma. Es el "trabajo neto" que estimula la adaptación.
+          a la calma. Es el «trabajo neto» que estimula la adaptación.
         </li>
         <li>
           <strong>Recuperación</strong>: la duración y la zona del bloque que separa dos
@@ -84,8 +84,8 @@ export function IntervalosArticle(): JSX.Element {
       </h3>
       <p>
         En running la cadencia natural de zancada se mantiene bastante uniforme alrededor
-        de 160-180 spm sea cual sea la intensidad — no hay un equivalente al "perfil
-        llano vs escalada" del ciclismo. Por eso los bloques de una sesión de running
+        de 160-180 spm sea cual sea la intensidad — no hay un equivalente al «perfil
+        llano vs escalada» del ciclismo. Por eso los bloques de una sesión de running
         llevan solo <strong>zona</strong> y <strong>duración</strong>; el constructor no
         te pide perfil de cadencia.
       </p>

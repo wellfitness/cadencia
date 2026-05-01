@@ -78,8 +78,8 @@ export function TestsArticle(): JSX.Element {
 
       <TestCard
         icon="monitor_heart"
-        title="Test 5 minutos all-out — VO₂max + FCmáx"
-        protocol="Calentamiento 15 min progresivo (incluye 2-3 aceleraciones cortas). Después 5 minutos all-out: arrancas fuerte pero gestionando para no irte abajo, y los últimos 60 s todo lo que te quede."
+        title="Test 5 minutos a tope — VO₂max + FCmáx"
+        protocol="Calentamiento 15 min progresivo (incluye 2-3 aceleraciones cortas). Después 5 minutos a tope: arrancas fuerte pero gestionando para no irte abajo, y los últimos 60 s todo lo que te quede."
         inputs="La potencia media de los 5 minutos y la FC pico que viste."
         formula={<>VO₂max (mL/kg/min) = 16,6 + 8,87 × (P5min / peso). Regresión bayesiana de Sitko 2021 sobre 46 ciclistas amateur, R² 95 % CI 0,61–0,77. Y la FC pico capta tu FCmáx real, mejor que cualquier estimación por edad.</>}
         refs={[{ author: 'Sitko 2021', doi: '10.1123/ijspp.2020-0923' }]}
@@ -88,9 +88,9 @@ export function TestsArticle(): JSX.Element {
       <TestCard
         icon="timer"
         title="Test 3MT — Critical Power y W′"
-        protocol="3 minutos all-out contra resistencia FIJA, sin pacing. Calentamiento 15 min con dos rampas. Arrancas a tope desde el segundo cero y sostienes lo que puedas hasta que la potencia se estabilice (que será baja). Es duro psicológicamente."
+        protocol="3 minutos a tope contra resistencia FIJA, sin dosificar. Calentamiento 15 min con dos rampas. Arrancas a tope desde el segundo cero y sostienes lo que puedas hasta que la potencia se estabilice (que será baja). Es duro psicológicamente."
         inputs="La potencia media de los últimos 30 segundos del test (= EP) y el trabajo total en kJ."
-        formula={<>CP = potencia media de los últimos 30 s (Vanhatalo 2007). W′ = trabajo total − CP × 180 s. Validez ±5 W vs CP convencional en 8/10 sujetos; predictive validity r = -0,83 con TT 16,1 km (Black 2013).</>}
+        formula={<>CP = potencia media de los últimos 30 s (Vanhatalo 2007). W′ = trabajo total − CP × 180 s. Validez ±5 W vs CP convencional en 8/10 sujetos; validez predictiva r = -0,83 con contrarreloj de 16,1 km (Black 2013).</>}
         hardware="CRÍTICO: el rodillo debe ir en modo NIVEL/SLOPE (resistencia fija). En modo ERG el rodillo auto-ajusta la resistencia a una potencia objetivo y el resultado es inválido sin error visible."
         refs={[
           { author: 'Vanhatalo, Doust & Burnley 2007', doi: '10.1249/mss.0b013e31802dd3e6' },
@@ -111,7 +111,7 @@ export function TestsArticle(): JSX.Element {
       <TestCard
         icon="monitor_heart"
         title="Daniels FCmáx — 4&apos; + 1&apos; + 3&apos;"
-        protocol="Calentamiento 15-20 min progresivo. Después 4 min al ritmo más alto que aguantes ese tiempo + 1 min trotando suave + 3 min all-out. Diseñado para alcanzar tu plateau cardiovascular en menos de 10 min de esfuerzo."
+        protocol="Calentamiento 15-20 min progresivo. Después 4 min al ritmo más alto que aguantes ese tiempo + 1 min trotando suave + 3 min a tope. Diseñado para alcanzar tu plateau cardiovascular en menos de 10 min de esfuerzo."
         inputs="La FC pico que registró tu pulsómetro durante el test (normalmente en el último minuto)."
         formula={<>FCmáx = pico real medido. Más fiable que cualquier fórmula por edad (Gulati/Tanaka tienen ±10 bpm de error, suficiente para desplazar una banda Karvonen entera).</>}
         refs={[
@@ -122,10 +122,10 @@ export function TestsArticle(): JSX.Element {
 
       <TestCard
         icon="timer"
-        title="Test 5 minutos all-out (running) — FCmáx + LTHR"
-        protocol="Calentamiento 15 min progresivo + 2-3 aceleraciones cortas. Después 5 min all-out en pista o tapiz, gestionando el ritmo para no irte abajo en el minuto 3."
+        title="Test 5 minutos a tope (running) — FCmáx + LTHR"
+        protocol="Calentamiento 15 min progresivo + 2-3 aceleraciones cortas. Después 5 min a tope en pista o tapiz, gestionando el ritmo para no irte abajo en el minuto 3."
         inputs="La FC pico (FCmáx) y la FC media de los 5 minutos."
-        formula={<>FCmáx = pico real medido. LTHR ≈ FC media de los 5 min: en un esfuerzo all-out de 5 min la FC media cae típicamente en el 92-95 % de la FCmáx y se aproxima a la LTHR clásica de Joe Friel (FC media de los últimos 20 min de un TT de 30 min).</>}
+        formula={<>FCmáx = pico real medido. LTHR ≈ FC media de los 5 min: en un esfuerzo a tope de 5 min la FC media cae típicamente en el 92-95 % de la FCmáx y se aproxima a la LTHR clásica de Joe Friel (FC media de los últimos 20 min de una contrarreloj de 30 min).</>}
         refs={[]}
       />
 

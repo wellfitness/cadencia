@@ -305,15 +305,15 @@ function Intro(): JSX.Element {
             <ul className="space-y-3 mb-6 max-w-xl mx-auto lg:mx-0 text-left">
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="directions_bike" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Bici o carrera a pie, al aire libre con GPX o en sala por bloques.</span>
+                <span>Sal a rodar, sal a correr o monta tu sesión en casa — tú eliges, la app se adapta.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="music_note" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Cada canción encaja con la intensidad real de cada tramo.</span>
+                <span>Cada canción cae justo donde toca apretar y donde toca soltar.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="import_export" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Bici en rodillo: exporta a Zwift, TrainingPeaks Virtual y otros simuladores con .zwo.</span>
+                <span>¿Entrenas en rodillo? Tu plan se exporta a Zwift, TrainerRoad y compañía con un clic.</span>
               </li>
             </ul>
 
@@ -546,19 +546,19 @@ function HowItWorks(): JSX.Element {
             num={1}
             icon="person"
             title="Tus datos"
-            desc="Tu frecuencia cardíaca máxima (medida o estimada por edad y sexo). Si haces bici, también tu peso (y tu FTP si tienes potenciómetro). Calculamos tus zonas con Karvonen y, en bici, Coggan."
+            desc="Tu frecuencia cardíaca máxima — la que mide tu pulsómetro o, si no tienes, la que estimamos por edad y sexo. Si haces bici, añade el peso (y el FTP si tienes potenciómetro). Con eso calculamos tus zonas reales."
           />
           <StepCard
             num={2}
             icon="route"
             title="Tu plan"
-            desc="Sube un GPX (de Strava, Komoot u otra app) con tu ruta o tu carrera, o construye una sesión en sala por bloques desde plantillas científicas (Noruego 4×4 en bici, Yasso 800 o Daniels en carrera, y más). Calculamos la intensidad de cada tramo o bloque."
+            desc="Sube el GPX de tu ruta o tu carrera — exportado de Strava, Komoot o lo que uses — o monta tu sesión en casa partiendo de una plantilla: Noruego 4×4, Yasso 800, Daniels y unas cuantas más. La app calcula la intensidad de cada tramo."
           />
           <StepCard
             num={3}
             icon="music_note"
             title="Tu música"
-            desc="Generamos una lista de Spotify donde el BPM y la energía de cada canción se ajustan a la intensidad de cada tramo."
+            desc="Te montamos la lista de Spotify para que el BPM y la energía de cada canción acompañen exactamente al esfuerzo que toca en cada tramo."
           />
         </ol>
       </div>
@@ -616,14 +616,15 @@ function InteropZwo(): JSX.Element {
               Tu sesión, <span className="text-turquesa-600">en cualquier rodillo</span>
             </h2>
             <p className="text-lg text-gris-700 mb-3 max-w-xl lg:mx-0 mx-auto">
-              Cadencia exporta tu plan en formato <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code> estándar.
-              Pásalo a Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh o
-              TrainingPeaks Virtual con un clic.
+              Tu plan sale en{' '}
+              <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code>{' '}
+              estándar. Lo abres en Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh o
+              TrainingPeaks Virtual sin apenas tocar nada.
             </p>
             <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
-              ¿Tienes ya una sesión en{' '}
-              <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code>?
-              Súbelo y conviértelo en sesión con música sincronizada.
+              ¿Te traes una sesión{' '}
+              <code className="font-mono text-base bg-gris-100 px-1.5 py-0.5 rounded">.zwo</code>{' '}
+              de fuera? Súbela y le ponemos música sincronizada al momento.
             </p>
             <ul className="flex flex-wrap justify-center lg:justify-start gap-3 md:gap-5 mb-4 text-gris-700">
               <li className="flex items-center gap-2">
@@ -873,8 +874,8 @@ function WhyItWorks(): JSX.Element {
           Por qué funciona
         </h2>
         <p className="text-center text-gris-600 max-w-2xl mx-auto mb-10">
-          No es magia: es la aplicación práctica de la evidencia científica más
-          sólida sobre música y ejercicio.
+          Es lo que muestra el metaanálisis más completo sobre música y
+          ejercicio: 139 estudios, 3.599 participantes (Terry et al. 2020).
         </p>
         <div className="grid md:grid-cols-3 gap-4 md:gap-6">
           <EvidenceCard
@@ -1219,26 +1220,26 @@ function PlanningCalendar(): JSX.Element {
               Tu plan, <span className="text-turquesa-600">semana a semana</span>
             </h2>
             <p className="text-lg text-gris-700 mb-6 max-w-xl lg:mx-0 mx-auto">
-              Programa tus rutas, carreras y sesiones en sala en el calendario.
-              Cadencia te las recuerda y, cuando llegue el día, las carga listas
-              en el asistente.
+              Apunta tus rutas, carreras y sesiones en casa en el calendario.
+              Cadencia te las recuerda y, cuando llegue el día, te las carga
+              listas para empezar.
             </p>
             <ul className="space-y-3 mb-2 max-w-xl mx-auto lg:mx-0 text-left">
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="event_repeat" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Sesiones puntuales o recurrentes (todos los martes y jueves).</span>
+                <span>Un día suelto o fijos en tu semana — los martes y jueves, sin ir más lejos.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="directions_bike" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>En sala con plan completo; al aire libre con enlace a Strava, Komoot o tu app.</span>
+                <span>En casa cargas el plan entero; para salir a la calle te dejas el enlace de Strava o Komoot a mano.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="notifications_active" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Tu próximo entreno, siempre visible en la cabecera.</span>
+                <span>El próximo entreno lo tienes siempre a la vista en la cabecera.</span>
               </li>
               <li className="flex gap-3 text-base md:text-lg text-gris-700">
                 <MaterialIcon name="cloud_sync" className="text-turquesa-600 mt-0.5 shrink-0" />
-                <span>Se sincroniza con Drive entre dispositivos.</span>
+                <span>Si conectas Drive, viaja contigo entre el móvil y el portátil.</span>
               </li>
             </ul>
           </div>

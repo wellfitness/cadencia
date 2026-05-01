@@ -13,7 +13,7 @@ const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
   'noruego-4x4':
     'El estándar oro para mejorar VO2max. Si solo pudieras hacer una sesión a la semana, sería esta. Coste: muy alta percepción del esfuerzo.',
   'zona2-continuo':
-    'La sesión "aburrida" que más beneficio acumula a largo plazo. Construye base aeróbica, mejora la oxidación de grasas y prepara al cuerpo para todo lo demás.',
+    'La sesión «aburrida» que más beneficio acumula a largo plazo. Construye base aeróbica, mejora la oxidación de grasas y prepara al cuerpo para todo lo demás.',
   'tempo-mlss':
     'Ideal cuando ya tienes base Z2 sólida y quieres empujar el umbral aeróbico hacia arriba. Tres bloques de 12 min en MLSS. Sostenible pero exigente.',
   'umbral-progresivo':
@@ -27,7 +27,7 @@ const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
   'run-easy-long':
     'Sesión más frecuente en cualquier plan de fondo. 60 min Z2 con conversación posible, base aeróbica.',
   'run-tempo':
-    'Veinte minutos a ritmo de umbral (Z3-Z4). "Cómodamente duro": solo frases cortas. Mejora MLSS.',
+    'Veinte minutos a ritmo de umbral (Z3-Z4). «Cómodamente duro»: solo frases cortas. Mejora MLSS.',
   'run-yasso-800':
     'Diez × 800 m al ritmo Z5 con 400 m suaves. Predictor clásico de tiempo de marathon (Yasso).',
   'run-daniels-intervals':
@@ -41,13 +41,13 @@ const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
   'bike-test-ramp':
     'Test de campo: rampa lineal +25 W/min hasta agotamiento. Estima FTP con factor 0,75 sobre la potencia minuto pico.',
   'bike-test-map5':
-    'Test de campo: 5 minutos all-out tras calentamiento. Estima VO2max (Sitko 2021) y captura tu FCmáx real.',
+    'Test de campo: 5 minutos a tope tras calentamiento. Estima VO2max (Sitko 2021) y captura tu FCmáx real.',
   'bike-test-3mt':
-    'Test de campo: 3 minutos all-out (Vanhatalo 2007) con resistencia fija. Calcula CP y W′. Solo válido en modo NIVEL/SLOPE.',
+    'Test de campo: 3 minutos a tope (Vanhatalo 2007) con resistencia fija. Calcula CP y W′. Solo válido en modo NIVEL/SLOPE.',
   'run-test-hrmax-daniels':
-    'Test de campo Daniels: 4 min duro + 1 min suave + 3 min all-out. Para medir tu FCmáx real con un protocolo de 10 min.',
+    'Test de campo Daniels: 4 min duro + 1 min suave + 3 min a tope. Para medir tu FCmáx real con un protocolo de 10 min.',
   'run-test-5min':
-    'Test de campo: 5 minutos all-out. Captura FCmáx y la FC media estima tu LTHR (FC umbral).',
+    'Test de campo: 5 minutos a tope. Captura FCmáx y la FC media estima tu LTHR (FC umbral).',
   'run-test-30-15-ift':
     'Test de campo Buchheit: 30 s corriendo + 15 s descanso, velocidad creciente cada estadio. Da vMAS y FCmáx sin sostener nunca >30 s.',
 };
@@ -75,7 +75,7 @@ export function PlantillasArticle(): JSX.Element {
   return (
     <ArticleShell
       slug="plantillas"
-      lead="Ocho plantillas de ciclo indoor validadas científicamente, organizadas por objetivo fisiológico. Cárgalas tal cual o úsalas como punto de partida y modifícalas en el constructor."
+      lead="Ocho plantillas de ciclo indoor con respaldo en la literatura (Bangsbo, Helgerud, Coggan…), organizadas por objetivo fisiológico. Cárgalas tal cual o úsalas como punto de partida y modifícalas en el constructor."
     >
       <Card variant="info" className="mb-6" title="¿Buscas plantillas de running?" titleIcon="directions_run">
         <p className="text-sm text-gris-700 leading-relaxed">

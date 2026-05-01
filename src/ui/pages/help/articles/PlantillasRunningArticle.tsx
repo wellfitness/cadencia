@@ -9,7 +9,7 @@ const TEMPLATE_CONTEXT: Partial<Record<SessionTemplateId, string>> = {
   'run-easy-long':
     'La sesión más frecuente de cualquier plan de fondo (5K, 10K, media, marathon, ultra). Una hora en Z2 con conversación posible: la base aeróbica que sostiene todo lo demás. Si solo pudieras hacer una sesión a la semana, sería esta.',
   'run-tempo':
-    'Veinte minutos a ritmo "cómodamente duro" — solo frases cortas, no podrías mantener una conversación fluida. Sube el umbral aeróbico (MLSS) y enseña al cuerpo a aclarar lactato a velocidad alta. Tres veces más eficiente que un volumen de Z2 equivalente para mejorar tiempos de 10K-marathon.',
+    'Veinte minutos a ritmo «cómodamente duro» — solo frases cortas, no podrías mantener una conversación fluida. Sube el umbral aeróbico (MLSS) y enseña al cuerpo a aclarar lactato a velocidad alta. Más eficiente, kilómetro a kilómetro, que un volumen equivalente de Z2 para mejorar tiempos de 10K-marathon.',
   'run-yasso-800':
     'Diez × 800 m al ritmo Z5 con 400 m suaves de recuperación entre cada uno. Predictor clásico de tiempo de marathon (Bart Yasso): el tiempo medio de los 800 m en min:seg ≈ tu tiempo objetivo de marathon en h:min. Sesión de potencia aeróbica máxima.',
   'run-daniels-intervals':
@@ -17,7 +17,7 @@ const TEMPLATE_CONTEXT: Partial<Record<SessionTemplateId, string>> = {
   'run-hiit-30-30':
     'Veinte ciclos de 30 s rápidos + 30 s suaves. Protocolo Billat para acumular tiempo a velocidad máxima aeróbica con recuperaciones cortas. Más asequible neuromuscularmente que los intervalos largos a vVO₂max y rinde mucho como sesión de calidad cuando tienes 40 minutos justos.',
   'run-threshold-cruise':
-    'Tres × 1500 m a ritmo de umbral (Z4) con 90 s suaves entre cada uno. Daniels lo llama "T-pace" — el ritmo más rápido que puedes sostener una hora. Mejora la capacidad de tolerar lactato sin agotar tanto como un Tempo Run continuo. Ideal en mitad de la semana.',
+    'Tres × 1500 m a ritmo de umbral (Z4) con 90 s suaves entre cada uno. Daniels lo llama «T-pace» — el ritmo más rápido que puedes sostener una hora. Mejora la capacidad de tolerar lactato sin agotar tanto como un Tempo Run continuo. Ideal en mitad de la semana.',
 };
 
 function runTemplatesByCategory(): {
@@ -46,7 +46,7 @@ export function PlantillasRunningArticle(): JSX.Element {
   return (
     <ArticleShell
       slug="plantillas-running"
-      lead="Seis plantillas de running validadas científicamente, organizadas por objetivo fisiológico. Cárgalas tal cual o úsalas como punto de partida y modifícalas en el constructor."
+      lead="Seis plantillas de running con respaldo en la literatura (Daniels, Yasso, Billat…), organizadas por objetivo fisiológico. Cárgalas tal cual o úsalas como punto de partida y modifícalas en el constructor."
     >
       <Section title="Base aeróbica (rodaje largo)" icon="favorite">
         {cats.base.map((t) => (
@@ -72,7 +72,7 @@ export function PlantillasRunningArticle(): JSX.Element {
       <Card variant="info" className="mt-8" title="¿Y los tests fisiológicos?" titleIcon="monitor_heart">
         <p className="text-sm text-gris-700 leading-relaxed">
           Cadencia tiene además <strong>3 tests guiados de running</strong> (Daniels
-          4&apos;+1&apos;+3&apos; para FCmáx, 5min all-out para FCmáx + LTHR, 30-15 IFT de
+          4&apos;+1&apos;+3&apos; para FCmáx, 5min a tope para FCmáx + LTHR, 30-15 IFT de
           Buchheit para vMAS y FCmáx) en una pestaña aparte dentro de la galería del
           constructor. Todos basados en pulsómetro: no necesitas potenciómetro para
           correr. Lee{' '}
