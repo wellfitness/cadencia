@@ -34,9 +34,12 @@ import {
   saveTokens,
   tokensAreFresh,
   SPOTIFY_SCOPES,
+  SpotifyAuthorizationError,
   type CreatedPlaylist,
 } from '@integrations/spotify';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
+import { BetaAccessDeniedDialog } from '@ui/components/BetaAccessDeniedDialog';
+import { SpotifyErrorReporter } from '@ui/components/SpotifyErrorReporter';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
@@ -139,6 +142,7 @@ export function ResultStep({
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [accessDeniedOpen, setAccessDeniedOpen] = useState<boolean>(false);
   const [created, setCreated] = useState<CreatedPlaylist | null>(null);
   const [hasSpotifySession, setHasSpotifySession] = useState<boolean>(() => loadTokens() !== null);
 
@@ -305,12 +309,27 @@ export function ResultStep({
             spotifyPlaylistId: playlist.id,
           });
         }
-      } catch {
+      } catch (historyErr) {
         // Falta de espacio en localStorage o cualquier otro fallo NO debe
         // romper el flujo principal: la playlist YA esta en Spotify y eso
-        // es lo importante. El historial es secundario.
+        // es lo importante. El historial es secundario. Logueamos con tag
+        // para que aparezca en DevTools si el usuario manda captura.
+        if (typeof console !== 'undefined') {
+          console.warn('[Cadencia historial]', historyErr);
+        }
       }
     } catch (err) {
+      // 403 Forbidden = caso "tu cuenta no esta en la lista de testers" tipico
+      // del Development Mode. La diferencia con un error normal es que el
+      // remedio es accionable (apuntarse al formulario), asi que abrimos el
+      // modal especifico en vez del banner generico.
+      if (err instanceof SpotifyAuthorizationError) {
+        setAccessDeniedOpen(true);
+        setPhase('idle');
+        return;
+      }
+      // Resto de errores: mostramos el detalle completo (status + endpoint +
+      // mensaje del servidor) para que el usuario pueda mandar captura util.
       setError(err instanceof Error ? err.message : 'Error inesperado al crear la lista');
       setPhase('error');
     }
@@ -426,13 +445,10 @@ export function ResultStep({
             helper="Aparecerá tal cual en tu Spotify (puedes cambiarlo después)."
           />
           {error !== null && (
-            <p
-              role="alert"
-              className="text-sm text-rosa-600 font-medium flex items-center gap-2"
-            >
-              <MaterialIcon name="error_outline" size="small" className="text-rosa-600" />
-              {error}
-            </p>
+            <SpotifyErrorReporter
+              message={error}
+              headline="Spotify ha rechazado la creación de la lista."
+            />
           )}
           {!hasSpotifySession && (
             <p className="text-xs text-gris-500">
@@ -588,6 +604,10 @@ export function ResultStep({
           </a>
         </div>
       )}
+      <BetaAccessDeniedDialog
+        open={accessDeniedOpen}
+        onClose={() => setAccessDeniedOpen(false)}
+      />
     </WizardStep>
   );
 }

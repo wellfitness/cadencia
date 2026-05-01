@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { SpotifyErrorReporter } from '@ui/components/SpotifyErrorReporter';
 import type { PlayerError, PlayerState } from '@integrations/spotify';
 
 export interface MusicControlBarProps {
@@ -23,8 +24,11 @@ export interface MusicControlBarProps {
  *    deshabilitado. El play/pause no aparece hasta que haya device.
  *  - Con device + sonando: chip con titulo del track (truncado) + botones.
  *  - Con device + pausado: igual pero el icono de play indica "reanudar".
- *  - Error transitorio: linea roja debajo con el mensaje, los controles siguen
- *    pulsables (proximo poll los recalcula).
+ *  - Error transitorio amistoso: linea roja debajo con el mensaje, los controles
+ *    siguen pulsables (proximo poll los recalcula).
+ *  - Error reportable (HTTP 4xx/5xx no esperado, fallo de red): ademas del
+ *    mensaje, un boton "Detalles" abre un dialog con info tecnica + CTAs
+ *    Copiar y Avisar por Telegram.
  */
 export function MusicControlBar({
   playerState,
@@ -33,7 +37,9 @@ export function MusicControlBar({
   onTogglePlay,
   onSkipNext,
 }: MusicControlBarProps): JSX.Element {
-  const errorMessage = useMemo(() => formatError(lastError), [lastError]);
+  const errorMessage = useMemo(() => formatErrorFriendly(lastError), [lastError]);
+  const reportable = useMemo(() => formatErrorReportable(lastError), [lastError]);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const isPlaying = playerState?.isPlaying === true;
   const deviceName = playerState?.device?.name ?? null;
 
@@ -88,19 +94,41 @@ export function MusicControlBar({
         </div>
       </div>
       {errorMessage !== null && (
-        <p
-          role="status"
-          className="text-[11px] text-rosa-300 truncate"
-          title={errorMessage}
-        >
-          {errorMessage}
-        </p>
+        <div role="status" className="flex items-center gap-2 text-[11px] text-rosa-300">
+          <p className="truncate flex-1" title={errorMessage}>
+            {errorMessage}
+          </p>
+          {reportable !== null && (
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              className="shrink-0 inline-flex items-center gap-0.5 font-semibold text-rosa-200 hover:text-white underline-offset-2 hover:underline"
+            >
+              <MaterialIcon name="info" size="small" />
+              Detalles
+            </button>
+          )}
+        </div>
+      )}
+      {reportable !== null && (
+        <ErrorDetailsDialog
+          open={detailsOpen}
+          message={reportable}
+          onClose={() => setDetailsOpen(false)}
+        />
       )}
     </div>
   );
 }
 
-function formatError(error: PlayerError | null): string | null {
+/**
+ * Mensaje legible del estado de error para mostrar en la linea pequena de
+ * la barra. Los kinds esperados (`no-active-device`, `not-premium`,
+ * `token-expired`) tienen mensaje claro y accionable; los kinds reportables
+ * (`unknown`, `network`) muestran un resumen compacto que invita a abrir
+ * los detalles.
+ */
+function formatErrorFriendly(error: PlayerError | null): string | null {
   if (error === null) return null;
   switch (error.kind) {
     case 'no-active-device':
@@ -111,8 +139,91 @@ function formatError(error: PlayerError | null): string | null {
     case 'token-expired':
       return 'Sesión Spotify caducada. Vuelve al asistente para reconectar.';
     case 'network':
-      return `Sin conexión con Spotify (${error.message}).`;
+      return 'Sin conexión con Spotify.';
     case 'unknown':
       return `Spotify respondió con un error (${error.status}).`;
   }
+}
+
+/**
+ * Mensaje tecnico detallado para que el usuario pueda enviar captura. Solo
+ * lo devolvemos para errores realmente reportables — los esperados (sin
+ * device, no Premium, sesion caducada) no tienen mas datos relevantes que
+ * los mostrados al usuario.
+ */
+function formatErrorReportable(error: PlayerError | null): string | null {
+  if (error === null) return null;
+  if (error.kind !== 'network' && error.kind !== 'unknown') return null;
+  const method = error.method ?? '?';
+  const path = error.path ?? '?';
+  if (error.kind === 'network') {
+    return `Spotify Player network en ${method} ${path}: ${error.message}`;
+  }
+  return `Spotify Player API ${error.status} en ${method} ${path}: ${error.message}`;
+}
+
+interface ErrorDetailsDialogProps {
+  open: boolean;
+  message: string;
+  onClose: () => void;
+}
+
+function ErrorDetailsDialog({
+  open,
+  message,
+  onClose,
+}: ErrorDetailsDialogProps): JSX.Element {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (dlg === null) return;
+    if (open && !dlg.open) {
+      dlg.showModal();
+    } else if (!open && dlg.open) {
+      dlg.close();
+    }
+  }, [open]);
+
+  function handleBackdropClick(e: React.MouseEvent<HTMLDialogElement>): void {
+    if (e.target === dialogRef.current) {
+      onClose();
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      onClick={handleBackdropClick}
+      aria-labelledby="tv-error-details-title"
+      className="
+        max-w-md w-[calc(100%-2rem)] p-0 rounded-2xl border-0
+        backdrop:bg-black/70 backdrop:backdrop-blur-sm
+        text-white bg-gris-900
+      "
+    >
+      <div className="p-5 md:p-6 relative">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar"
+          className="absolute top-3 right-3 w-10 h-10 inline-flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+        >
+          <MaterialIcon name="close" />
+        </button>
+        <h2
+          id="tv-error-details-title"
+          className="font-display text-xl text-white mb-3 pr-10"
+        >
+          Detalles del error de Spotify
+        </h2>
+        <p className="text-sm text-white/80 mb-3">
+          Si te ocurre repetidamente, copia los detalles y avísame por Telegram
+          para revisarlo.
+        </p>
+        <SpotifyErrorReporter message={message} variant="dark" />
+      </div>
+    </dialog>
+  );
 }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { BetaBanner } from '../BetaBanner';
 import { Logo } from '../Logo';
 import { MaterialIcon } from '../MaterialIcon';
 import { SiteFooter } from '../SiteFooter';
@@ -88,6 +89,7 @@ export function HelpLayout({ activeSlug, children }: HelpLayoutProps): JSX.Eleme
         <main className="min-w-0">{children}</main>
       </div>
 
+      <BetaBanner />
       <SiteFooter />
     </div>
   );

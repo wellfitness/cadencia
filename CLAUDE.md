@@ -150,7 +150,13 @@ src/
                               # SaveSessionDialog, MySavedSessionsTab
       sync/                   # GoogleSyncCard, SyncStatusBadge
       calendar/               # CalendarListView, CalendarMonthView, EventEditorDialog
+      tv/                     # MusicControlBar, useSpotifyTVPlayer (controles Spotify
+                              # integrados en Modo TV con dialog de detalles reportable)
       TodayBadge.tsx          # Badge de proximo entreno en header del wizard
+      BetaBanner.tsx          # Aviso permanente de estado beta (Landing/Wizard/Help)
+      BetaAccessModal.tsx     # Modal pre-acceso al pulsar "Probar aplicación"
+      BetaAccessDeniedDialog.tsx  # Modal disparado por SpotifyAuthorizationError (403)
+      SpotifyErrorReporter.tsx    # Card compartida: <pre> técnico + Copiar + Telegram
       …                       # Resto: Stepper, Card, FileDropzone, ZoneBadge, Charts, etc.
     lib/
       loadPlannedEvent.ts     # Rehidrata un PlannedEvent en el wizard (indoor → SavedSession; outdoor → reset)
@@ -476,6 +482,32 @@ GET  /v1/search?q=track:{n}+artist:{a}&type=track      # solo si falta URI
 Scope: `playlist-modify-private`.
 
 > **Nota — rename feb-2026 de Spotify**: los endpoints antiguos `POST /v1/users/{user_id}/playlists` y `POST /v1/playlists/{id}/tracks` fueron retirados en febrero de 2026 y devuelven **403 silencioso** (sin razón, sin error legible). Los endpoints actuales son los listados arriba: `/me/playlists` para crear y `/items` para añadir tracks (renombrado para soportar episodios de podcast). Si en algún momento algo devuelve 403 en el OAuth flow después de autenticar correctamente, este es el primer sospechoso.
+
+### Estado beta + acceso de testers
+
+Mientras Spotify aprueba el acceso público de la app, cada usuario debe estar en la lista manual de **testers del Developer Dashboard** (tope 25 cuentas). Sin estar en la lista, el OAuth pasa OK pero `POST /v1/me/playlists` devuelve **403 Forbidden**. Para que el usuario no se quede mirando un fallo silencioso, hay tres superficies coordinadas:
+
+1. **`BetaBanner`** ([src/ui/components/BetaBanner.tsx](src/ui/components/BetaBanner.tsx)): franja `rosa-600` permanente con CTA «SOLICITAR ACCESO» al [Google Form de alta](https://forms.gle/7iAq1kPzZ7ptdhaG8). Se monta en tres sitios: cabecera de la Landing, encima del footer del wizard y encima del SiteFooter de cada artículo del centro de ayuda. La URL del formulario vive como constante exportada desde `BetaAccessModal.tsx` (`BETA_FORM_URL`) — única fuente de verdad.
+2. **`BetaAccessModal`**: modal pre-acceso al pulsar «Probar aplicación» en la Landing. Explica los dos requisitos (Premium + alta como tester) y ofrece dos CTAs: «Continuar» (al wizard, modo previsualización) y «Apuntarme a la beta».
+3. **`BetaAccessDeniedDialog`** ([src/ui/components/BetaAccessDeniedDialog.tsx](src/ui/components/BetaAccessDeniedDialog.tsx)): modal de fallback que se abre **solo cuando** la API responde 403. Sustituye al banner rojo genérico de error en ese caso porque el usuario necesita un CTA accionable (formulario), no un mensaje técnico. Disparado desde el catch de `handleCreatePlaylist` en `ResultStep` cuando captura una `SpotifyAuthorizationError`.
+
+### Manejo explícito de errores de Spotify (reportabilidad)
+
+**Principio**: cualquier error de Spotify que escape al usuario debe ser **explícito y copiable**. Sin DevTools de por medio. Aplicado en dos capas:
+
+**Capa de integración** (`src/integrations/spotify/`):
+
+- `fetchSpotify` (api.ts) lanza `SpotifyAuthorizationError` ante un 403 (clase exportada desde el barrel `@integrations/spotify`) y `Error` con mensaje formato `Spotify API <status> en <method> <path>: <detail>` para el resto. `console.error` etiquetado con `[Spotify API error]` y body raw truncado a 500 chars.
+- `postTokenRequest` (auth.ts) parsea el JSON estándar OAuth `{error, error_description}` para mostrar `error_description` legible en lugar del raw body. Logueado con `[Spotify OAuth error]`.
+- `callPlayer` (player.ts) propaga `method` y `path` a los kinds reportables (`'unknown'`, `'network'`) del discriminador `PlayerError`. Los kinds esperados (`'no-active-device'`, `'not-premium'`, `'token-expired'`) NO los llevan: son estados normales, no bugs reportables.
+
+**Capa de UI** (`src/ui/components/`):
+
+- **`SpotifyErrorReporter`** ([src/ui/components/SpotifyErrorReporter.tsx](src/ui/components/SpotifyErrorReporter.tsx)): componente compartido que muestra el mensaje técnico en `<pre>` monoespaciado + botón **«Copiar detalles»** (clipboard) + enlace **«Avisar por Telegram»** ([t.me/wellfitness_trainer](https://t.me/wellfitness_trainer)). Variantes `'light'` (fondo blanco para `ResultStep`) y `'dark'` (fondo negro semitransparente para Modo TV).
+- **`ResultStep.tsx`**: el `error` (string) se renderiza con `<SpotifyErrorReporter>` directamente. El catch detecta `instanceof SpotifyAuthorizationError` para abrir `BetaAccessDeniedDialog` en lugar del reporter.
+- **`MusicControlBar.tsx`** del Modo TV: línea pequeña de error como antes; **si** el error es reportable (`kind === 'unknown' | 'network'`), aparece un botón «Detalles» que abre un `<dialog>` oscuro embebiendo el `SpotifyErrorReporter` en variant dark. Los kinds esperados (`not-premium`, `token-expired`, `no-active-device`) no muestran ese botón — su mensaje amistoso ya basta.
+
+Catch silencioso aceptable: solo el guardado del historial de playlist (`createPlaylistHistoryEntry`) y los fallbacks de `clipboard.writeText`. El primero loguea con `[Cadencia historial]` para que aparezca en captura de DevTools.
 
 ### Configuración del Client ID
 

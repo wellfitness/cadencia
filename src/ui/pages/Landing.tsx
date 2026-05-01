@@ -3,6 +3,7 @@ import { Button } from '@ui/components/Button';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { SiteFooter } from '@ui/components/SiteFooter';
 import { BetaAccessModal } from '@ui/components/BetaAccessModal';
+import { BetaBanner } from '@ui/components/BetaBanner';
 import { usePwaInstall } from '@ui/state/usePwaInstall';
 import { navigateInApp } from '@ui/utils/navigation';
 
@@ -21,6 +22,7 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
 
   return (
     <div className="min-h-full flex flex-col bg-white">
+      <BetaBanner />
       <main className="flex-1">
         <HeroVisual onTry={openModal} />
         {/* Bloque post-hero móvil + tablet (<lg).

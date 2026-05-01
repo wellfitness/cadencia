@@ -55,6 +55,12 @@ function tokenResponseToTokens(json: TokenResponse): SpotifyTokens {
   };
 }
 
+function isOAuthErrorBody(v: unknown): v is { error: string; error_description?: string } {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  return typeof o['error'] === 'string';
+}
+
 async function postTokenRequest(body: URLSearchParams): Promise<SpotifyTokens> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -62,8 +68,31 @@ async function postTokenRequest(body: URLSearchParams): Promise<SpotifyTokens> {
     body,
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Spotify /api/token ${res.status}: ${text}`);
+    // Spotify devuelve OAuth-standard JSON en errores: { error, error_description }.
+    // Parseamos para mostrar el campo legible en lugar del raw, que ayuda al
+    // usuario a entender (y reportar) errores tipo invalid_grant, invalid_client.
+    const rawBody = await res.text().catch(() => '');
+    let detail = rawBody;
+    try {
+      const json: unknown = JSON.parse(rawBody);
+      if (isOAuthErrorBody(json)) {
+        detail =
+          json.error_description !== undefined && json.error_description !== ''
+            ? `${json.error}: ${json.error_description}`
+            : json.error;
+      }
+    } catch {
+      // Body no era JSON, dejamos el rawBody.
+    }
+    if (typeof console !== 'undefined') {
+      console.error('[Spotify OAuth error]', {
+        status: res.status,
+        statusText: res.statusText,
+        endpoint: 'POST /api/token',
+        detail,
+      });
+    }
+    throw new Error(`Spotify /api/token ${res.status}: ${detail}`);
   }
   const json: unknown = await res.json();
   if (!isTokenResponse(json)) {

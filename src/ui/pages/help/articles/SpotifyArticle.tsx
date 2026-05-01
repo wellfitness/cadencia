@@ -8,6 +8,11 @@ interface FaqItem {
 
 const FAQS: readonly FaqItem[] = [
   {
+    q: 'Cadencia está en beta privada — ¿cómo me apunto?',
+    a:
+      'Mientras Spotify aprueba el acceso público de la app, cada cuenta se añade manualmente a la lista de testers. Rellena el formulario que aparece en el banner rosa de la cabecera (o en el modal al pulsar «Probar aplicación») con tu email de Spotify y te incluyo a mano — suele tardar menos de 24 h. Sin estar en la lista puedes seguir usando todo lo demás (sesiones, .zwo, Modo TV) excepto la creación de la lista en tu biblioteca de Spotify.',
+  },
+  {
     q: '¿Necesito una cuenta Premium de Spotify?',
     a:
       'Para crear la lista en tu biblioteca, sí — Spotify exige Premium para escribir listas desde aplicaciones de terceros. Para previsualizar el emparejamiento y exportar la sesión a .zwo (Zwift, TrainerRoad, etc.) no hace falta cuenta.',
@@ -20,7 +25,12 @@ const FAQS: readonly FaqItem[] = [
   {
     q: 'He visto un error 403 después de autenticar — ¿qué pasa?',
     a:
-      'En febrero de 2026 Spotify retiró los puntos de acceso antiguos para crear listas (POST /v1/users/{id}/playlists y POST /v1/playlists/{id}/tracks). Devuelven 403 silencioso sin mensaje. Cadencia ya usa los nuevos (/me/playlists y /items), pero si una versión vieja del service worker queda en caché puedes ver el error. Recarga con Ctrl+Shift+R o cierra y reabre la PWA.',
+      'El motivo más probable es que tu cuenta no esté todavía en la lista de testers de la beta privada. La app detecta ese 403 y abre una ventana específica con un enlace al formulario para que te dé de alta. Si ya estás en la lista y aun así te sale, puede ser que tengas en caché una versión antigua del service worker (Spotify renombró sus endpoints en febrero de 2026): recarga con Ctrl+Shift+R o cierra y reabre la PWA. Si persiste, copia los detalles del error desde la propia tarjeta y avísame por Telegram.',
+  },
+  {
+    q: 'Me sale otro error de Spotify (502, sin conexión, etc.). ¿Qué hago?',
+    a:
+      'Cualquier fallo de la API muestra una tarjeta roja con el mensaje técnico completo (status, endpoint, detalle) y dos atajos: «Copiar detalles» (al portapapeles) y «Avisar por Telegram» (abre t.me/wellfitness_trainer en una pestaña nueva). Cópialo y pégamelo allí — con eso puedo localizar el problema sin pedirte que abras DevTools. En el Modo TV el botón se llama «Detalles» y abre la misma información en un cuadro de diálogo.',
   },
   {
     q: '¿Por qué tengo que abrir la app en 127.0.0.1 en lugar de localhost (modo desarrollo)?',

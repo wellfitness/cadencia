@@ -2,6 +2,13 @@ import { useEffect, useRef } from 'react';
 import { Button } from '@ui/components/Button';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 
+/**
+ * URL del formulario de alta en la lista de testers de Spotify. Reusada
+ * por el BetaBanner de la Landing para que solo haya un sitio donde
+ * actualizar el enlace si cambia.
+ */
+export const BETA_FORM_URL = 'https://forms.gle/7iAq1kPzZ7ptdhaG8';
+
 export interface BetaAccessModalProps {
   open: boolean;
   onClose: () => void;
@@ -128,7 +135,7 @@ export function BetaAccessModal({
             Continuar
           </Button>
           <a
-            href="https://forms.gle/7iAq1kPzZ7ptdhaG8"
+            href={BETA_FORM_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="sm:flex-1 inline-flex items-center justify-center gap-2 font-semibold rounded-lg border-2 transition-all duration-200 ease-out bg-turquesa-600 text-white border-turquesa-700 hover:bg-turquesa-700 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(0,190,200,0.3)] active:translate-y-0 text-base px-4 py-2.5 min-h-[44px] md:min-h-[48px] no-underline"
