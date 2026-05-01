@@ -1,4 +1,4 @@
-import type { SpotifyAuthFlowState, SpotifyTokens } from './types';
+import type { SpotifyAuthFlowState, SpotifyTokens, SpotifyUserProfile } from './types';
 
 /**
  * Wrapper de sessionStorage para el state OAuth y los tokens.
@@ -11,6 +11,7 @@ import type { SpotifyAuthFlowState, SpotifyTokens } from './types';
 
 const FLOW_KEY = 'cadencia:spotify:authFlow:v1';
 const TOKENS_KEY = 'cadencia:spotify:tokens:v1';
+const USER_PROFILE_KEY = 'cadencia:spotify:user:v1';
 
 // Keys del rebrand previo (Vatios → Cadencia). Las leemos como fallback para
 // que un usuario con el flow OAuth a medio completar tras una actualizacion
@@ -38,6 +39,14 @@ function isTokens(v: unknown): v is SpotifyTokens {
     typeof o['expiresAtMs'] === 'number' &&
     typeof o['scope'] === 'string'
   );
+}
+
+function isUserProfile(v: unknown): v is SpotifyUserProfile {
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  const product = o['product'];
+  if (product !== 'premium' && product !== 'free' && product !== 'open') return false;
+  return typeof o['productPremium'] === 'boolean';
 }
 
 function safeGet(key: string): string | null {
@@ -118,6 +127,10 @@ export function loadTokens(): SpotifyTokens | null {
 export function clearTokens(): void {
   safeRemove(TOKENS_KEY);
   safeRemove(LEGACY_TOKENS_KEY);
+  // El perfil va siempre acoplado a los tokens (mismo flow OAuth). Si el
+  // usuario desconecta, no queremos un perfil huerfano que sugiera que
+  // sigue siendo Premium en la siguiente sesion.
+  safeRemove(USER_PROFILE_KEY);
 }
 
 /**
@@ -126,4 +139,40 @@ export function clearTokens(): void {
  */
 export function tokensAreFresh(tokens: SpotifyTokens, nowMs: number = Date.now()): boolean {
   return tokens.expiresAtMs > nowMs + 30_000;
+}
+
+/**
+ * Comprueba si el token tiene concedidos TODOS los scopes requeridos. El
+ * campo `tokens.scope` es un string de scopes separados por espacios (formato
+ * canonico de la respuesta de /api/token).
+ *
+ * Caso de uso: gating de features. Por ejemplo, antes de mostrar los
+ * controles de musica del Modo TV comprobamos que el token tiene los scopes
+ * de player; si no, ofrecemos re-autorizar.
+ */
+export function tokenHasScopes(
+  tokens: SpotifyTokens,
+  requiredScopes: readonly string[],
+): boolean {
+  const granted = new Set(tokens.scope.split(/\s+/u).filter((s) => s.length > 0));
+  return requiredScopes.every((s) => granted.has(s));
+}
+
+export function saveUserProfile(profile: SpotifyUserProfile): void {
+  safeSet(USER_PROFILE_KEY, JSON.stringify(profile));
+}
+
+export function loadUserProfile(): SpotifyUserProfile | null {
+  const raw = safeGet(USER_PROFILE_KEY);
+  if (raw === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isUserProfile(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearUserProfile(): void {
+  safeRemove(USER_PROFILE_KEY);
 }

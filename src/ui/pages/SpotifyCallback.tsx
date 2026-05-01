@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   exchangeCodeForTokens,
+  getCurrentUser,
   getRedirectUri,
   getSpotifyClientId,
   loadAuthFlow,
   saveTokens,
+  saveUserProfile,
 } from '@integrations/spotify';
 import { Card } from '@ui/components/Card';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -63,8 +65,19 @@ export function SpotifyCallback(): JSX.Element {
       code,
       codeVerifier: flow.codeVerifier,
     })
-      .then((tokens) => {
+      .then(async (tokens) => {
         saveTokens(tokens);
+        // Detectar Premium en background. Lo necesitamos cacheado para que
+        // el wizard pueda decidir si activa los controles integrados de
+        // musica en el Modo TV. Si /me falla (red, scope ausente), seguimos
+        // adelante con la creacion de playlist; los controles del Modo TV
+        // simplemente no apareceran hasta el proximo OAuth con scopes ok.
+        try {
+          const profile = await getCurrentUser(tokens.accessToken);
+          saveUserProfile(profile);
+        } catch {
+          // Silenciar: no bloqueamos el flujo principal por un /me fallido.
+        }
         setPhase('success');
         // Pequeno delay para que el usuario vea el mensaje antes de redirigir.
         setTimeout(() => {

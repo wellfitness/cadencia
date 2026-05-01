@@ -2,6 +2,50 @@ import type { EditableSessionPlan } from '@core/segmentation';
 import type { ValidatedUserInputs } from '@core/user';
 
 /**
+ * Datos minimos de Spotify que la pestaña /tv necesita para activar los
+ * controles de musica integrados (Fase progressive enhancement).
+ *
+ * Por que va por handoff y no se lee directo del storage en la pestaña /tv:
+ * los tokens viven en `sessionStorage` que es PER-PESTAÑA. La pestaña /tv
+ * abierta con `window.open` arranca con sessionStorage vacio, asi que sin
+ * este puente no veria los tokens del wizard. La pestaña /tv copia estos
+ * tokens a SU sessionStorage en el primer render para que sobrevivan a F5.
+ *
+ * Si la usuaria no tiene Spotify conectado o no es Premium, este campo
+ * va `undefined` y SessionTVMode degrada al comportamiento legacy (sin
+ * controles integrados).
+ */
+export interface TVHandoffSpotify {
+  /** Tokens completos del flow PKCE actual. La pestaña /tv los re-persiste. */
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+    expiresAtMs: number;
+    scope: string;
+  };
+  /**
+   * Premium gating ya resuelto en la pestaña origen (tras llamar a /me). Si
+   * `false`, los controles integrados se ocultan: los endpoints /me/player/*
+   * devolverian 403 sistematicamente.
+   */
+  productPremium: boolean;
+  /**
+   * URIs de Spotify (`spotify:track:XXX`) en orden de bloque. `blockTrackUris[i]`
+   * es el track que debe sonar durante `plan.blocks[i]`. La logica de cambio
+   * de bloque en SessionTVMode dispara `play({uris: [blockTrackUris[i]]})` para
+   * forzar la sincronizacion timer ↔ track.
+   *
+   * Cuando un mismo track cubre varios bloques consecutivos (modo `overlap`),
+   * el array repite el URI: el motor de Spotify ignora el play() si la URI ya
+   * esta sonando, asi que es seguro repetir.
+   *
+   * Longitud == numero de bloques expandidos del plan. Si esta vacio, no hay
+   * playlist creada (no deberia pasar; SessionTVMode trata el caso defensive).
+   */
+  blockTrackUris: readonly string[];
+}
+
+/**
  * Payload que viaja del wizard a la pestaña /tv. Incluye el plan editable y
  * los inputs validados — son los unicos datos que SessionTVMode necesita para
  * arrancar (todo lo demas, como zonas Karvonen, se deriva de estos dos).
@@ -10,11 +54,15 @@ import type { ValidatedUserInputs } from '@core/user';
  * sesion desde una plantilla de SESSION_TEMPLATES (no cuando el plan se
  * construye desde cero). SessionTVMode lo usa para detectar plantillas-test
  * y disparar el TestResultDialog al completar la sesion.
+ *
+ * `spotify` es opcional y solo se rellena si la usuaria tiene sesion Spotify
+ * activa, es Premium y la playlist se ha creado con exito (URIs disponibles).
  */
 export interface TVHandoffPayload {
   plan: EditableSessionPlan;
   validatedInputs: ValidatedUserInputs;
   templateId?: string;
+  spotify?: TVHandoffSpotify;
 }
 
 /**

@@ -23,6 +23,7 @@ import {
 } from '@core/matching';
 import { dedupeByUri, loadNativeTracks, type Track } from '@core/tracks';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
+import { BetaBanner } from '@ui/components/BetaBanner';
 import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -55,6 +56,7 @@ const TVModeRoute = lazy(() =>
   import('@ui/pages/TVModeRoute').then((m) => ({ default: m.TVModeRoute })),
 );
 import { writeHandoff } from '@core/tv/tvHandoff';
+import { buildSpotifyTVHandoff } from '@ui/lib/spotifyTVHandoff';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
 import { hydrateUploadedCsvs, type UploadedCsv } from '@ui/state/uploadedCsv';
 import { navigateBack, navigateInApp, usePathname } from '@ui/utils/navigation';
@@ -564,10 +566,15 @@ function WizardApp(): JSX.Element {
 
   const openTVModeNow = (): void => {
     if (sessionPlan === null || !validation.ok) return;
+    // Adjuntar tokens y URIs solo si TODAS las precondiciones se cumplen
+    // (Premium + scopes + playlist casada). Si falta cualquier cosa, el
+    // Modo TV se abre en su modo legacy sin controles integrados.
+    const spotifyHandoff = buildSpotifyTVHandoff(matchedList);
     writeHandoff({
       plan: sessionPlan,
       validatedInputs: validation.data,
       ...(activeTemplateId !== null ? { templateId: activeTemplateId } : {}),
+      ...(spotifyHandoff !== null ? { spotify: spotifyHandoff } : {}),
     });
     window.open('/tv', '_blank', 'noopener');
   };
@@ -749,6 +756,7 @@ function WizardApp(): JSX.Element {
             matchedList === null) && <NeedsMusicMessage onBack={handleBack} />}
       </main>
 
+      <BetaBanner />
       <Footer />
     </div>
   );

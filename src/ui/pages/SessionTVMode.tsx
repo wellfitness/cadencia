@@ -25,6 +25,9 @@ import { wakeLock } from '@ui/lib/wakeLock';
 import { buildPhaseAnnouncement, COMPLETION_ANNOUNCEMENT } from '@ui/lib/ttsMessages';
 import { updateSection, useCadenciaData } from '@ui/state/cadenciaStore';
 import { TestResultDialog } from '@ui/components/session-builder/TestResultDialog';
+import { MusicControlBar } from '@ui/components/tv/MusicControlBar';
+import { useSpotifyTVPlayer } from '@ui/components/tv/useSpotifyTVPlayer';
+import type { TVHandoffSpotify } from '@core/tv/tvHandoff';
 
 const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
   flat: 'Llano',
@@ -42,6 +45,13 @@ export interface SessionTVModeProps {
    * construyo el plan desde cero o lo importo de un .zwo.
    */
   templateId?: string;
+  /**
+   * Datos de Spotify para activar los controles integrados de musica
+   * (Premium-only, progressive enhancement). Indefinido si el usuario no
+   * tiene sesion Spotify, no es Premium, o el token no incluye los scopes
+   * de player. En ese caso el Modo TV cae al comportamiento legacy.
+   */
+  spotify?: TVHandoffSpotify;
   onClose: () => void;
 }
 
@@ -129,6 +139,7 @@ export function SessionTVMode({
   plan,
   validatedInputs,
   templateId,
+  spotify,
   onClose,
 }: SessionTVModeProps): JSX.Element {
   const expanded = useMemo(() => expandSessionPlan(plan), [plan]);
@@ -192,6 +203,35 @@ export function SessionTVMode({
   // repetirlo al pausar/reanudar la misma fase. Se resetea con restart o
   // cuando cambia currentIndex.
   const announcedIndexRef = useRef<number | null>(null);
+
+  // Pausa externa de Spotify (usuario pulso pause desde su movil mientras
+  // el cronometro corria). Sincronizamos el cronometro local. Memoizado
+  // para no thrashear los efectos del hook de Spotify.
+  const handleExternalPause = useCallback((): void => {
+    setIsRunning(false);
+    void wakeLock.release();
+  }, []);
+
+  // Args estables para el hook de Spotify. Cuando no hay handoff de spotify
+  // (usuario sin Premium / sin conectar), pasamos args neutros y el hook
+  // se queda inerte (no consume cuota, no hace polling, no falla).
+  const blockTrackUris = useMemo(
+    () => spotify?.blockTrackUris ?? [],
+    [spotify?.blockTrackUris],
+  );
+  const spotifyTV = useSpotifyTVPlayer({
+    initialTokens: spotify?.tokens ?? {
+      accessToken: '',
+      refreshToken: '',
+      expiresAtMs: 0,
+      scope: '',
+    },
+    productPremium: spotify?.productPremium === true,
+    blockTrackUris,
+    currentBlockIndex: currentIndex,
+    isRunning,
+    onExternalPause: handleExternalPause,
+  });
 
   const currentBlock = blocks[currentIndex];
 
@@ -354,7 +394,16 @@ export function SessionTVMode({
       }
       return next;
     });
-  }, [ensureAudioContext, effectiveVoiceEnabled]);
+    // Sincronizar musica con cronometro cuando hay sesion Spotify activa.
+    // Solo despues del primer arranque (cuando ya hay un playerState):
+    // el primer Play lo gestiona el block-sync del hook, que carga la URI
+    // del bloque con play({uris}). Si llamasemos a togglePlay aqui en el
+    // arranque inicial, podriamos llegar antes que el block-sync y mandar
+    // un play({}) sin URI → 404 No Active Device aunque haya device.
+    if (spotify !== undefined && spotifyTV.playerState !== null) {
+      void spotifyTV.togglePlay();
+    }
+  }, [ensureAudioContext, effectiveVoiceEnabled, spotify, spotifyTV]);
 
   const restart = useCallback((): void => {
     setCurrentIndex(0);
@@ -588,6 +637,16 @@ export function SessionTVMode({
           <ControlButton label="Cerrar modo TV" icon="close" onClick={onClose} variant="danger" />
         </div>
       </header>
+
+      {spotify !== undefined && (
+        <MusicControlBar
+          playerState={spotifyTV.playerState}
+          lastError={spotifyTV.lastError}
+          hasActiveDevice={spotifyTV.hasActiveDevice}
+          onTogglePlay={() => void spotifyTV.togglePlay()}
+          onSkipNext={() => void spotifyTV.skipNext()}
+        />
+      )}
 
       <div className="h-1.5 bg-black/40">
         <div

@@ -1,4 +1,4 @@
-import type { CreatedPlaylist } from './types';
+import type { CreatedPlaylist, SpotifyUserProfile } from './types';
 
 const API_BASE = 'https://api.spotify.com/v1';
 
@@ -18,6 +18,39 @@ function isSpotifyErrorResponse(v: unknown): v is { error: SpotifyError } {
   return typeof err['message'] === 'string';
 }
 
+/**
+ * Error 403 Forbidden de la Web API de Spotify. Caso tipico en una app en
+ * Development Mode: el usuario autenticado no esta en la lista de testers
+ * del Developer Dashboard, asi que cualquier llamada autenticada falla con
+ * 403. Se diferencia del Error generico para que la UI pueda abrir un
+ * modal explicativo con CTA al formulario de alta como tester en lugar
+ * del banner de error generico.
+ *
+ * Tambien aplica a otros 403 (scope insuficiente, endpoint retirado, rate
+ * limit) — la UI los trata como mismo caso porque el remedio inmediato
+ * (apuntarse a la beta) es tambien valido para los demas escenarios poco
+ * frecuentes.
+ */
+export class SpotifyAuthorizationError extends Error {
+  readonly status: number;
+  readonly path: string;
+  readonly method: string;
+  readonly serverMessage: string;
+  constructor(args: {
+    status: number;
+    path: string;
+    method: string;
+    serverMessage: string;
+  }) {
+    super(`Spotify API ${args.status} en ${args.method} ${args.path}: ${args.serverMessage}`);
+    this.name = 'SpotifyAuthorizationError';
+    this.status = args.status;
+    this.path = args.path;
+    this.method = args.method;
+    this.serverMessage = args.serverMessage;
+  }
+}
+
 async function fetchSpotify(
   accessToken: string,
   path: string,
@@ -28,6 +61,7 @@ async function fetchSpotify(
   if (init.body !== undefined && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
+  const method = init.method ?? 'GET';
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     // Leer el cuerpo del error de la forma mas tolerante posible:
@@ -48,7 +82,7 @@ async function fetchSpotify(
         status: res.status,
         statusText: res.statusText,
         path,
-        method: init.method ?? 'GET',
+        method,
         parsedMessage,
         rawBody: rawBody.slice(0, 500), // primeros 500 chars
       });
@@ -61,7 +95,17 @@ async function fetchSpotify(
         : rawBody !== ''
           ? rawBody.slice(0, 200)
           : res.statusText;
-    throw new Error(`Spotify API ${res.status}: ${detail}`);
+    if (res.status === 403) {
+      throw new SpotifyAuthorizationError({
+        status: 403,
+        path,
+        method,
+        serverMessage: detail,
+      });
+    }
+    // Incluimos method+path en el message para que el banner de error de la UI
+    // permita al usuario enviar una captura util sin tener que abrir DevTools.
+    throw new Error(`Spotify API ${res.status} en ${method} ${path}: ${detail}`);
   }
   return res;
 }
@@ -155,6 +199,45 @@ export async function addTracksToPlaylist(
       body: JSON.stringify({ uris: batch }),
     });
   }
+}
+
+interface SpotifyMeResponse {
+  product?: string;
+}
+
+function isSpotifyMeResponse(v: unknown): v is SpotifyMeResponse {
+  return typeof v === 'object' && v !== null;
+}
+
+/**
+ * Lee el perfil minimo del usuario autenticado: solo el campo `product` para
+ * gating de Premium en los controles de Modo TV.
+ *
+ * Endpoint: `GET /v1/me`. Requiere scope `user-read-private` para que `product`
+ * venga relleno; sin ese scope la respuesta es 200 pero `product` viene como
+ * undefined. En ese caso degradamos a `productPremium: false` para que la UI
+ * no asuma Premium y oculte los controles que requieren /me/player/*.
+ *
+ * Spotify documenta tres valores de `product`: `premium`, `free` y `open`
+ * (alias historico de `free`). Cualquier valor que no sea exactamente
+ * `premium` se trata como no-Premium.
+ *
+ * Referencia: https://developer.spotify.com/documentation/web-api/reference/get-current-users-profile
+ */
+export async function getCurrentUser(accessToken: string): Promise<SpotifyUserProfile> {
+  const res = await fetchSpotify(accessToken, '/me');
+  const json: unknown = await res.json();
+  if (!isSpotifyMeResponse(json)) {
+    throw new Error('Spotify /me devolvio una respuesta inesperada');
+  }
+  const product =
+    json.product === 'premium' || json.product === 'free' || json.product === 'open'
+      ? json.product
+      : 'free';
+  return {
+    product,
+    productPremium: product === 'premium',
+  };
 }
 
 /**

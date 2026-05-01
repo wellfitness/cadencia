@@ -41,6 +41,7 @@ export function TVModeRoute(): JSX.Element {
       plan={payload.plan}
       validatedInputs={payload.validatedInputs}
       {...(payload.templateId !== undefined ? { templateId: payload.templateId } : {})}
+      {...(payload.spotify !== undefined ? { spotify: payload.spotify } : {})}
       onClose={() => {
         // Cerrar la pestaña: window.close() solo funciona para pestañas
         // abiertas via window.open; las navegaciones directas del usuario lo
