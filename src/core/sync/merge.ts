@@ -68,6 +68,7 @@ const ATOMIC_SECTIONS = [
   'musicPreferences',
   'nativeCatalogPrefs',
   'dismissedTrackUris',
+  'tvModePrefs',
 ] as const;
 type AtomicSection = (typeof ATOMIC_SECTIONS)[number];
 

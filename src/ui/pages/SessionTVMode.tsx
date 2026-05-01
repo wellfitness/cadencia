@@ -18,6 +18,10 @@ import type { Sport, ValidatedUserInputs } from '@core/user/userInputs';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { zoneTextColor } from '@ui/components/zoneColors';
+import { tts } from '@ui/lib/tts';
+import { wakeLock } from '@ui/lib/wakeLock';
+import { buildPhaseAnnouncement, COMPLETION_ANNOUNCEMENT } from '@ui/lib/ttsMessages';
+import { updateSection, useCadenciaData } from '@ui/state/cadenciaStore';
 
 const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
   flat: 'Llano',
@@ -94,12 +98,22 @@ const ZONE_PERCENT_FCR: Record<HeartRateZone, string> = {
 const WARNING_BEEP_TIMES = new Set([10, 5, 3, 2, 1]);
 
 /**
- * Modo TV: cronometro fase a fase con beeps de aviso, atajos de teclado
- * y feedback visual prominente. Pensado para usar mientras suena la
- * playlist de Spotify en otra app (la app no controla audio externo).
+ * Modo TV: cronometro fase a fase con beeps de aviso, voz del entrenador,
+ * atajos de teclado y feedback visual prominente. Pensado para usar
+ * mientras suena la playlist de Spotify en otra app (la app no controla
+ * audio externo).
+ *
+ * Voz: al iniciar cada bloque se anuncia «Zona X, sensacion, cadencia,
+ * duracion. RPE». Sustituye al acorde de cambio de fase para no saturar.
+ * Si el usuario silencia la voz (atajo V o boton), el acorde vuelve como
+ * red de seguridad sonora.
+ *
+ * Wake Lock: mientras isRunning, se mantiene la pantalla encendida via
+ * Screen Wake Lock API (Chrome 84+, Safari 16.4+). Sin esto, la pantalla
+ * se apaga a los ~30s y muchos navegadores moviles silencian el audio.
  *
  * Atajos: Space (play/pause), Flechas (saltar fase), Esc (cerrar),
- *         S (sonido), V (vibración, solo si el navegador la soporta), R (reiniciar).
+ *         S (sonido), V (voz), R (reiniciar).
  */
 export function SessionTVMode({
   plan,
@@ -132,8 +146,25 @@ export function SessionTVMode({
     [],
   );
 
+  // Soporte de TTS: si el navegador no expone speechSynthesis, ocultamos el
+  // boton de voz y degradamos al comportamiento legacy (acorde de cambio).
+  const ttsSupported = useMemo(() => tts.isSupported(), []);
+
+  // Persistencia de la preferencia voz on/off en cadenciaStore (sincroniza
+  // con Drive). Default true cuando el usuario nunca lo ha tocado.
+  const cadenciaData = useCadenciaData();
+  const voiceEnabledStored = cadenciaData.tvModePrefs?.voiceEnabled ?? true;
+  // El estado efectivo combina la preferencia del usuario con el soporte
+  // del navegador. Todos los call sites consultan esto, no la prefencia
+  // pura, para no intentar hablar en un browser sin TTS.
+  const effectiveVoiceEnabled = voiceEnabledStored && ttsSupported;
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Track del ultimo bloque cuyo anuncio TTS ya se disparo, para no
+  // repetirlo al pausar/reanudar la misma fase. Se resetea con restart o
+  // cuando cambia currentIndex.
+  const announcedIndexRef = useRef<number | null>(null);
 
   const currentBlock = blocks[currentIndex];
 
@@ -157,19 +188,38 @@ export function SessionTVMode({
     return karvonenZones.find((z) => z.zone === currentBlock.zone) ?? null;
   }, [currentBlock, karvonenZones]);
 
-  // Web Audio API: lazy init en el primer beep (gesto del usuario)
+  // iOS Safari rechaza crear/reanudar AudioContext fuera de un gesto humano: si
+  // el primer beep llega desde el setInterval del timer (warning a 10s del fin
+  // de fase), el contexto nace 'suspended' y queda mudo el resto de la sesion.
+  // Por eso este helper se invoca tambien desde toggleRunning, que es el unico
+  // gesto fiable (clic en Play o barra espaciadora) en el ciclo del modo TV.
+  const ensureAudioContext = useCallback((): void => {
+    if (audioContextRef.current === null) {
+      const Ctx =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctx === undefined) return;
+      try {
+        audioContextRef.current = new Ctx();
+      } catch {
+        return;
+      }
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') {
+      void ctx.resume().catch(() => {
+        // Si resume rechaza (fuera de gesto), degradamos en silencio.
+      });
+    }
+  }, []);
+
   const playBeep = useCallback(
     (frequency: number, durationMs: number, volume = 0.3): void => {
       if (!soundEnabled) return;
       try {
-        if (audioContextRef.current === null) {
-          const Ctx =
-            window.AudioContext ??
-            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-          if (Ctx === undefined) return;
-          audioContextRef.current = new Ctx();
-        }
+        ensureAudioContext();
         const ctx = audioContextRef.current;
+        if (ctx === null) return;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -184,7 +234,7 @@ export function SessionTVMode({
         // Audio no disponible: degradacion silenciosa
       }
     },
-    [soundEnabled],
+    [soundEnabled, ensureAudioContext],
   );
 
   const vibrate = useCallback(
@@ -224,7 +274,13 @@ export function SessionTVMode({
       const nextBlock = blocks[nextIndex];
       setCurrentIndex(nextIndex);
       setTimeRemaining(nextBlock?.durationSec ?? 0);
-      playPhaseChange();
+      // Si la voz está activa, el anuncio del nuevo bloque lo dispara el
+      // useEffect de abajo (reactivo a currentIndex). El acorde se omite
+      // para no solapar con la voz. Si la voz está silenciada o no
+      // soportada, el acorde es el unico marcador audible del cambio.
+      if (!effectiveVoiceEnabled) {
+        playPhaseChange();
+      }
       // Z6 → patrón más largo y rotundo para que destaque del cambio de fase
       // estándar, dado que es el tramo de máxima exigencia.
       const isMaxZone = nextBlock?.zone === 6;
@@ -233,8 +289,13 @@ export function SessionTVMode({
       setIsCompleted(true);
       setIsRunning(false);
       playCompletion();
+      if (effectiveVoiceEnabled) {
+        tts.speak(COMPLETION_ANNOUNCEMENT);
+      }
+      // Liberar el wake lock al terminar — la sesion ya no esta activa.
+      void wakeLock.release();
     }
-  }, [currentIndex, blocks, playPhaseChange, playCompletion, vibrate]);
+  }, [currentIndex, blocks, playPhaseChange, playCompletion, vibrate, effectiveVoiceEnabled]);
 
   const goToPrevPhase = useCallback((): void => {
     if (currentIndex > 0) {
@@ -246,8 +307,27 @@ export function SessionTVMode({
   }, [currentIndex, blocks]);
 
   const toggleRunning = useCallback((): void => {
-    setIsRunning((prev) => !prev);
-  }, []);
+    // Pre-armar el AudioContext y el motor TTS en este gesto humano
+    // (clic Play / barra espaciadora). iOS Safari requiere que ambos
+    // motores se armen desde un gesto del usuario; si el primer beep o
+    // utterance llega desde un setInterval, queda suspendido y mudo el
+    // resto de la sesion.
+    ensureAudioContext();
+    if (effectiveVoiceEnabled) {
+      tts.warmup();
+    }
+    setIsRunning((prev) => {
+      const next = !prev;
+      // Pedir/liberar wake lock en el mismo gesto: pantalla encendida
+      // mientras la sesion esta activa, sleep normal cuando se pausa.
+      if (next) {
+        void wakeLock.request();
+      } else {
+        void wakeLock.release();
+      }
+      return next;
+    });
+  }, [ensureAudioContext, effectiveVoiceEnabled]);
 
   const restart = useCallback((): void => {
     setCurrentIndex(0);
@@ -255,7 +335,39 @@ export function SessionTVMode({
     setTotalElapsed(0);
     setIsCompleted(false);
     setIsRunning(false);
+    // Permitir reanunciar el bloque 0 al volver a pulsar Play, y detener
+    // cualquier voz en curso (ej. "Sesion completada" si se reinicia
+    // antes de que termine de hablar).
+    announcedIndexRef.current = null;
+    tts.cancel();
+    void wakeLock.release();
   }, [blocks]);
+
+  /**
+   * Anuncia por voz el bloque actual en cuanto la sesion arranca o cambia
+   * de fase. Usa announcedIndexRef como guard para no repetir el anuncio
+   * al pausar/reanudar la misma fase.
+   */
+  useEffect(() => {
+    if (!isRunning || isCompleted) return;
+    if (announcedIndexRef.current === currentIndex) return;
+    announcedIndexRef.current = currentIndex;
+    if (!effectiveVoiceEnabled || currentBlock === undefined) return;
+    tts.speak(buildPhaseAnnouncement(currentBlock, sport));
+  }, [isRunning, isCompleted, currentIndex, currentBlock, effectiveVoiceEnabled, sport]);
+
+  /**
+   * Cleanup al desmontar el modo TV (Esc, ruta cambia, etc): detener la
+   * voz y liberar el wake lock. Sin esto, la voz puede seguir hablando
+   * despues de cerrar la pantalla, y el lock queda colgado hasta el
+   * siguiente release implicito del navegador.
+   */
+  useEffect(() => {
+    return () => {
+      tts.cancel();
+      void wakeLock.release();
+    };
+  }, []);
 
   // Timer principal
   useEffect(() => {
@@ -288,6 +400,21 @@ export function SessionTVMode({
     }
   }, [timeRemaining, isRunning, isCompleted, currentBlock, goToNextPhase]);
 
+  /**
+   * Persiste el toggle de voz en cadenciaStore (sincroniza con Drive si
+   * el usuario tiene Drive conectado). El default cuando nunca se ha
+   * tocado es true, asi que el primer toggle escribe `false`.
+   */
+  const toggleVoice = useCallback((): void => {
+    const next = !voiceEnabledStored;
+    updateSection('tvModePrefs', { voiceEnabled: next });
+    if (!next) {
+      // Si el usuario silencia la voz mientras un anuncio esta sonando,
+      // cortarlo en el acto en vez de esperar a que termine la frase.
+      tts.cancel();
+    }
+  }, [voiceEnabledStored]);
+
   // Atajos de teclado
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -316,9 +443,9 @@ export function SessionTVMode({
           break;
         case 'v':
         case 'V':
-          if (!vibrationSupported) break;
+          if (!ttsSupported) break;
           e.preventDefault();
-          setVibrationEnabled((prev) => !prev);
+          toggleVoice();
           break;
         case 'r':
         case 'R':
@@ -329,7 +456,7 @@ export function SessionTVMode({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [toggleRunning, goToNextPhase, goToPrevPhase, onClose, restart, vibrationSupported]);
+  }, [toggleRunning, goToNextPhase, goToPrevPhase, onClose, restart, toggleVoice, ttsSupported]);
 
   if (blocks.length === 0 || currentBlock === undefined) {
     return (
@@ -395,10 +522,17 @@ export function SessionTVMode({
             disabled={currentIndex >= blocks.length - 1}
           />
           <ControlButton
-            label={soundEnabled ? 'Silenciar' : 'Activar sonido'}
+            label={soundEnabled ? 'Silenciar beeps' : 'Activar beeps'}
             icon={soundEnabled ? 'volume_up' : 'volume_off'}
             onClick={() => setSoundEnabled((prev) => !prev)}
           />
+          {ttsSupported && (
+            <ControlButton
+              label={voiceEnabledStored ? 'Silenciar voz del entrenador' : 'Activar voz del entrenador'}
+              icon={voiceEnabledStored ? 'record_voice_over' : 'voice_over_off'}
+              onClick={toggleVoice}
+            />
+          )}
           {vibrationSupported && (
             <ControlButton
               label={vibrationEnabled ? 'Desactivar vibración' : 'Activar vibración'}
@@ -566,7 +700,7 @@ export function SessionTVMode({
           />
         </div>
         <span className="hidden md:inline opacity-60 flex-1 text-center">
-          Espacio: pausa · Flechas: saltar fase · S: sonido · R: reiniciar · Esc: cerrar
+          Espacio: pausa · Flechas: saltar fase · S: sonido · V: voz · R: reiniciar · Esc: cerrar
         </span>
         <span className="md:hidden opacity-60 flex-shrink-0 tabular-nums">
           Total {formatTime(totalElapsed)} · {Math.round(totalProgressPct)}%

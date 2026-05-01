@@ -72,6 +72,8 @@ export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Elem
 
           <CatalogSection data={data} />
 
+          <TvModeSection data={data} />
+
           <PersistenceSection data={data} />
 
           <Card title="Sincronización entre dispositivos" titleIcon="cloud_sync">
@@ -253,6 +255,53 @@ function PersistenceSection({ data }: SectionProps): JSX.Element {
           </p>
         }
       />
+    </Card>
+  );
+}
+
+/**
+ * Modo TV: solo se usa en sesiones indoor. Por ahora una unica preferencia
+ * (voz on/off); si manana añadimos slider de velocidad o seleccion de voz
+ * concreta, todo cabe aqui sin reestructurar la pagina.
+ */
+function TvModeSection({ data }: SectionProps): JSX.Element {
+  // null = nunca se ha tocado el toggle, comportamiento default = on.
+  const voiceEnabled = data.tvModePrefs?.voiceEnabled ?? true;
+  const ttsAvailable =
+    typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+  const handleToggle = (e: ChangeEvent<HTMLInputElement>): void => {
+    updateSection('tvModePrefs', { voiceEnabled: e.target.checked });
+  };
+
+  return (
+    <Card title="Modo TV" titleIcon="cast">
+      {ttsAvailable ? (
+        <label className="flex items-start gap-3 cursor-pointer min-h-[44px]">
+          <input
+            type="checkbox"
+            checked={voiceEnabled}
+            onChange={handleToggle}
+            className="mt-1 w-5 h-5 accent-turquesa-600 cursor-pointer"
+          />
+          <div>
+            <p className="text-sm font-semibold text-gris-700">
+              Voz del entrenador
+            </p>
+            <p className="text-xs text-gris-500">
+              En cada nuevo bloque de la sesión indoor, una voz anuncia la
+              zona, sensación, cadencia objetivo y duración. Puedes también
+              activarla/silenciarla en el modo TV con la tecla «V» o el
+              botón del altavoz.
+            </p>
+          </div>
+        </label>
+      ) : (
+        <EmptyHint
+          icon="info"
+          text="Tu navegador no soporta síntesis de voz. El modo TV seguirá funcionando con beeps y vibración."
+        />
+      )}
     </Card>
   );
 }

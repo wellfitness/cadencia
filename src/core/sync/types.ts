@@ -75,6 +75,24 @@ export interface NativeCatalogPrefs {
 }
 
 /**
+ * Preferencias del modo TV (sesion indoor a pantalla completa).
+ * Persistido y sincronizado para que «activar voz una vez en el movil»
+ * propague al portatil sin tener que repetir la accion.
+ *
+ * Estructura de objeto (no boolean suelto) para poder ampliar sin romper
+ * schema: si manana queremos `speechRate` o `voiceUri` preferida, se
+ * añaden aqui sin tocar SyncedData.
+ */
+export interface TvModePrefs {
+  /**
+   * Si la voz del entrenador esta activa al iniciar cada bloque. Cuando
+   * `null` (estado inicial, usuario nunca ha tocado el toggle), el
+   * llamador interpreta como `true` (voz activa por defecto).
+   */
+  voiceEnabled: boolean;
+}
+
+/**
  * El blob completo que se persiste en localStorage y se sincroniza con
  * Drive. Cada seccion tiene su propio meta para LWW granular.
  */
@@ -91,6 +109,7 @@ export interface SyncedData {
     dismissedTrackUris?: SectionMeta;
     plannedEvents?: SectionMeta;
     playlistHistory?: SectionMeta;
+    tvModePrefs?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
@@ -99,6 +118,8 @@ export interface SyncedData {
   uploadedCsvs: UploadedCsvRecord[];
   /** Preferencias sobre el catalogo nativo (denylist). */
   nativeCatalogPrefs: NativeCatalogPrefs | null;
+  /** Preferencias del modo TV (voz on/off). */
+  tvModePrefs: TvModePrefs | null;
   /**
    * URIs de canciones descartadas globalmente desde ResultStep ("A pedalear").
    * Se filtran del livePool antes del matching, independientemente de la fuente.

@@ -40,6 +40,7 @@ function normalize(data: SyncedData): SyncedData {
     dismissedTrackUris: data.dismissedTrackUris ?? [],
     plannedEvents: data.plannedEvents ?? [],
     playlistHistory: data.playlistHistory ?? [],
+    tvModePrefs: data.tvModePrefs ?? null,
   };
 }
 
@@ -84,7 +85,8 @@ type AtomicSectionKey =
   | 'userInputs'
   | 'musicPreferences'
   | 'nativeCatalogPrefs'
-  | 'dismissedTrackUris';
+  | 'dismissedTrackUris'
+  | 'tvModePrefs';
 
 /**
  * Actualiza una seccion atomica del store, bumpeando su `_sectionMeta.updatedAt`

@@ -13,6 +13,7 @@ export function emptySyncedData(): SyncedData {
     dismissedTrackUris: [],
     plannedEvents: [],
     playlistHistory: [],
+    tvModePrefs: null,
   };
 }
 
