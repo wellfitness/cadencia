@@ -74,6 +74,15 @@ export const HELP_ARTICLES: readonly HelpArticleMeta[] = [
   },
   // — Universales (ambos deportes) —
   {
+    slug: 'tests-fisiologicos',
+    path: '/ayuda/tests-fisiologicos',
+    icon: 'monitor_heart',
+    title: 'Tests fisiológicos guiados',
+    description: 'Los 6 tests de campo de Cadencia (rampa, MAP-5min, 3MT en bici; Daniels, 5min, 30-15 IFT en run): protocolo, fórmulas y cuándo elegir cada uno.',
+    readTime: '6 min',
+    audience: 'shared',
+  },
+  {
     slug: 'zonas',
     path: '/ayuda/zonas',
     icon: 'speed',

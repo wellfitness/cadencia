@@ -1,6 +1,9 @@
 import { SESSION_TEMPLATES, type SessionTemplate, type SessionTemplateId } from '@core/segmentation';
 import { ArticleShell } from '@ui/components/help/ArticleShell';
+import { Card } from '@ui/components/Card';
+import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TemplateExplainer } from '@ui/components/help/TemplateExplainer';
+import { navigateInApp } from '@ui/utils/navigation';
 
 const TEMPLATE_CONTEXT: Partial<Record<SessionTemplateId, string>> = {
   'run-easy-long':
@@ -65,6 +68,28 @@ export function PlantillasRunningArticle(): JSX.Element {
           <TemplateExplainerWithContext key={t.id} template={t} />
         ))}
       </Section>
+
+      <Card variant="info" className="mt-8" title="¿Y los tests fisiológicos?" titleIcon="monitor_heart">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          Cadencia tiene además <strong>3 tests guiados de running</strong> (Daniels
+          4&apos;+1&apos;+3&apos; para FCmáx, 5min all-out para FCmáx + LTHR, 30-15 IFT de
+          Buchheit para vMAS y FCmáx) en una pestaña aparte dentro de la galería del
+          constructor. Todos basados en pulsómetro: no necesitas potenciómetro para
+          correr. Lee{' '}
+          <a
+            href="/ayuda/tests-fisiologicos"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/tests-fisiologicos');
+            }}
+            className="text-turquesa-600 hover:text-turquesa-700 font-semibold inline-flex items-center gap-1"
+          >
+            Tests fisiológicos guiados
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </a>{' '}
+          para entender protocolo y cuándo elegir cada uno.
+        </p>
+      </Card>
     </ArticleShell>
   );
 }

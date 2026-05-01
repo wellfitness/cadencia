@@ -79,7 +79,7 @@ La app arranca en una **Landing page**. El usuario pulsa "Empezar" y entra al **
 | 1 | **Datos** | `UserDataStep` | Recoge inputs fisiológicos. Validación **bifurcada por `(sport, mode)`**: en run el peso es opcional (Minetti normaliza por kg); en bike+gpx el peso alimenta la ecuación de potencia y es obligatorio. Ver "Modelo de dominio". |
 | 2 | **Ruta** | `RouteStep` → bifurca a `GpxRouteFlow` o a `SessionBuilder` según la fuente elegida. | Outdoor: sube GPX y procesa segmentos (potencia ciclista o Cr de Minetti según deporte). Indoor: construye sesión por bloques desde plantilla, desde cero o **importando un .zwo** (Zwift Workout); cada bloque muestra los rangos bpm/W del usuario para su zona. Permite **descargar el plan como .zwo** para Zwift, TrainingPeaks Virtual, TrainerRoad, Wahoo SYSTM, MyWhoosh. |
 | 3 | **Música** | `MusicStep` | Selector de fuentes (CSVs embebidos, propios o ambos), preferencias de género, "todo con energía", matching en vivo. |
-| 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales, crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. |
+| 4 | **Resultado** | `ResultStep` | Muestra playlist final, permite editar tracks individuales (incluido un buscador por título o artista en el dropdown «Otro tema», client-side, case- y diacritic-insensitive sobre el ranking ya calculado), crear en Spotify (OAuth PKCE), o entrar en **Modo TV** (`SessionTVMode`) — solo en sesiones indoor — para seguir la sesión a pantalla completa con la música sincronizada. El Modo TV incluye **voz del entrenador** (Web Speech API en castellano, anuncia zona/sensación/cadencia/duración/RPE en cada cambio de bloque), **Screen Wake Lock** (la pantalla no se apaga mientras corre la sesión), beeps de cuenta atrás (10/5/3/2/1 s), atajos de teclado (Espacio, flechas, S/V/R/Esc) y, si la plantilla activa es un test fisiológico, dispara el `TestResultDialog` al completar la sesión. |
 
 Páginas adicionales: `Landing` (home), `SpotifyCallback` (handler del OAuth redirect), `CatalogEditorPage` (`/catalogo`, editor con cuatro pestañas — catálogo nativo, listas propias, descartadas y **estadísticas** del historial real de playlists creadas — con persistencia automática), `MyPreferencesPage` (`/preferencias`, vista consolidada de los datos guardados del usuario; alias `/cuenta` por retrocompatibilidad), `CalendarPage` (`/calendario`, planificación de entrenamientos en vista lista o mes), `HelpRouter` (`/ayuda/*`).
 
@@ -360,6 +360,26 @@ Cada `SessionTemplate` lleva un campo `sport: 'bike' | 'run'`. La galería del `
 
 En running el campo `cadenceProfile` de los bloques se rellena por convención a `'flat'`: el matching musical en running se acopla a la zona, no al terreno (ver siguiente sección).
 
+### Tests fisiológicos guiados (`kind: 'test'`)
+
+Algunas `SessionTemplate` llevan `kind: 'test'` además de `kind: 'workout'` (default). Son **plantillas-test** que el usuario ejecuta en Modo TV y, al terminar, introduce los datos clave del test en un modal genérico (`TestResultDialog`) que aplica un `compute()` puro sobre la fórmula correspondiente y persiste el delta resultante en `cadenciaStore.userInputs` (sincronizado con Drive si está conectado). Las fórmulas viven en [src/core/physiology/tests.ts](src/core/physiology/tests.ts) con tests golden TDD.
+
+**Ciclismo (3 tests)**:
+
+- **Rampa lineal** (`bike-test-ramp`): +25 W/min hasta agotamiento. `FTP = 0,75 × MAP` (Michalik 2019, Valenzuela 2018). El usuario introduce la potencia minuto pico (MAP). Disclaimer hardware: el rodillo debe estar configurado en modo NIVEL/SLOPE para que la rampa avance correctamente.
+- **5-min PAM all-out** (`bike-test-map5`): 5 minutos all-out tras calentamiento. Estima `VO₂max = 16,6 + 8,87 × (P5min/peso)` (Sitko 2021, regresión bayesiana sobre 46 ciclistas amateur, R² 95% CI 0,61–0,77) y captura la FCmáx pico del usuario.
+- **3MT all-out** (`bike-test-3mt`): 3 minutos all-out con resistencia FIJA. `CP = potencia media de los últimos 30 s`; `W' = trabajo total − CP·180` (Vanhatalo 2007, Black 2013). Disclaimer crítico: el rodillo debe ir en **NIVEL/SLOPE**, NO en modo ERG (en ERG la resistencia se auto-ajusta y el resultado es inválido sin error visible).
+
+**Running (3 tests, todos HR-only — sin potenciómetro)**:
+
+- **Daniels FCmáx** (`run-test-hrmax-daniels`): 4 min duro + 1 min recuperación + 3 min all-out. La FC pico registrada es la FCmáx real del usuario (más fiable que cualquier estimación por edad/sexo). Protocolo de Zhou 2001 + Daniels Running Formula.
+- **5-min all-out run** (`run-test-5min`): captura FCmáx (pico) y estima LTHR ≈ FC media de los 5 min (en un esfuerzo all-out de 5 min la FC media cae en el 92-95 % de la FCmáx y se aproxima a la LTHR de Joe Friel).
+- **30-15 IFT** (`run-test-30-15-ift`): test intermitente Buchheit 2011. 30 s corriendo + 15 s descanso, velocidad creciente +0,5 km/h por estadio. Stage 1 = 8 km/h. `vMAS = 8 + 0,5·(stage−1)`. Disclaimer hardware: requiere conos a 40 m y app de audio oficial Buchheit. vMAS es informativa en V1 (no alimenta el matching); el valor real está en la FCmáx pico capturada.
+
+**Arquitectura UI**: cada `TestProtocol` declara `inputs[]` (preguntas numéricas con id/label/unit/min/max), un `compute()` puro que devuelve `TestResult { delta: Partial<UserInputsRaw>, derived: TestDerivedValue[] }`, y `citationDois[]` con los DOIs (la UI los renderiza como links a doi.org). Si `hardwareDisclaimer` está presente, antes de abrir Modo TV se muestra el `TestSetupDialog` con el aviso crítico (rampa, 3MT, 30-15 IFT). Al completar la sesión, `SessionTVMode` lee `templateId` del `TVHandoffPayload` y, si la plantilla activa es un test, dispara el `TestResultDialog` que itera sobre `inputs[]` — añadir un séptimo test no requiere código nuevo de UI, solo declarar la nueva entrada en `SESSION_TEMPLATES` con su `testProtocol`.
+
+La galería del `SessionBuilder` muestra una **pestaña «Tests»** separada de la de plantillas de entrenamiento (filtrado vía `templatesBy(sport, 'test' | 'workout')`).
+
 ### Algoritmo de matching (determinista)
 
 **Multisport — qué cambia entre bike y run**: el motor de matching es el mismo (mismo scoring, misma regla cero-repeticiones, misma política strict/best-effort/repeated). Lo único distinto es **el filtro de cadencia**: en cycling la cadencia musical (rpm pedaleando 1:1 al beat o 2:1 half-time) depende del `cadenceProfile` del bloque (flat/climb/sprint); en running la cadencia natural se acopla a la zona (cadencia de zancada ~160-180 spm es bastante uniforme), por lo que el `cadenceProfile` deja de discriminar y los rangos de cadencia musical aplican en función directa de la zona Z1-Z6. El resto del pipeline (energy/valence ideales por zona, género preferido, scoring, fallback cross-zone) es idéntico.
@@ -398,6 +418,7 @@ Para cada segmento `(zona, profile, duración)`:
 2. **Fallback al catálogo entero**: si ningún strict queda libre (catálogo agotado o sin candidatos ideales para esa zona), cae al resto del catálogo libre, ordenado por score. Garantiza que el dropdown nunca aparezca vacío mientras quede algún track no usado.
 3. **Aviso pre-elección**: cada `AlternativeCandidate` lleva un flag `passesCadence: boolean`. Si todas las opciones del dropdown son `passesCadence: false`, la UI pinta una cabecera dorada **"Sin opciones ideales libres"** antes del listado para avisar al usuario.
 4. **Calidad del nuevo slot**: se recalcula track-a-track via `passesCadenceFilter` al sustituir (no se hereda del slot anterior). Si el track elegido encaja en cadencia → `'strict'`; si no → `'best-effort'`.
+5. **Buscador por título o artista** (en el dropdown «Otro tema» de `PlaylistTrackRow`): filtro client-side sobre el ranking ya calculado, manteniendo el orden por score (las mejores opciones siguen apareciendo arriba). Diacritic- y case-insensitive (`"cafe"` matchea `"Café"`). Autofocus al abrir el popover, reset al cerrar, botón X para limpiar. El banner «Sin opciones ideales libres» se computa sobre la lista original (no sobre la filtrada) para no parpadear. Cero cambios en `src/core/`: el filtrado vive en la UI sobre lo que ya devuelve `getAlternativesForSegment`, así que la garantía cero-repeticiones se mantiene.
 
 **Banner "Encaje libre" global** (`@ui/components/BestEffortBanner`): en `MusicStep` y `ResultStep`, si la playlist tiene ≥1 segmento con `matchQuality === 'best-effort'`, se muestra un banner dorado explicando el concepto y recomendando subir más listas. Reemplaza al chip pequeño que antes pasaba desapercibido.
 
@@ -500,6 +521,7 @@ Para que el usuario pueda llevar sus datos entre el móvil y el ordenador sin re
 - `dismissedTrackUris`: URIs descartadas globalmente. Dos puntos de entrada: (a) botón «No la quiero» en cada track de `ResultStep`; (b) botón rojo de cada fila del catálogo nativo en `CatalogEditorPage` (icono `do_not_disturb_on`). Aplicables a cualquier source. El livePool del wizard las filtra antes del matching y la pestaña «Catálogo nativo» las oculta de su lista (siguen accesibles en «Descartadas» con su botón «Recuperar»). Distinto del checkbox de inclusión/exclusión del catálogo nativo, que solo afecta a la denylist `nativeCatalogPrefs.excludedUris` (catálogo bundled), mientras que `dismissedTrackUris` es cross-source.
 - `plannedEvents`: entradas del **calendario de planificación** (`/calendario`) — entrenamientos futuros que el usuario ha programado. Pueden ser puntuales o recurrentes semanales (`recurrence.daysOfWeek`), de tipo `indoor` (referencia a una `SavedSession` por id) o `outdoor` (nombre + URL externa opcional, sin GPX persistido). Borrado lógico vía `deletedAt` con expiry 30 días. Ver «Calendario de planificación» abajo.
 - `playlistHistory`: historial de las playlists creadas en Spotify. Snapshot frozen capturado solo tras éxito de `createPlaylistWithTracks` en `ResultStep` (no en generaciones intermedias o abandonadas). Cada entrada lleva los tracks que llegaron a Spotify (uri, name, artist joineado, genres, tempoBpm, zona, duración del segmento, matchQuality, `wasReplaced` per-track), zoneDurations agregadas, deporte, modo (gpx/session) y la seed del motor. Mismo patrón de array merge LWW + tombstones que `savedSessions`. Alimenta la pestaña **Estadísticas** (`/catalogo?tab=stats`): top 20 tracks, top 15 artistas, top 10 géneros (ponderado por duración), distribución de zonas, ratio de sustituciones manuales y vista cronológica de las últimas 30 listas creadas. Funciones puras en `src/core/playlist/historyStats.ts`.
+- `tvModePrefs`: preferencias del Modo TV. Por ahora una única clave (`voiceEnabled: boolean`, default `true`) que controla si la voz del entrenador (Web Speech API) anuncia cada nuevo bloque. Se sincroniza con Drive como sección atomic LWW: silenciar la voz en el móvil propaga al portátil. Editable también desde [/preferencias](src/ui/pages/MyPreferencesPage.tsx) (sección «Modo TV»).
 
 **Qué NO se sincroniza** (deliberadamente):
 
@@ -525,6 +547,7 @@ export interface SyncedData {
     dismissedTrackUris?: SectionMeta;
     plannedEvents?: SectionMeta;
     playlistHistory?: SectionMeta;
+    tvModePrefs?: SectionMeta;
   };
   userInputs: UserInputsRaw | null;
   musicPreferences: MatchPreferences | null;
@@ -534,10 +557,11 @@ export interface SyncedData {
   dismissedTrackUris: string[];
   plannedEvents: PlannedEvent[];
   playlistHistory: PlaylistHistoryEntry[];
+  tvModePrefs: TvModePrefs | null;
 }
 ```
 
-- **Atomic LWW por sección** (`userInputs`, `musicPreferences`, `nativeCatalogPrefs`, `dismissedTrackUris`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
+- **Atomic LWW por sección** (`userInputs`, `musicPreferences`, `nativeCatalogPrefs`, `dismissedTrackUris`, `tvModePrefs`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
 - **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`, `plannedEvents`, `playlistHistory`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
 - **Anti-regresión**: si local está vacío y remote tiene datos, aplica remote sin merge. Si local tiene <30% de la riqueza de remote (instalación nueva), también aplica remote directo.
 - **Anti-ciclo**: flag `_applyingRemote` evita que `pull` dispare `push` tras actualizar `cadenciaStore` con datos descargados.

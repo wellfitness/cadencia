@@ -326,7 +326,7 @@ function Intro(): JSX.Element {
                 InteropZwo, para coherencia visual. */}
             <p className="text-sm text-gris-600 mb-2 max-w-xl mx-auto lg:mx-0">
               <span className="text-xs font-semibold uppercase tracking-wider text-gris-500 mr-2">
-                14 plantillas con base científica · bici y carrera:
+                14 plantillas + 6 tests con base científica · bici y carrera:
               </span>
               <strong className="font-semibold text-gris-800">Noruego 4×4</strong>
               <span className="text-gris-300 mx-1.5">·</span>
@@ -335,6 +335,8 @@ function Intro(): JSX.Element {
               <strong className="font-semibold text-gris-800">Yasso 800</strong>
               <span className="text-gris-300 mx-1.5">·</span>
               <strong className="font-semibold text-gris-800">Daniels</strong>
+              <span className="text-gris-300 mx-1.5">·</span>
+              <strong className="font-semibold text-gris-800">FTP rampa</strong>
               <span className="text-gris-300 mx-1.5">·</span>
               <span>y más</span>
             </p>

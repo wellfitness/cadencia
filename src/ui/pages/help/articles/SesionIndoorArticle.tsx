@@ -110,6 +110,66 @@ export function SesionIndoorArticle(): JSX.Element {
         </p>
       </Card>
 
+      <h2 className="font-display text-xl md:text-2xl text-gris-900 mt-6 mb-3">
+        Modo TV: pantalla completa con voz e indicaciones
+      </h2>
+      <p>
+        Cuando ya tienes la sesión y la lista de música casadas, el botón{' '}
+        <strong>«Modo TV»</strong> abre una pestaña en pantalla completa pensada para apoyarse
+        en una tablet sobre el manillar (rodillo) o frente a la cinta — y para que no tengas
+        que mirar el reloj.
+      </p>
+      <ul className="list-disc pl-6 space-y-2">
+        <li>
+          <strong>Voz del entrenador</strong>: en cada cambio de bloque, una voz castellana
+          anuncia <em>«Zona X, sensación, cadencia objetivo, duración. RPE Y»</em>. Puedes
+          silenciarla con la tecla <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">V</kbd>{' '}
+          o el botón del altavoz; se guarda en{' '}
+          <a
+            href="/preferencias"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/preferencias');
+            }}
+            className="text-turquesa-600 hover:text-turquesa-700 font-semibold"
+          >
+            Mis preferencias
+          </a>{' '}
+          y se sincroniza con Drive.
+        </li>
+        <li>
+          <strong>Beeps de cuenta atrás</strong> a 10, 5, 3, 2 y 1 segundos del fin de fase, y
+          un acorde ascendente al cambiar de bloque (si la voz está activa, el acorde se omite
+          para no saturar).
+        </li>
+        <li>
+          <strong>Pantalla siempre encendida</strong> via Screen Wake Lock. Sin esto la
+          pantalla del móvil/tablet se apaga a los ~30 s y muchos navegadores móviles
+          silencian la voz y los beeps en background.
+        </li>
+        <li>
+          <strong>Atajos de teclado</strong>:{' '}
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">Espacio</kbd>{' '}
+          play/pausa,{' '}
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">←</kbd>/
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">→</kbd>{' '}
+          saltar fase,{' '}
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">S</kbd> sonido
+          on/off,{' '}
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">V</kbd> voz
+          on/off,{' '}
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">R</kbd>{' '}
+          reiniciar,{' '}
+          <kbd className="font-mono text-xs bg-gris-100 px-1.5 py-0.5 rounded">Esc</kbd>{' '}
+          cerrar.
+        </li>
+      </ul>
+      <p>
+        Si el navegador no soporta síntesis de voz (por ejemplo, algunos navegadores antiguos),
+        el modo TV degrada solo: los beeps y el acorde de cambio siguen funcionando como red
+        de seguridad sonora.
+      </p>
+
       <div className="mt-6">
         <Button variant="primary" iconRight="arrow_forward" onClick={goToWizard}>
           Empezar a construir mi sesión

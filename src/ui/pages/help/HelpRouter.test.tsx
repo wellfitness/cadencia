@@ -19,6 +19,7 @@ describe('HelpRouter', () => {
       ['/ayuda/intervalos', 'Prescripción de intervalos'],
       ['/ayuda/plantillas', 'Plantillas de ciclismo y cuándo usarlas'],
       ['/ayuda/plantillas-running', 'Plantillas de running y cuándo usarlas'],
+      ['/ayuda/tests-fisiologicos', 'Tests fisiológicos guiados'],
       ['/ayuda/musica', 'Cómo se elige la música de cada bloque'],
       ['/ayuda/spotify', 'Spotify y preguntas frecuentes'],
     ] as const;

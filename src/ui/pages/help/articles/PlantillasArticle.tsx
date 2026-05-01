@@ -122,6 +122,28 @@ export function PlantillasArticle(): JSX.Element {
           <TemplateExplainer key={t.id} template={t} context={TEMPLATE_CONTEXT[t.id]} />
         ))}
       </Section>
+
+      <Card variant="info" className="mt-8" title="¿Y los tests fisiológicos?" titleIcon="monitor_heart">
+        <p className="text-sm text-gris-700 leading-relaxed">
+          Cadencia tiene además <strong>3 tests guiados de bici</strong> (rampa para
+          FTP, MAP-5min para VO₂max+FCmáx, 3MT para Critical Power y W′) en una pestaña
+          aparte dentro de la galería del constructor. No son entrenamientos — son
+          protocolos cerrados que ejecutas en Modo TV y, al terminar, calculan y
+          guardan tus parámetros. Lee{' '}
+          <a
+            href="/ayuda/tests-fisiologicos"
+            onClick={(e) => {
+              e.preventDefault();
+              navigateInApp('/ayuda/tests-fisiologicos');
+            }}
+            className="text-turquesa-600 hover:text-turquesa-700 font-semibold inline-flex items-center gap-1"
+          >
+            Tests fisiológicos guiados
+            <MaterialIcon name="arrow_forward" size="small" decorative />
+          </a>{' '}
+          para entender cuál te conviene.
+        </p>
+      </Card>
     </ArticleShell>
   );
 }

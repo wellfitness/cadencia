@@ -7,6 +7,7 @@ import { ZonasArticle } from './articles/ZonasArticle';
 import { IntervalosArticle } from './articles/IntervalosArticle';
 import { PlantillasArticle } from './articles/PlantillasArticle';
 import { PlantillasRunningArticle } from './articles/PlantillasRunningArticle';
+import { TestsArticle } from './articles/TestsArticle';
 import { MusicaArticle } from './articles/MusicaArticle';
 import { SpotifyArticle } from './articles/SpotifyArticle';
 import { SincronizarDriveArticle } from './articles/SincronizarDriveArticle';
@@ -74,6 +75,12 @@ export function HelpRouter({ pathname }: HelpRouterProps): JSX.Element {
       return (
         <HelpLayout activeSlug="plantillas-running">
           <PlantillasRunningArticle />
+        </HelpLayout>
+      );
+    case '/ayuda/tests-fisiologicos':
+      return (
+        <HelpLayout activeSlug="tests-fisiologicos">
+          <TestsArticle />
         </HelpLayout>
       );
     case '/ayuda/musica':
