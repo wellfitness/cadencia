@@ -7,7 +7,13 @@ import {
   type UserInputsRaw,
 } from '@core/user';
 import { findTemplate } from '@core/segmentation';
-import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/segmentation';
+import type {
+  ClassifiedSegment,
+  EditableSessionPlan,
+  RouteMeta,
+  SessionTemplate,
+} from '@core/segmentation';
+import { TestSetupDialog } from '@ui/components/session-builder/TestSetupDialog';
 import {
   EMPTY_PREFERENCES,
   matchTracksToSegments,
@@ -549,10 +555,36 @@ function WizardApp(): JSX.Element {
   // del boton (donde se monta este callback) y su ejecucion, no abrimos la
   // pestaña — la otra alternativa seria abrir y mostrar el placeholder, peor
   // experiencia. El boton del UI tambien se desactiva si !validation.ok.
+  //
+  // Si la sesion proviene de una plantilla-test con `hardwareDisclaimer`,
+  // mostramos el TestSetupDialog antes de abrir la pestaña de Modo TV — el
+  // usuario debe leer el aviso (e.g., "rodillo en SLOPE no ERG" para 3MT)
+  // antes de empezar para que el resultado del test sea valido.
+  const [pendingTestSetup, setPendingTestSetup] = useState<SessionTemplate | null>(null);
+
+  const openTVModeNow = (): void => {
+    if (sessionPlan === null || !validation.ok) return;
+    writeHandoff({
+      plan: sessionPlan,
+      validatedInputs: validation.data,
+      ...(activeTemplateId !== null ? { templateId: activeTemplateId } : {}),
+    });
+    window.open('/tv', '_blank', 'noopener');
+  };
+
   const handleEnterTVMode = (): void => {
     if (sessionPlan === null || !validation.ok) return;
-    writeHandoff({ plan: sessionPlan, validatedInputs: validation.data });
-    window.open('/tv', '_blank', 'noopener');
+    if (activeTemplateId !== null) {
+      const template = findTemplate(activeTemplateId);
+      if (
+        template?.kind === 'test' &&
+        template.testProtocol?.hardwareDisclaimer !== undefined
+      ) {
+        setPendingTestSetup(template);
+        return;
+      }
+    }
+    openTVModeNow();
   };
 
   // Landing: pantalla de inicio. Al pulsar "Empezar" entramos al wizard
@@ -566,6 +598,17 @@ function WizardApp(): JSX.Element {
   return (
     <div className="min-h-full flex flex-col bg-gris-50">
       <Header />
+      {pendingTestSetup !== null && pendingTestSetup.testProtocol !== undefined && (
+        <TestSetupDialog
+          templateName={pendingTestSetup.name}
+          testProtocol={pendingTestSetup.testProtocol}
+          onConfirm={() => {
+            setPendingTestSetup(null);
+            openTVModeNow();
+          }}
+          onCancel={() => setPendingTestSetup(null)}
+        />
+      )}
       <div className="md:border-b md:border-gris-200 bg-gris-50/95 backdrop-blur-sm sticky top-0 z-30 md:static md:bg-gris-50 md:backdrop-blur-none border-b border-gris-200">
         <div className="mx-auto w-full max-w-4xl px-4 py-3 md:py-4">
           <Stepper

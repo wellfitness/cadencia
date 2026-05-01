@@ -40,6 +40,7 @@ export function TVModeRoute(): JSX.Element {
     <SessionTVMode
       plan={payload.plan}
       validatedInputs={payload.validatedInputs}
+      {...(payload.templateId !== undefined ? { templateId: payload.templateId } : {})}
       onClose={() => {
         // Cerrar la pestaña: window.close() solo funciona para pestañas
         // abiertas via window.open; las navegaciones directas del usuario lo

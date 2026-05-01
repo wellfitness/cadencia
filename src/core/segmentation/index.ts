@@ -11,6 +11,12 @@ export type {
   SessionTemplate,
   SessionTemplateId,
   SessionPlanValidation,
+  TemplateKind,
+  TestProtocol,
+  TestProtocolId,
+  TestInput,
+  TestDerivedValue,
+  TestResult,
 } from './sessionPlan';
 export {
   CADENCE_PROFILES,
@@ -28,6 +34,11 @@ export {
   isSlopeVisuallyFlat,
   FLAT_SLOPE_DISPLAY_THRESHOLD_PCT,
 } from './segmentSlope';
-export { SESSION_TEMPLATES, findTemplate, templatesForSport } from './sessionTemplates';
+export {
+  SESSION_TEMPLATES,
+  findTemplate,
+  templatesForSport,
+  templatesBy,
+} from './sessionTemplates';
 export { classifySessionPlan, buildSessionRouteMeta } from './fromSessionBlocks';
 export { getRecommendedCadence, type CadenceRange } from './cadenceRecommendation';

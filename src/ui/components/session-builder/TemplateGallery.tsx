@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import {
   calculateTotalDurationSec,
-  templatesForSport,
+  templatesBy,
   type EditableSessionPlan,
   type SessionTemplate,
 } from '@core/segmentation';
@@ -38,10 +38,10 @@ export interface TemplateGalleryProps {
   onImportFile?: (file: File) => void;
 }
 
-type Tab = 'templates' | 'mine';
+type Tab = 'templates' | 'tests' | 'mine';
 
 const TEMPLATE_ICONS: Record<string, string> = {
-  // Cycling
+  // Cycling — entrenos
   sit: 'bolt',
   'hiit-10-20-30': 'local_fire_department',
   'noruego-4x4': 'trending_up',
@@ -50,13 +50,21 @@ const TEMPLATE_ICONS: Record<string, string> = {
   'umbral-progresivo': 'show_chart',
   'vo2max-cortos': 'rocket_launch',
   'recuperacion-activa': 'self_improvement',
-  // Running
+  // Cycling — tests
+  'bike-test-ramp': 'stairs',
+  'bike-test-map5': 'monitor_heart',
+  'bike-test-3mt': 'timer',
+  // Running — entrenos
   'run-easy-long': 'self_improvement',
   'run-tempo': 'speed',
   'run-yasso-800': 'flag',
   'run-daniels-intervals': 'rocket_launch',
   'run-hiit-30-30': 'local_fire_department',
   'run-threshold-cruise': 'show_chart',
+  // Running — tests
+  'run-test-hrmax-daniels': 'monitor_heart',
+  'run-test-5min': 'timer',
+  'run-test-30-15-ift': 'shuffle',
 };
 
 /**
@@ -73,7 +81,9 @@ export function TemplateGallery({
 }: TemplateGalleryProps): JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<Tab>('templates');
-  const templates = templatesForSport(sport);
+  const workoutTemplates = templatesBy(sport, 'workout');
+  const testTemplates = templatesBy(sport, 'test');
+  const visibleTemplates = tab === 'tests' ? testTemplates : workoutTemplates;
 
   const handleImportClick = (): void => {
     fileInputRef.current?.click();
@@ -92,7 +102,11 @@ export function TemplateGallery({
       <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h3 className="text-base md:text-lg font-semibold text-gris-800 flex items-center gap-2">
           <MaterialIcon name="auto_awesome" size="small" className="text-turquesa-600" />
-          {tab === 'templates' ? 'Empieza con una plantilla' : 'Mis sesiones guardadas'}
+          {tab === 'templates'
+            ? 'Empieza con una plantilla'
+            : tab === 'tests'
+              ? 'Tests fisiológicos guiados'
+              : 'Mis sesiones guardadas'}
         </h3>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onStartFromScratch}>
@@ -121,26 +135,42 @@ export function TemplateGallery({
         </div>
       </header>
 
-      {onLoadSavedPlan !== undefined && (
-        <div
-          className="flex gap-1 border-b border-gris-200"
-          role="tablist"
-          aria-label="Origen del plan"
+      <div
+        className="flex flex-wrap gap-1 border-b border-gris-200"
+        role="tablist"
+        aria-label="Origen del plan"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'templates'}
+          onClick={() => setTab('templates')}
+          className={`px-4 py-2 text-sm min-h-[44px] transition-colors ${
+            tab === 'templates'
+              ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
+              : 'text-gris-600 hover:text-gris-800'
+          }`}
         >
+          <MaterialIcon name="science" size="small" className="mr-1" />
+          Plantillas científicas
+        </button>
+        {testTemplates.length > 0 && (
           <button
             type="button"
             role="tab"
-            aria-selected={tab === 'templates'}
-            onClick={() => setTab('templates')}
+            aria-selected={tab === 'tests'}
+            onClick={() => setTab('tests')}
             className={`px-4 py-2 text-sm min-h-[44px] transition-colors ${
-              tab === 'templates'
+              tab === 'tests'
                 ? 'border-b-2 border-turquesa-600 text-turquesa-700 font-semibold'
                 : 'text-gris-600 hover:text-gris-800'
             }`}
           >
-            <MaterialIcon name="science" size="small" className="mr-1" />
-            Plantillas científicas
+            <MaterialIcon name="biotech" size="small" className="mr-1" />
+            Tests
           </button>
+        )}
+        {onLoadSavedPlan !== undefined && (
           <button
             type="button"
             role="tab"
@@ -155,32 +185,40 @@ export function TemplateGallery({
             <MaterialIcon name="bookmark" size="small" className="mr-1" />
             Mis sesiones
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {tab === 'templates' ? (
+      {tab === 'mine' ? (
+        onLoadSavedPlan !== undefined && <MySavedSessionsTab onLoad={onLoadSavedPlan} />
+      ) : (
         <>
-          <a
-            href="/ayuda/plantillas"
-            onClick={(e) => {
-              e.preventDefault();
-              navigateInApp('/ayuda/plantillas');
-            }}
-            className="inline-flex items-center gap-1.5 text-xs md:text-sm text-turquesa-600 hover:text-turquesa-700 transition-colors"
-          >
-            <MaterialIcon name="help_outline" size="small" decorative />
-            ¿Qué plantilla elegir? Consulta la guía
-            <MaterialIcon name="arrow_forward" size="small" decorative />
-          </a>
-          {/* Grid: 4 cols en bike (8 plantillas → 2 filas), 3 cols en run
-              (6 plantillas → 2 filas exactas). Asi evitamos huecos vacios en
-              la rejilla cuando sport === 'run'. */}
+          {tab === 'templates' && (
+            <a
+              href="/ayuda/plantillas"
+              onClick={(e) => {
+                e.preventDefault();
+                navigateInApp('/ayuda/plantillas');
+              }}
+              className="inline-flex items-center gap-1.5 text-xs md:text-sm text-turquesa-600 hover:text-turquesa-700 transition-colors"
+            >
+              <MaterialIcon name="help_outline" size="small" decorative />
+              ¿Qué plantilla elegir? Consulta la guía
+              <MaterialIcon name="arrow_forward" size="small" decorative />
+            </a>
+          )}
+          {tab === 'tests' && (
+            <p className="text-xs md:text-sm text-gris-600 leading-relaxed">
+              Tests fisiológicos guiados con respaldo científico (PubMed). Sigue el
+              protocolo en Modo TV; al terminar te pediremos los datos clave para
+              calcular tu FTP, FCmáx, VO2max o vMAS y actualizar tu perfil.
+            </p>
+          )}
           <div
             className={`grid grid-cols-2 gap-2 md:gap-3 ${
-              sport === 'run' ? 'md:grid-cols-3' : 'md:grid-cols-4'
+              tab === 'tests' || sport === 'run' ? 'md:grid-cols-3' : 'md:grid-cols-4'
             }`}
           >
-            {templates.map((template) => (
+            {visibleTemplates.map((template) => (
               <TemplateCard
                 key={template.id}
                 template={template}
@@ -190,8 +228,6 @@ export function TemplateGallery({
             ))}
           </div>
         </>
-      ) : (
-        onLoadSavedPlan !== undefined && <MySavedSessionsTab onLoad={onLoadSavedPlan} />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import type { HeartRateZone } from '../physiology/karvonen';
-import type { Sport } from '../user/userInputs';
+import type { Sport, UserInputsRaw } from '../user/userInputs';
 
 /**
  * Modelo de datos del constructor de sesiones (indoor cycling y running).
@@ -121,7 +121,7 @@ export interface SessionPlan {
 }
 
 export type SessionTemplateId =
-  // Ciclismo (sport: 'bike')
+  // Ciclismo — entrenos (sport: 'bike', kind: 'workout')
   | 'sit'
   | 'hiit-10-20-30'
   | 'noruego-4x4'
@@ -130,13 +130,85 @@ export type SessionTemplateId =
   | 'umbral-progresivo'
   | 'vo2max-cortos'
   | 'recuperacion-activa'
-  // Running (sport: 'run')
+  // Ciclismo — tests (sport: 'bike', kind: 'test')
+  | 'bike-test-ramp'
+  | 'bike-test-map5'
+  | 'bike-test-3mt'
+  // Running — entrenos (sport: 'run', kind: 'workout')
   | 'run-easy-long'
   | 'run-tempo'
   | 'run-yasso-800'
   | 'run-daniels-intervals'
   | 'run-hiit-30-30'
-  | 'run-threshold-cruise';
+  | 'run-threshold-cruise'
+  // Running — tests (sport: 'run', kind: 'test')
+  | 'run-test-hrmax-daniels'
+  | 'run-test-5min'
+  | 'run-test-30-15-ift';
+
+/**
+ * 'workout' (default si undefined) → plantillas de entrenamiento normales.
+ * 'test' → plantillas de test fisiologico guiado: la UI muestra el
+ * `TestSetupDialog` antes de empezar y dispara el `TestResultDialog` al
+ * acabar la sesion (en SessionTVMode o ResultStep) con el `testProtocol`
+ * de la plantilla.
+ */
+export type TemplateKind = 'workout' | 'test';
+
+/** Identificador del protocolo del test (apunta a la formula correspondiente en physiology/tests). */
+export type TestProtocolId =
+  | 'bike-ramp'
+  | 'bike-map5'
+  | 'bike-3mt'
+  | 'run-hrmax-daniels'
+  | 'run-5min'
+  | 'run-30-15-ift';
+
+/** Una pregunta numerica que el modal de resultado le hace al usuario. */
+export interface TestInput {
+  /** Clave por la que `compute()` recibe este valor en su Record<string, number>. */
+  id: string;
+  /** Etiqueta visible (en castellano). */
+  label: string;
+  unit: 'W' | 'bpm' | 'kJ' | 'stage';
+  min: number;
+  max: number;
+  /** Texto de ayuda bajo el input (clarifica QUE valor leer del pulsometro/Zwift). */
+  helperText?: string;
+}
+
+/** Item informativo derivado del calculo (no se persiste, solo se muestra). */
+export interface TestDerivedValue {
+  label: string;
+  value: number;
+  unit: string;
+  /** Decimales a mostrar (default 0). */
+  precision?: number;
+}
+
+export interface TestResult {
+  /** Cambios atomicos a aplicar a `UserInputsRaw` cuando el usuario pulsa "Guardar". */
+  delta: Partial<UserInputsRaw>;
+  /** Valores derivados informativos (VO2max, CP, vMAS, LTHR). */
+  derived: ReadonlyArray<TestDerivedValue>;
+}
+
+export interface TestProtocol {
+  id: TestProtocolId;
+  /** Preguntas numericas que se pasan a `compute()` con sus ids como claves. */
+  inputs: ReadonlyArray<TestInput>;
+  /** Funcion pura que convierte los inputs del modal en TestResult. */
+  compute: (inputs: Record<string, number>, user: UserInputsRaw) => TestResult;
+  /** DOIs (sin URL) de las refs. La UI las muestra como links a doi.org. */
+  citationDois: ReadonlyArray<string>;
+  /**
+   * Aviso de configuracion previa que el modal de SETUP muestra antes de
+   * empezar (e.g., "Pon tu rodillo en modo NIVEL/SLOPE, no ERG").
+   */
+  hardwareDisclaimer?: string;
+  /** Mensaje informativo tras guardar (e.g., "Tus zonas de FC se recalcularan"). */
+  postTestNote?: string;
+}
 
 export interface SessionTemplate {
   id: SessionTemplateId;
@@ -145,6 +217,14 @@ export interface SessionTemplate {
   name: string;
   description: string;
   items: SessionItem[];
+  /**
+   * 'workout' (default si undefined) | 'test'. Las plantillas-test llevan
+   * `testProtocol` con la formula de derivacion y los inputs a pedir al
+   * usuario tras la sesion.
+   */
+  kind?: TemplateKind;
+  /** Presente solo cuando `kind === 'test'`. */
+  testProtocol?: TestProtocol;
 }
 
 /**

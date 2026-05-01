@@ -5,10 +5,16 @@ import type { ValidatedUserInputs } from '@core/user';
  * Payload que viaja del wizard a la pestaña /tv. Incluye el plan editable y
  * los inputs validados — son los unicos datos que SessionTVMode necesita para
  * arrancar (todo lo demas, como zonas Karvonen, se deriva de estos dos).
+ *
+ * `templateId` es opcional y solo se rellena cuando el usuario lanza la
+ * sesion desde una plantilla de SESSION_TEMPLATES (no cuando el plan se
+ * construye desde cero). SessionTVMode lo usa para detectar plantillas-test
+ * y disparar el TestResultDialog al completar la sesion.
  */
 export interface TVHandoffPayload {
   plan: EditableSessionPlan;
   validatedInputs: ValidatedUserInputs;
+  templateId?: string;
 }
 
 /**

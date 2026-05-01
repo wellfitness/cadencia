@@ -36,6 +36,20 @@ const TEMPLATE_CONTEXT: Record<SessionTemplateId, string> = {
     'Veinte ciclos de 30 s rápidos + 30 s suaves. Protocolo Billat para acumular tiempo a velocidad máxima aeróbica.',
   'run-threshold-cruise':
     'Tres × 1500 m a ritmo de umbral con 90 s suaves entre cada uno. T-pace de Daniels.',
+  // Plantillas de tests fisiologicos (este articulo cubre entrenos; los tests
+  // se documentan en su propio articulo de ayuda dedicado).
+  'bike-test-ramp':
+    'Test de campo: rampa lineal +25 W/min hasta agotamiento. Estima FTP con factor 0,75 sobre la potencia minuto pico.',
+  'bike-test-map5':
+    'Test de campo: 5 minutos all-out tras calentamiento. Estima VO2max (Sitko 2021) y captura tu FCmáx real.',
+  'bike-test-3mt':
+    'Test de campo: 3 minutos all-out (Vanhatalo 2007) con resistencia fija. Calcula CP y W′. Solo válido en modo NIVEL/SLOPE.',
+  'run-test-hrmax-daniels':
+    'Test de campo Daniels: 4 min duro + 1 min suave + 3 min all-out. Para medir tu FCmáx real con un protocolo de 10 min.',
+  'run-test-5min':
+    'Test de campo: 5 minutos all-out. Captura FCmáx y la FC media estima tu LTHR (FC umbral).',
+  'run-test-30-15-ift':
+    'Test de campo Buchheit: 30 s corriendo + 15 s descanso, velocidad creciente cada estadio. Da vMAS y FCmáx sin sostener nunca >30 s.',
 };
 
 function templatesByCategory(): {

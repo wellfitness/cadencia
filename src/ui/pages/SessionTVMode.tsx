@@ -8,13 +8,15 @@ import {
 } from '@core/physiology';
 import {
   expandSessionPlan,
+  findTemplate,
   getRecommendedCadence,
   type CadenceProfile,
   type EditableSessionPlan,
   type SessionBlock,
+  type SessionTemplate,
 } from '@core/segmentation';
 import { getZoneCriteria } from '@core/matching';
-import type { Sport, ValidatedUserInputs } from '@core/user/userInputs';
+import { EMPTY_USER_INPUTS, type Sport, type ValidatedUserInputs } from '@core/user/userInputs';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { zoneTextColor } from '@ui/components/zoneColors';
@@ -22,6 +24,7 @@ import { tts } from '@ui/lib/tts';
 import { wakeLock } from '@ui/lib/wakeLock';
 import { buildPhaseAnnouncement, COMPLETION_ANNOUNCEMENT } from '@ui/lib/ttsMessages';
 import { updateSection, useCadenciaData } from '@ui/state/cadenciaStore';
+import { TestResultDialog } from '@ui/components/session-builder/TestResultDialog';
 
 const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
   flat: 'Llano',
@@ -32,6 +35,13 @@ const CADENCE_PROFILE_LABELS: Record<CadenceProfile, string> = {
 export interface SessionTVModeProps {
   plan: EditableSessionPlan;
   validatedInputs: ValidatedUserInputs;
+  /**
+   * Id de la plantilla que origino este plan, si la sesion proviene de una.
+   * Se usa para detectar plantillas-test (`kind === 'test'`) y disparar el
+   * TestResultDialog al completar la sesion. Indefinido cuando el usuario
+   * construyo el plan desde cero o lo importo de un .zwo.
+   */
+  templateId?: string;
   onClose: () => void;
 }
 
@@ -118,10 +128,22 @@ const WARNING_BEEP_TIMES = new Set([10, 5, 3, 2, 1]);
 export function SessionTVMode({
   plan,
   validatedInputs,
+  templateId,
   onClose,
 }: SessionTVModeProps): JSX.Element {
   const expanded = useMemo(() => expandSessionPlan(plan), [plan]);
   const blocks = expanded.blocks;
+
+  /**
+   * Busca la plantilla activa para detectar tests guiados. Indefinido si la
+   * sesion no se origino desde plantilla o el id no esta en SESSION_TEMPLATES
+   * (defensa contra desincronizaciones; tests-templates nuevas requieren
+   * actualizar el union SessionTemplateId, asi que esto no ocurre en runtime
+   * salvo si el handoff lleva basura).
+   */
+  const activeTemplate: SessionTemplate | undefined =
+    templateId !== undefined ? findTemplate(templateId) : undefined;
+  const testProtocol = activeTemplate?.kind === 'test' ? activeTemplate.testProtocol : undefined;
   // Default 'bike' por retrocompat con planes guardados antes de la extension
   // a running (mismo criterio que expandSessionPlan).
   const sport: Sport = plan.sport ?? 'bike';
@@ -138,6 +160,11 @@ export function SessionTVMode({
   const [totalElapsed, setTotalElapsed] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  /**
+   * Tracking del modal post-test: true si el usuario ya guardo o salto el
+   * resultado. Solo aplica si la sesion proviene de una plantilla-test.
+   */
+  const [testResultDismissed, setTestResultDismissed] = useState(false);
 
   // Detección estable: Safari iOS no implementa Vibration API, ni la mayoría
   // de tablets tiene motor háptico aunque navegador la exponga.
@@ -468,14 +495,31 @@ export function SessionTVMode({
 
   if (isCompleted) {
     return (
-      <CompletionScreen
-        sessionName={plan.name}
-        totalElapsedSec={totalElapsed}
-        phaseCount={blocks.length}
-        blocks={blocks}
-        onRestart={restart}
-        onClose={onClose}
-      />
+      <>
+        <CompletionScreen
+          sessionName={plan.name}
+          totalElapsedSec={totalElapsed}
+          phaseCount={blocks.length}
+          blocks={blocks}
+          onRestart={restart}
+          onClose={onClose}
+        />
+        {testProtocol !== undefined &&
+          activeTemplate !== undefined &&
+          !testResultDismissed && (
+            <TestResultDialog
+              templateName={activeTemplate.name}
+              testProtocol={testProtocol}
+              user={cadenciaData.userInputs ?? EMPTY_USER_INPUTS}
+              onSaved={(delta) => {
+                const current = cadenciaData.userInputs ?? EMPTY_USER_INPUTS;
+                updateSection('userInputs', { ...current, ...delta });
+                setTestResultDismissed(true);
+              }}
+              onSkipped={() => setTestResultDismissed(true)}
+            />
+          )}
+      </>
     );
   }
 
