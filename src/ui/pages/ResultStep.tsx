@@ -39,6 +39,7 @@ import {
 } from '@integrations/spotify';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { SpotifyAccessDeniedDialog } from '@ui/components/SpotifyAccessDeniedDialog';
+import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { SpotifyErrorReporter } from '@ui/components/SpotifyErrorReporter';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
@@ -608,6 +609,10 @@ export function ResultStep({
         open={accessDeniedOpen}
         onClose={() => setAccessDeniedOpen(false)}
       />
+
+      <div className="flex justify-center pt-4">
+        <SpotifyAttribution variant="light" />
+      </div>
     </WizardStep>
   );
 }

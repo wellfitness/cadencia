@@ -8,6 +8,11 @@ interface FaqItem {
 
 const FAQS: readonly FaqItem[] = [
   {
+    q: '¿La voz del entrenador del Modo TV controla Spotify?',
+    a:
+      'No. La voz que oyes en el Modo TV es síntesis de voz local (Web Speech API de tu navegador) y solo describe el bloque actual del entrenamiento (zona, sensación, cadencia, duración). No controla la reproducción de Spotify por voz: los botones de música del Modo TV (play/pause/anterior/siguiente) envían comandos directos a tu reproductor Spotify Premium activo a través de la API oficial. Voz y controles son dos canales independientes.',
+  },
+  {
     q: '¿Necesito una cuenta Premium de Spotify?',
     a:
       'Para crear la lista en tu biblioteca, sí — Spotify exige Premium para escribir listas desde aplicaciones de terceros. Para previsualizar el emparejamiento y exportar la sesión a .zwo (Zwift, TrainerRoad, etc.) no hace falta cuenta.',

@@ -18,6 +18,7 @@ import {
 import { addDismissedUri, removeDismissedUri, clearAllDismissed } from '@core/csvs/dismissed';
 import { useCadenciaData } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
+import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { StatsTab } from '@ui/components/catalog/StatsTab';
 
 export interface CatalogEditorPageProps {
@@ -289,6 +290,9 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
               <p className="text-xs text-gris-500 truncate flex items-center gap-1.5">
                 <SaveStatusIndicator status={saveStatus} />
               </p>
+              <div className="mt-1">
+                <SpotifyAttribution variant="light" />
+              </div>
             </div>
             {activeTab === 'native' && (
               <Button
@@ -361,8 +365,8 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
                   : 'text-gris-600 hover:text-gris-800'
               }`}
             >
-              <MaterialIcon name="insights" size="small" />
-              Estadísticas
+              <MaterialIcon name="auto_stories" size="small" />
+              Mi diario
             </button>
           </div>
 

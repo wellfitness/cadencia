@@ -18,6 +18,7 @@ import { PlaylistPreviewRow } from '@ui/components/PlaylistPreviewRow';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
 import type { MusicSourceMode } from '@ui/state/wizardStorage';
 import { navigateInApp } from '@ui/utils/navigation';
+import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { WizardStep } from '@ui/components/WizardStep';
 import { WizardStepFooter } from '@ui/components/WizardStepFooter';
 import { WizardStepHeading } from '@ui/components/WizardStepHeading';
@@ -318,6 +319,10 @@ export function MusicStep({
         onNext={onAdvance}
         canGoNext={list.length > 0 && tracks.length > 0 && !needsUserUpload}
       />
+
+      <div className="flex justify-center pt-4">
+        <SpotifyAttribution variant="light" />
+      </div>
     </WizardStep>
   );
 }

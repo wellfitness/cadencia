@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
+import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { SpotifyErrorReporter } from '@ui/components/SpotifyErrorReporter';
 import type { PlayerError, PlayerState } from '@integrations/spotify';
 
@@ -61,6 +62,7 @@ export function MusicControlBar({
                     <span className="font-normal opacity-70"> · {deviceName}</span>
                   )}
                 </p>
+                <SpotifyAttribution variant="dark" />
               </>
             ) : (
               <p className="text-white/70">
@@ -135,7 +137,7 @@ function formatErrorFriendly(error: PlayerError | null): string | null {
       // No es un error real; el render principal ya muestra "abre Spotify".
       return null;
     case 'not-premium':
-      return 'Spotify Premium es necesario para los controles integrados.';
+      return 'Spotify Premium te permite reproducir cualquier tema sin anuncios y con mejor calidad. Pruébalo gratis en spotify.com/premium.';
     case 'token-expired':
       return 'Sesión Spotify caducada. Vuelve al asistente para reconectar.';
     case 'network':

@@ -1,7 +1,9 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { clearAuthFlow, clearTokens, loadTokens } from '@integrations/spotify';
 import { Card } from '@ui/components/Card';
 import { Button } from '@ui/components/Button';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
+import { ExternalLink } from '@ui/components/ExternalLink';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { GoogleSyncCard } from '@ui/components/sync/GoogleSyncCard';
@@ -71,6 +73,8 @@ export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Elem
           <PlannedEventsSection />
 
           <CatalogSection data={data} />
+
+          <SpotifyConnectionSection />
 
           <TvModeSection data={data} />
 
@@ -255,6 +259,94 @@ function PersistenceSection({ data }: SectionProps): JSX.Element {
           </p>
         }
       />
+    </Card>
+  );
+}
+
+/**
+ * Estado de la conexion con Spotify y boton de desconexion explicito.
+ * Spotify Developer Policy I exige que cualquier app de terceros ofrezca
+ * un mecanismo facilmente accesible para desconectar la cuenta y borrar
+ * los datos asociados. Tenemos un boton de desconexion en el paso final
+ * del wizard (ResultStep), pero tiene que estar tambien aqui para que
+ * sea hallable sin tener que generar una lista primero.
+ *
+ * El token de Spotify vive en sessionStorage, asi que «conectado» es
+ * efimero por diseño: muere al cerrar la pestaña. Aun asi, mientras la
+ * pestana este abierta, el usuario debe poder desconectar a voluntad.
+ */
+function SpotifyConnectionSection(): JSX.Element {
+  // sessionStorage no dispara eventos React; sondeamos al montar y tras
+  // pulsar desconectar. Lo suficiente — el usuario no se conecta/
+  // desconecta en otra pestana mientras esta en /preferencias.
+  const [hasSession, setHasSession] = useState<boolean>(false);
+
+  useEffect(() => {
+    setHasSession(loadTokens() !== null);
+  }, []);
+
+  const handleDisconnect = (): void => {
+    clearTokens();
+    clearAuthFlow();
+    setHasSession(false);
+  };
+
+  return (
+    <Card title="Conexión con Spotify" titleIcon="link">
+      {hasSession ? (
+        <>
+          <p className="text-sm text-gris-700 flex items-start gap-2">
+            <MaterialIcon
+              name="check_circle"
+              size="small"
+              className="text-turquesa-600 mt-0.5 shrink-0"
+            />
+            <span>
+              <strong>Tu cuenta de Spotify está conectada en esta pestaña.</strong>{' '}
+              <span className="text-gris-500">
+                Cadencia solo usa el permiso de modificar listas privadas (
+                <code className="font-mono text-[11px]">playlist-modify-private</code>
+                ). El token vive en{' '}
+                <code className="font-mono text-[11px]">sessionStorage</code> y
+                se borra al cerrar la pestaña.
+              </span>
+            </span>
+          </p>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="critical"
+              size="sm"
+              iconLeft="logout"
+              onClick={handleDisconnect}
+            >
+              Desconectar Spotify
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-gris-700 flex items-start gap-2">
+          <MaterialIcon
+            name="info"
+            size="small"
+            className="text-gris-500 mt-0.5 shrink-0"
+          />
+          <span>
+            <strong>Sin sesión Spotify activa en esta pestaña.</strong>{' '}
+            <span className="text-gris-500">
+              Cadencia solo se conecta a Spotify cuando pulsas «Crear lista»
+              en el último paso del asistente. Para revocar el permiso desde
+              tu cuenta de Spotify (más allá de esta pestaña), ve a{' '}
+              <ExternalLink
+                href="https://www.spotify.com/account/apps/"
+                className="text-turquesa-700 hover:underline"
+              >
+                spotify.com → Apps
+              </ExternalLink>
+              .
+            </span>
+          </span>
+        </p>
+      )}
     </Card>
   );
 }
@@ -728,11 +820,11 @@ function PlaylistHistoryStat(): JSX.Element | null {
         onClick={() => navigateInApp('/catalogo?tab=stats')}
         className="text-sm text-turquesa-700 hover:text-turquesa-800 hover:underline inline-flex items-center gap-1.5"
       >
-        <MaterialIcon name="insights" size="small" />
+        <MaterialIcon name="auto_stories" size="small" />
         <span>
           Has creado <strong className="tabular-nums">{history.length}</strong>{' '}
           {history.length === 1 ? 'lista' : 'listas'} en Spotify desde Cadencia ·
-          ver estadísticas
+          abrir mi diario
         </span>
       </button>
     </div>

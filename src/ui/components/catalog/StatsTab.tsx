@@ -32,9 +32,11 @@ function formatPct(ratio: number): string {
 }
 
 /**
- * Pestana de Estadisticas del catalogo. Agrega el historial real de
- * playlists creadas en Spotify (via `createPlaylistHistoryEntry` en
- * ResultStep tras exito de la API). Cinco secciones colapsables:
+ * Pestana «Mi diario» del catalogo. Vista personal que enseña al usuario
+ * el historial de las listas que ha creado el (via `createPlaylistHistoryEntry`
+ * en ResultStep tras exito de la API). NO es analytics sobre el contenido
+ * de Spotify: es un diario personal del propio comportamiento del usuario
+ * sobre sus propias listas. Cinco secciones colapsables:
  *
  *  1. Resumen: totales + barra de zonas + ratio de sustituciones.
  *  2. Top temas (20).
@@ -69,13 +71,14 @@ export function StatsTab(): JSX.Element {
   if (history.length === 0) {
     return (
       <div className="text-center text-gris-600 py-12 px-4 rounded-lg border border-dashed border-gris-300 bg-gris-50">
-        <MaterialIcon name="insights" size="large" className="text-gris-400 mb-2" />
+        <MaterialIcon name="auto_stories" size="large" className="text-gris-400 mb-2" />
         <p className="text-sm font-semibold text-gris-700">
-          Aún no hay datos para tus estadísticas
+          Aún no hay entradas en tu diario
         </p>
         <p className="text-xs mt-2 text-gris-500 max-w-md mx-auto">
-          Aquí verás tus temas, artistas y géneros más usados cuando crees tu
-          primera lista en Spotify desde el último paso del asistente.
+          Aquí verás un resumen personal de las listas que tú has creado:
+          tus temas, artistas y géneros recurrentes. Aparecerá cuando crees
+          tu primera lista en Spotify desde el último paso del asistente.
         </p>
       </div>
     );

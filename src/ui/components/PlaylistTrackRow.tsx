@@ -2,10 +2,23 @@ import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'r
 import { createPortal } from 'react-dom';
 import type { AlternativeCandidate, MatchedSegment } from '@core/matching';
 import { Button } from './Button';
+import { ExternalLink } from './ExternalLink';
 import { MaterialIcon } from './MaterialIcon';
 import { SlopePill } from './SlopePill';
 import { TrackPreviewButton } from './TrackPreviewButton';
 import { ZoneBadge } from './ZoneBadge';
+
+/**
+ * Convierte un URI canonico de Spotify (`spotify:track:{id}`) en la URL
+ * web (`https://open.spotify.com/track/{id}`) que Spotify Design Guidelines
+ * exigen como «link back» desde cada track de terceros que muestra metadata.
+ * Devuelve null si el URI no es un track reconocible (no se renderiza link).
+ */
+function spotifyTrackUriToWebUrl(uri: string): string | null {
+  const match = /^spotify:track:([A-Za-z0-9]+)$/.exec(uri);
+  if (match === null) return null;
+  return `https://open.spotify.com/track/${match[1]}`;
+}
 
 export interface PlaylistTrackRowProps {
   matched: MatchedSegment;
@@ -88,6 +101,7 @@ export function PlaylistTrackRow({
   }
 
   const showPicker = onReplaceWith !== undefined;
+  const spotifyWebUrl = spotifyTrackUriToWebUrl(track.uri);
 
   return (
     <article className="rounded-lg border border-gris-200 bg-white p-3 hover:border-turquesa-300 transition-colors duration-200">
@@ -119,6 +133,17 @@ export function PlaylistTrackRow({
           <span className="text-xs text-gris-500 tabular-nums">
             {Math.round(track.tempoBpm)} bpm
           </span>
+          {spotifyWebUrl !== null && (
+            <ExternalLink
+              href={spotifyWebUrl}
+              className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-turquesa-700 hover:text-turquesa-800 hover:underline no-underline"
+              aria-label={`Abrir ${track.name} en Spotify`}
+              title="Abrir en Spotify"
+            >
+              Abrir en Spotify
+              <MaterialIcon name="open_in_new" size="small" decorative />
+            </ExternalLink>
+          )}
         </div>
       </div>
       {showPicker && (
