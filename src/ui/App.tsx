@@ -6,13 +6,14 @@ import {
   validateUserInputs,
   type UserInputsRaw,
 } from '@core/user';
-import { findTemplate } from '@core/segmentation';
+import { findTemplate, segmentInto60SecondBlocks } from '@core/segmentation';
 import type {
   ClassifiedSegment,
   EditableSessionPlan,
   RouteMeta,
   SessionTemplate,
 } from '@core/segmentation';
+import type { GpxTrack } from '@core/gpx/types';
 import { TestSetupDialog } from '@ui/components/session-builder/TestSetupDialog';
 import {
   EMPTY_PREFERENCES,
@@ -284,6 +285,15 @@ function WizardApp(): JSX.Element {
   );
   const [routeMeta, setRouteMeta] = useState<RouteMeta | null>(persisted?.routeMeta ?? null);
 
+  // GpxTrack parseado del archivo subido por el usuario. Vive solo en memoria
+  // (no en sessionStorage: serializado pesa cientos de KB para rutas largas).
+  // Lo guardamos para reprocesar la zonificacion sin pedirle al usuario que
+  // re-suba el archivo cuando cambie campos que afectan al calculo de zonas
+  // bike+gpx (bikeType, ftpWatts, weightKg). Tras un OAuth full-reload se
+  // pierde, pero los segments cacheados en sessionStorage siguen ahi: si el
+  // usuario quisiera re-zonificar tras volver del OAuth tendra que re-subir.
+  const [gpxTrack, setGpxTrack] = useState<GpxTrack | null>(null);
+
   // Estado de la lista de musica generada (preferencias + segmentos casados).
   const [matchedList, setMatchedList] = useState<readonly MatchedSegment[] | null>(
     persisted?.matchedList ?? null,
@@ -469,10 +479,53 @@ function WizardApp(): JSX.Element {
     }
   };
 
-  const handleRouteProcessed = (segments: ClassifiedSegment[], meta: RouteMeta): void => {
+  const handleRouteProcessed = (
+    segments: ClassifiedSegment[],
+    meta: RouteMeta,
+    track: GpxTrack | null,
+  ): void => {
     setRouteSegments(segments);
     setRouteMeta(meta);
+    setGpxTrack(track);
   };
+
+  // Re-segmenta el GPX cuando el usuario edita campos que afectan a la
+  // zonificacion bike+gpx (bikeType cambia el floor por pendiente y los
+  // presets Crr/CdA; ftpWatts cambia los thresholds Coggan; weightKg cambia
+  // la masa total que entra en la ecuacion de potencia). Sin este efecto el
+  // usuario que sube el GPX en gravel y luego cambia a MTB veria la misma
+  // distribucion de zonas porque los segments quedan cacheados desde el
+  // procesado original. Solo aplica al sub-flujo bike+gpx (sport='bike',
+  // sourceType='gpx', track !== null).
+  //
+  // Extraemos los campos relevantes de validation a primitivas locales para
+  // que el array de deps sea estaticamente analizable por react-hooks/
+  // exhaustive-deps (no acepta expresiones ternarias inline).
+  const validatedForReseg = validation.ok ? validation.data : null;
+  const resegBikeType = validatedForReseg?.bikeType ?? null;
+  const resegFtpWatts = validatedForReseg?.ftpWatts ?? null;
+  const resegHasFtp = validatedForReseg?.hasFtp ?? false;
+  const resegWeightKg = validatedForReseg?.weightKg ?? null;
+  const resegBikeWeightKg = validatedForReseg?.bikeWeightKg ?? null;
+  useEffect(() => {
+    if (gpxTrack === null) return;
+    if (sourceType !== 'gpx') return;
+    if ((inputs.sport ?? 'bike') !== 'bike') return;
+    if (validatedForReseg === null) return;
+    const result = segmentInto60SecondBlocks(gpxTrack, validatedForReseg);
+    setRouteSegments(result.segments);
+    setRouteMeta(result.meta);
+  }, [
+    gpxTrack,
+    sourceType,
+    inputs.sport,
+    validatedForReseg,
+    resegBikeType,
+    resegFtpWatts,
+    resegHasFtp,
+    resegWeightKg,
+    resegBikeWeightKg,
+  ]);
 
   const handleSourceTypeSelect = (choice: TypeChoice): void => {
     const { sport, source } = choice;
@@ -488,6 +541,7 @@ function WizardApp(): JSX.Element {
       // cadenciaStore desde Fase E y deben sobrevivir a cambios de rama.
       setRouteSegments(null);
       setRouteMeta(null);
+      setGpxTrack(null);
       setMatchedList(null);
       setReplacedIndices(new Set());
       setPlaylistName('');
@@ -537,6 +591,7 @@ function WizardApp(): JSX.Element {
   const handleResetWizard = (): void => {
     setRouteSegments(null);
     setRouteMeta(null);
+    setGpxTrack(null);
     setMatchedList(null);
     setMusicPreferences({ ...EMPTY_PREFERENCES, seed: makeRandomSeed() });
     setReplacedIndices(new Set());

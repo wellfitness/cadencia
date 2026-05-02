@@ -67,7 +67,9 @@ describe('classifySessionPlan', () => {
       });
       const segment = classifySessionPlan(plan, userWithFtp)[0];
       expect(segment).toBeDefined();
-      const reclassified = classifyZone(segment!.avgPowerWatts, userWithFtp);
+      // Sesiones indoor no tienen pendiente: slopePct=0 hace que el floor sea Z1
+      // y deje a Coggan mandar, asi el ciclo zona -> potencia -> zona se cierra.
+      const reclassified = classifyZone(segment!.avgPowerWatts, 0, userWithFtp);
       expect(reclassified).toBe(zone);
     }
   });

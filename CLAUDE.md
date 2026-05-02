@@ -245,6 +245,28 @@ Z5  105–120 % FTP
 Z6 > 120 % FTP        // Se mapea a Z5 musical (no hay banda BPM superior)
 ```
 
+### Zonas en `bike + gpx`: `max(Coggan, floor por pendiente)`
+
+El modelo Coggan asume que la potencia mecánica medida ≈ esfuerzo cardiovascular. Es razonable en carretera (>95 % de la potencia metabólica acaba siendo potencia mecánica de pedaleo) pero **falla en gravel/MTB**: la velocidad media GPX es estructuralmente baja por Crr efectivo dinámico (barro, grava suelta, raíces), micro-paradas técnicas y coste metabólico de equilibrio que no se traduce en potencia traslacional. Resultado sin corrección: una rampa del 8% en MTB con velocidad media 7 km/h calcula ~140 W mecánicos = Z2 Coggan, cuando el ciclista está en Z5+ cardiovascular.
+
+Solución: la zona de cada bloque ciclista outdoor es `max(zona_Coggan, zona_floor)`. La pendiente sale limpia del GPX y correlaciona con el esfuerzo cardiovascular sin importar la superficie, así que actúa como suelo mínimo. En carretera el floor es muy permisivo y Coggan suele ganar; en gravel/MTB el floor sostiene la zona en subida.
+
+**Tabla de floor por tipo de bici** (en [src/core/segmentation/classifyZone.ts](src/core/segmentation/classifyZone.ts), función `bikeSlopeFloorZone`):
+
+| Pendiente | road | gravel | mtb |
+|---|---|---|---|
+| < 2% | Z1 | Z1 | Z1 |
+| 2-3% | Z1 | Z2 | Z2 |
+| 3-5% | Z2 | Z3 | Z3 |
+| 5-7% | Z3 | Z4 | Z4 |
+| 7-9% | Z4 | Z5 | Z5 |
+| 9-11% | Z5 | Z5 | Z6 |
+| ≥ 11% | road≥12%→Z6, gravel→Z6, mtb→Z6 | | |
+
+A igual pendiente fuerte la jerarquía es `road ≤ gravel ≤ mtb`: en MTB sostener un 7% obliga ya a Z5 por la "tax" técnica de la superficie, mientras que en carretera el mismo 7% sólo asegura Z4.
+
+**Caso sin FTP**: la zona se deriva exclusivamente del floor. No se inventa un FTP genérico (el viejo default `2.5 W/kg` arrastraba todos los bloques de gravel/MTB a Z1-Z2). La pendiente es un proxy más honesto cuando no hay potenciómetro.
+
 ### Cálculo de potencia por segmento (modo `bike + gpx`)
 
 Aplicable solo a ciclismo outdoor. En running outdoor se usa el polinomio de Minetti (siguiente sección).

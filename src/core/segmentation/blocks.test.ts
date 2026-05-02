@@ -93,3 +93,85 @@ describe('segmentInto60SecondBlocks', () => {
     expect(segmentInto60SecondBlocks(trackNoTime, validatedRider).meta.hadRealTimestamps).toBe(false);
   });
 });
+
+/**
+ * Genera un track sintetico de subida sostenida con velocidad realista de
+ * gravel/MTB (10 km/h) y pendiente parametrizable. Reproduce el caso del bug
+ * original: la potencia mecanica calculada cae a niveles bajos por la
+ * velocidad reducida y el modelo Coggan puro mete los bloques en Z2/Z3, lo
+ * que activaba el sintoma "todo Z1/Z2 en gravel" hasta que llego el floor.
+ */
+function syntheticClimbingTrack(slopeFraction: number): GpxTrack {
+  const numPoints = 60; // 5 min a 5s entre puntos
+  const speedMps = (10 * 1000) / 3600; // ~2.78 m/s
+  const secondsBetween = 5;
+  const distancePerStep = speedMps * secondsBetween; // ~13.9 m
+  const elevPerStep = distancePerStep * slopeFraction;
+  // 1 grado lat ~111111 m. Avanza solo en latitud, lon constante.
+  const dLat = distancePerStep / 111111;
+  const start = new Date('2026-01-01T00:00:00Z').getTime();
+  return {
+    name: `subida ${(slopeFraction * 100).toFixed(0)}% sintetica`,
+    hasTimestamps: true,
+    points: Array.from({ length: numPoints }, (_, i) => ({
+      lat: 42 + dLat * i,
+      lon: -8,
+      ele: 100 + elevPerStep * i,
+      time: new Date(start + i * secondsBetween * 1000),
+    })),
+  };
+}
+
+describe('segmentInto60SecondBlocks: la zonificacion bike+gpx depende del tipo de bici', () => {
+  // Bug regresion: antes del floor por pendiente, los tres bicis producian la
+  // misma distribucion porque la potencia mecanica subestimaba el esfuerzo en
+  // gravel/MTB. Tras el floor, MTB > gravel >= road para la misma subida.
+  // Trabajamos con pendientes alejadas de los bordes exactos de la tabla
+  // (8/10/11/12 %) para que jitter de haversine no nos ponga en frontera.
+
+  it('rampa 10,3% en MTB: la mayoria del tiempo en Z6 (floor MTB Z6 desde 10%)', () => {
+    // 10.3 % esta dentro del rango Z6 mtb (10-13) y Z5 road/gravel (9-12, 8-11).
+    const climbing = syntheticClimbingTrack(0.103);
+    const mtb = segmentInto60SecondBlocks(climbing, { ...validatedRider, bikeType: 'mtb' });
+    expect(mtb.meta.zoneDurationsSec[6]).toBeGreaterThan(mtb.meta.totalDurationSec / 2);
+  });
+
+  it('rampa 10,3% en road y gravel: la mayoria del tiempo en Z5 (floor road/gravel Z5)', () => {
+    const climbing = syntheticClimbingTrack(0.103);
+    const road = segmentInto60SecondBlocks(climbing, { ...validatedRider, bikeType: 'road' });
+    const gravel = segmentInto60SecondBlocks(climbing, { ...validatedRider, bikeType: 'gravel' });
+    expect(road.meta.zoneDurationsSec[5]).toBeGreaterThan(road.meta.totalDurationSec / 2);
+    expect(gravel.meta.zoneDurationsSec[5]).toBeGreaterThan(gravel.meta.totalDurationSec / 2);
+    // Z6 NO se activa en estas dos tablas con 10.3 %.
+    expect(road.meta.zoneDurationsSec[6]).toBe(0);
+    expect(gravel.meta.zoneDurationsSec[6]).toBe(0);
+  });
+
+  it('rampa 10,3% road/gravel vs MTB: distribuciones DISTINTAS (regresion del bug "todo igual")', () => {
+    const climbing = syntheticClimbingTrack(0.103);
+    const road = segmentInto60SecondBlocks(climbing, { ...validatedRider, bikeType: 'road' });
+    const gravel = segmentInto60SecondBlocks(climbing, { ...validatedRider, bikeType: 'gravel' });
+    const mtb = segmentInto60SecondBlocks(climbing, { ...validatedRider, bikeType: 'mtb' });
+    // MTB esta mayoritariamente en Z6; road/gravel mayoritariamente en Z5.
+    expect(mtb.meta.zoneDurationsSec[6]).toBeGreaterThan(road.meta.zoneDurationsSec[6]);
+    expect(mtb.meta.zoneDurationsSec[6]).toBeGreaterThan(gravel.meta.zoneDurationsSec[6]);
+    expect(road.meta.zoneDurationsSec[5]).toBeGreaterThan(mtb.meta.zoneDurationsSec[5]);
+    expect(gravel.meta.zoneDurationsSec[5]).toBeGreaterThan(mtb.meta.zoneDurationsSec[5]);
+  });
+
+  it('rampa intermedia 4,5%: road queda mas bajo que gravel/MTB (separacion road vs no-road)', () => {
+    // 4.5 % cae en road->Z2 [3,5), gravel->Z3 [4,6), mtb->Z3 [3,5).
+    const gentle = syntheticClimbingTrack(0.045);
+    const road = segmentInto60SecondBlocks(gentle, { ...validatedRider, bikeType: 'road' });
+    const gravel = segmentInto60SecondBlocks(gentle, { ...validatedRider, bikeType: 'gravel' });
+    const mtb = segmentInto60SecondBlocks(gentle, { ...validatedRider, bikeType: 'mtb' });
+    // Road tiene MAS tiempo en Z1-Z2 que gravel/mtb (que estan empujados al
+    // floor mas alto). Validar la asimetria sin depender de boundaries
+    // exactos.
+    const roadLow = road.meta.zoneDurationsSec[1] + road.meta.zoneDurationsSec[2];
+    const gravelLow = gravel.meta.zoneDurationsSec[1] + gravel.meta.zoneDurationsSec[2];
+    const mtbLow = mtb.meta.zoneDurationsSec[1] + mtb.meta.zoneDurationsSec[2];
+    expect(roadLow).toBeGreaterThan(gravelLow);
+    expect(roadLow).toBeGreaterThan(mtbLow);
+  });
+});

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { parseGpx } from '@core/gpx/parser';
+import type { GpxTrack } from '@core/gpx/types';
 import {
   segmentInto60SecondBlocks,
   type ClassifiedSegment,
@@ -44,7 +45,17 @@ export interface RouteStepProps {
    * que subir. Sin efecto en el sub-flujo de sesion indoor.
    */
   plannedRouteContext?: PlannedRouteContext;
-  onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
+  /**
+   * Callback que recibe la zonificacion derivada. `track` es el GpxTrack
+   * parseado cuando proviene del flujo GPX (App lo guarda para reprocesar
+   * sin re-subir si cambian validatedInputs.bikeType / .ftpWatts / .weightKg);
+   * es null cuando la fuente es una sesion indoor por bloques (no hay GPX).
+   */
+  onProcessed: (
+    segments: ClassifiedSegment[],
+    meta: RouteMeta,
+    track: GpxTrack | null,
+  ) => void;
   /** Callback cuando el plan de sesion editable cambia. */
   onSessionPlanChange: (plan: EditableSessionPlan | null) => void;
   /** Callback cuando el usuario carga otra plantilla o empieza de cero. */
@@ -83,7 +94,8 @@ export function RouteStep({
         initialActiveTemplateId={initialActiveTemplateId}
         onProcessed={(segments, meta, plan) => {
           onSessionPlanChange(plan);
-          onProcessed(segments, meta);
+          // Sesion indoor: no hay GpxTrack subyacente.
+          onProcessed(segments, meta, null);
         }}
         onChange={onSessionPlanChange}
         {...(onActiveTemplateIdChange !== undefined
@@ -113,7 +125,11 @@ interface GpxRouteFlowProps {
   initialSegments: readonly ClassifiedSegment[] | null;
   initialMeta: RouteMeta | null;
   plannedRouteContext: PlannedRouteContext | null;
-  onProcessed: (segments: ClassifiedSegment[], meta: RouteMeta) => void;
+  onProcessed: (
+    segments: ClassifiedSegment[],
+    meta: RouteMeta,
+    track: GpxTrack | null,
+  ) => void;
   onBack: () => void;
   onNext: () => void;
 }
@@ -176,7 +192,10 @@ function GpxRouteFlow({
         setSegments(result.segments);
         setMeta(result.meta);
         setPhase('ready');
-        onProcessed(result.segments, result.meta);
+        // Subimos el track parseado a App para que pueda reprocesar la
+        // zonificacion sin re-subida cuando el usuario cambie bikeType,
+        // ftpWatts o weightKg desde el paso Datos.
+        onProcessed(result.segments, result.meta, track);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Error desconocido al procesar la ruta.';
         setErrorMessage(message);

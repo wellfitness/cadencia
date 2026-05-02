@@ -91,10 +91,12 @@ export function segmentInto60SecondBlocks(
 
     const avgPower = blockDuration > 0 ? blockEnergyJoules / blockDuration : 0;
     const slopePct = blockDistance > 0 ? ((endPoint.ele - startPoint.ele) / blockDistance) * 100 : 0;
-    // Bike: zona derivada de potencia media (Coggan).
+    // Bike: zona = max(Coggan sobre %FTP, floor por pendiente segun tipo bici).
+    // El floor compensa que la potencia mecanica subestima el esfuerzo en
+    // gravel/MTB cuando la velocidad GPX es baja por terreno tecnico.
     // Run: zona derivada de pendiente (Minetti). El runner promedio no entrena
     // por potencia y la app no la calcula.
-    const zone = isRun ? slopeToRunZone(slopePct) : classifyZone(avgPower, validated);
+    const zone = isRun ? slopeToRunZone(slopePct) : classifyZone(avgPower, slopePct, validated);
     const cadenceProfile = inferCadenceProfileFromSlopePct(slopePct);
 
     blocks.push({
