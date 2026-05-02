@@ -19,21 +19,18 @@ export interface SpotifyAttributionProps {
 
 /**
  * Atribucion oficial a Spotify segun Branding & Design Guidelines de la
- * Web API. Renderiza el logo oficial (SVG descargado desde el media kit
- * de Spotify) o, si los assets no estan presentes en `public/spotify/`,
- * un fallback textual «Música de Spotify» que cumple el minimo de
- * atribucion textual.
+ * Web API. Renderiza el logo oficial (PNG descargado del media kit de
+ * Spotify en https://newsroom.spotify.com/media-kit/logo-and-brand-assets/)
+ * o, si los assets no estan presentes en `public/spotify/`, un fallback
+ * textual «Música de Spotify» que cumple el minimo de atribucion.
  *
- * Como subir los logos oficiales:
- *   1. Ir a https://newsroom.spotify.com/media-kit/
- *   2. Descargar el «Spotify Logo» (paquete RGB SVG) en sus tres variantes:
- *        - Spotify_Logo_RGB_Green.svg     (default, fondos blancos/claros)
- *        - Spotify_Logo_RGB_White.svg     (fondos oscuros, p.ej. Modo TV)
- *        - Spotify_Logo_RGB_Black.svg     (alternativa monocromo)
- *   3. Copiarlos a `public/spotify/` con esos nombres EXACTOS.
+ * Archivos esperados en `public/spotify/`:
+ *   - Spotify_Full_Logo_RGB_Green.png   (default, fondos blancos/claros)
+ *   - Spotify_Full_Logo_RGB_White.png   (fondos oscuros, p.ej. Modo TV)
+ *   - Spotify_Full_Logo_RGB_Black.png   (alternativa monocromo)
  *
- * Mientras los SVG no esten subidos, el componente cae a fallback
- * textual sin romper la UI ni los tests.
+ * Estos archivos vienen del media kit oficial de Spotify y se sirven
+ * tal cual (sin recortar, sin recolorar, sin estirar).
  *
  * Este componente debe aparecer en cada superficie que muestra metadata
  * de Spotify (track names, artist names, cover art, BPM derivado de
@@ -52,8 +49,8 @@ export function SpotifyAttribution({
 
   const fileName =
     variant === 'dark'
-      ? 'Spotify_Logo_RGB_White.svg'
-      : 'Spotify_Logo_RGB_Green.svg';
+      ? 'Spotify_Full_Logo_RGB_White.png'
+      : 'Spotify_Full_Logo_RGB_Green.png';
 
   const heightPx = size === 'sm' ? 24 : 32;
 

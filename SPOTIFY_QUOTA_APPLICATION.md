@@ -20,10 +20,11 @@ correspondientes en cada campo del formulario.
 | Privacy Policy | https://cadencia.movimientofuncional.app/privacy.html |
 | Terms of Service | https://cadencia.movimientofuncional.app/terms.html |
 | Contact email | movimientofuncional.net@gmail.com |
-| Organization name | Movimiento Funcional (Elena Cruces, autónoma) |
+| Organization name | Movimiento Funcional (Elena Cruces Domínguez, autónoma) |
 | Country / Markets | Spain (primary), available globally where Spotify operates |
-| NIF / VAT | _[rellenar con tu NIF de actividad económica de autónoma]_ |
-| Business address | _[dirección fiscal de tu alta de autónomos]_ |
+| Legal name | Elena Cruces Domínguez |
+| NIF | 36114681N |
+| Business address | Rúa Médico José Mato Soto, 22 - 9B, 36210 Vigo (Pontevedra), España |
 
 ---
 
