@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "description": "Webapp que sincroniza musica de Spotify con la intensidad de tu cardio (corredores y ciclistas): outdoor desde un GPX o indoor desde sesiones por bloques. Disfruta del cardio a tu ritmo.",
   "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

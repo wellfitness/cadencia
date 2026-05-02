@@ -1,9 +1,6 @@
-import { useState } from 'react';
 import { Button } from '@ui/components/Button';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { SiteFooter } from '@ui/components/SiteFooter';
-import { BetaAccessModal } from '@ui/components/BetaAccessModal';
-import { BetaBanner } from '@ui/components/BetaBanner';
 import { usePwaInstall } from '@ui/state/usePwaInstall';
 import { navigateInApp } from '@ui/utils/navigation';
 
@@ -12,19 +9,10 @@ export interface LandingProps {
 }
 
 export function Landing({ onStart }: LandingProps): JSX.Element {
-  const [modalOpen, setModalOpen] = useState(false);
-  const openModal = (): void => setModalOpen(true);
-  const closeModal = (): void => setModalOpen(false);
-  const continueToWizard = (): void => {
-    setModalOpen(false);
-    onStart();
-  };
-
   return (
     <div className="min-h-full flex flex-col bg-white">
-      <BetaBanner />
       <main className="flex-1">
-        <HeroVisual onTry={openModal} />
+        <HeroVisual onTry={onStart} />
         {/* Bloque post-hero móvil + tablet (<lg).
             - Móvil (<md): CTA + microcopy + chips en blanco. La imagen 9:16
               está saturada (logo, reproductor, corredor+ciclista, copy
@@ -35,7 +23,7 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
             Los chips se mantienen en row para ambas anchuras. */}
         <div className="lg:hidden bg-white px-4 pt-6 pb-2 flex flex-col items-center gap-5">
           <div className="md:hidden w-full flex justify-center">
-            <LandingCtaBlock onTry={openModal} microcopyTone="dark" />
+            <LandingCtaBlock onTry={onStart} microcopyTone="dark" />
           </div>
           <BenefitChips orientation="row" />
         </div>
@@ -47,14 +35,9 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
         <WhyItWorks />
         <Privacy />
         <Faq />
-        <FinalCta onTry={openModal} />
+        <FinalCta onTry={onStart} />
       </main>
       <SiteFooter />
-      <BetaAccessModal
-        open={modalOpen}
-        onClose={closeModal}
-        onContinue={continueToWizard}
-      />
     </div>
   );
 }

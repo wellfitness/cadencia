@@ -1,26 +1,33 @@
 import { useEffect, useRef } from 'react';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
-import { BETA_FORM_URL } from '@ui/components/BetaAccessModal';
 
-export interface BetaAccessDeniedDialogProps {
+/**
+ * URL del formulario de alta en la lista de testers autorizados de la
+ * integración de Cadencia con Spotify. Mientras Spotify no apruebe la cuota
+ * extendida, las cuentas necesitan añadirse manualmente al Developer
+ * Dashboard. Cuando se apruebe, este dialogo dejara de dispararse y la URL
+ * podra retirarse.
+ */
+export const SPOTIFY_ACCESS_REQUEST_URL = 'https://forms.gle/7iAq1kPzZ7ptdhaG8';
+
+export interface SpotifyAccessDeniedDialogProps {
   open: boolean;
   onClose: () => void;
 }
 
 /**
- * Dialogo modal que se abre cuando Spotify devuelve 403 al crear la lista,
- * caso tipico de "el usuario autenticado no esta en la lista de testers
- * del Developer Dashboard". Sustituye al banner de error generico para ese
- * caso especifico porque el usuario necesita un CTA accionable (apuntarse
- * al formulario) en vez de un mensaje frio.
+ * Dialogo que se abre cuando Spotify devuelve 403 al crear la lista, caso
+ * tipico de "el usuario autenticado no tiene autorizacion para usar la
+ * integracion". Muestra una explicacion amable y un CTA al formulario de
+ * solicitud de acceso, en lugar del banner de error generico.
  *
- * Patron `<dialog>` nativo igual que BetaAccessModal: ESC para cerrar,
- * focus trap, backdrop accesible, sin dependencias.
+ * Patron `<dialog>` nativo: ESC para cerrar, focus trap, backdrop accesible,
+ * sin dependencias.
  */
-export function BetaAccessDeniedDialog({
+export function SpotifyAccessDeniedDialog({
   open,
   onClose,
-}: BetaAccessDeniedDialogProps): JSX.Element {
+}: SpotifyAccessDeniedDialogProps): JSX.Element {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -44,7 +51,7 @@ export function BetaAccessDeniedDialog({
       ref={dialogRef}
       onClose={onClose}
       onClick={handleBackdropClick}
-      aria-labelledby="beta-denied-title"
+      aria-labelledby="spotify-denied-title"
       className="
         max-w-lg w-[calc(100%-2rem)] p-0 rounded-2xl border-0
         backdrop:bg-gris-900/60 backdrop:backdrop-blur-sm
@@ -69,7 +76,7 @@ export function BetaAccessDeniedDialog({
             <MaterialIcon name="lock" size="large" />
           </span>
           <h2
-            id="beta-denied-title"
+            id="spotify-denied-title"
             className="font-display text-2xl md:text-3xl text-gris-800"
           >
             Aún no tienes acceso
@@ -77,13 +84,14 @@ export function BetaAccessDeniedDialog({
         </div>
 
         <p className="text-gris-700 mb-3">
-          Spotify ha rechazado la creación de la lista porque tu cuenta todavía
-          no está autorizada para usar Cadencia.
+          Spotify no ha podido completar la creación de la lista en tu cuenta
+          porque todavía no estás autorizada para usar la integración de
+          Cadencia con Spotify.
         </p>
         <p className="text-gris-700 mb-5">
-          La app está en beta privada mientras Spotify aprueba el acceso
-          público. Apúntate con tu email de Spotify y te añado a mano a la
-          lista de testers — suele tardar menos de 24 h.
+          Estamos en proceso de habilitar el acceso para todo el público.
+          Mientras tanto, apúntate con tu email de Spotify y te incluyo
+          manualmente — suele tardar menos de 24 h.
         </p>
 
         <div className="flex flex-col-reverse sm:flex-row gap-3">
@@ -95,20 +103,21 @@ export function BetaAccessDeniedDialog({
             Cerrar
           </button>
           <a
-            href={BETA_FORM_URL}
+            href={SPOTIFY_ACCESS_REQUEST_URL}
             target="_blank"
             rel="noopener noreferrer"
             onClick={onClose}
             className="sm:flex-1 inline-flex items-center justify-center gap-2 font-semibold rounded-lg border-2 transition-all duration-200 ease-out bg-rosa-600 text-white border-rosa-700 hover:bg-rosa-700 hover:-translate-y-0.5 active:translate-y-0 text-base px-4 py-2.5 min-h-[44px] md:min-h-[48px] no-underline"
           >
-            <MaterialIcon name="science" size="small" />
+            <MaterialIcon name="mark_email_read" size="small" />
             Solicitar acceso
           </a>
         </div>
 
         <p className="text-xs text-gris-500 mt-4">
-          Mientras tanto puedes seguir usando Cadencia para construir sesiones,
-          previsualizar la lista y exportarla a Zwift en formato .zwo.
+          Mientras tanto puedes seguir usando Cadencia para construir
+          sesiones, previsualizar la lista y exportarla a Zwift en formato
+          .zwo.
         </p>
       </div>
     </dialog>

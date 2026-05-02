@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Objetivo
 
-**Cadencia** — *disfruta del cardio a tu ritmo*. App **source-available** (PolyForm Noncommercial — colaboración abierta, uso comercial reservado a la autora) que sincroniza música de Spotify con la intensidad de tus entrenamientos de cardio. Da soporte a dos deportes (**ciclismo** y **carrera**) y dos modalidades por deporte (outdoor desde GPX o indoor por bloques):
+**Cadencia** — *disfruta del cardio a tu ritmo*. App **open source** (licencia MIT) que sincroniza música de Spotify con la intensidad de tus entrenamientos de cardio. Da soporte a dos deportes (**ciclismo** y **carrera**) y dos modalidades por deporte (outdoor desde GPX o indoor por bloques):
 
 - **Bike outdoor**: subes un GPX de tu ruta, la app estima la **potencia (vatios)** por segmentos (ecuación gravedad + rodadura + aerodinámica) y mapea cada segmento a su zona Z1-Z6.
 - **Bike indoor**: construyes una sesión de rodillo o spinning por bloques (calentamiento, intervalos, recuperación, sprints…) desde cero o partiendo de **plantillas científicas de ciclismo** (SIT, HIIT 10-20-30, Noruego 4×4, Z2…).
@@ -747,7 +747,7 @@ Si el usuario no tiene entradas, el badge se oculta. No hay notificaciones nativ
 
 ## Licencia y contribuciones
 
-- Licencia: **PolyForm Noncommercial 1.0.0** ([LICENSE](./LICENSE)). Uso no comercial libre; comercial reservado a la titular del copyright.
+- Licencia: **MIT** ([LICENSE](./LICENSE)). Uso libre incluido el comercial; la única condición es mantener el aviso de copyright.
 - Contribuciones externas: requieren **firma DCO** (`git commit -s`) en cada commit. Detalles en [CONTRIBUTING.md](./CONTRIBUTING.md). Sin DCO no se mergea.
 - Las dependencias instaladas son todas licencias permisivas (MIT, ISC, Apache-2.0, BSD). Si se va a añadir una dependencia con licencia copyleft fuerte (GPL, AGPL), parar y preguntar primero.
 

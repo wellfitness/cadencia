@@ -28,8 +28,8 @@ function isSpotifyErrorResponse(v: unknown): v is { error: SpotifyError } {
  *
  * Tambien aplica a otros 403 (scope insuficiente, endpoint retirado, rate
  * limit) — la UI los trata como mismo caso porque el remedio inmediato
- * (apuntarse a la beta) es tambien valido para los demas escenarios poco
- * frecuentes.
+ * (solicitar acceso autorizado) es tambien valido para los demas escenarios
+ * poco frecuentes.
  */
 export class SpotifyAuthorizationError extends Error {
   readonly status: number;

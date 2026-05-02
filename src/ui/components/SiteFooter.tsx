@@ -271,7 +271,7 @@ export function SiteFooter(): JSX.Element {
             rel="noopener noreferrer"
             className="text-turquesa-400 hover:text-turquesa-300 hover:underline transition-colors"
           >
-            Licencia PolyForm Noncommercial
+            Licencia MIT
           </a>
           .
         </p>

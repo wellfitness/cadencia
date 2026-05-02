@@ -6,12 +6,11 @@
 
 ## Licencia
 
-Este proyecto se distribuye bajo **PolyForm Noncommercial License 1.0.0** (ver [LICENSE](./LICENSE)).
+Este proyecto se distribuye bajo **MIT License** (ver [LICENSE](./LICENSE)).
 
-Eso significa que cualquier persona puede usar, modificar y contribuir al
-código **para fines no comerciales**, pero **el uso comercial está reservado
-a la titular del copyright**. Si necesitas uso comercial, abre un issue o
-contacta directamente.
+Cualquier persona puede usar, modificar, redistribuir y contribuir al código
+libremente, incluido para uso comercial. La única condición es mantener el
+aviso de copyright original.
 
 ---
 

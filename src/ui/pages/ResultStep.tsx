@@ -38,7 +38,7 @@ import {
   type CreatedPlaylist,
 } from '@integrations/spotify';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
-import { BetaAccessDeniedDialog } from '@ui/components/BetaAccessDeniedDialog';
+import { SpotifyAccessDeniedDialog } from '@ui/components/SpotifyAccessDeniedDialog';
 import { SpotifyErrorReporter } from '@ui/components/SpotifyErrorReporter';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
@@ -604,7 +604,7 @@ export function ResultStep({
           </a>
         </div>
       )}
-      <BetaAccessDeniedDialog
+      <SpotifyAccessDeniedDialog
         open={accessDeniedOpen}
         onClose={() => setAccessDeniedOpen(false)}
       />

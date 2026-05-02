@@ -24,7 +24,6 @@ import {
 } from '@core/matching';
 import { dedupeByUri, loadNativeTracks, type Track } from '@core/tracks';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
-import { BetaBanner } from '@ui/components/BetaBanner';
 import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -811,7 +810,6 @@ function WizardApp(): JSX.Element {
             matchedList === null) && <NeedsMusicMessage onBack={handleBack} />}
       </main>
 
-      <BetaBanner />
       <Footer />
     </div>
   );
@@ -979,7 +977,7 @@ function Footer(): JSX.Element {
           </a>
           <span aria-hidden className="text-gris-300">·</span>
           <a
-            href="https://polyformproject.org/licenses/noncommercial/1.0.0/"
+            href="https://opensource.org/licenses/MIT"
             target="_blank"
             rel="noopener noreferrer"
             className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"

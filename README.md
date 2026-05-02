@@ -4,7 +4,7 @@
 
 Webapp que sincroniza música de Spotify con la intensidad de tu cardio, para corredores y ciclistas. Outdoor desde un GPX o indoor desde sesiones por bloques.
 
-> **Source-available, open a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la lógica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist).
+> **Open source, abierto a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la lógica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist).
 
 ## Qué puedes hacer
 
@@ -48,9 +48,9 @@ Para guías de contribución y reglas vinculantes del proyecto ver [CLAUDE.md](.
 
 ## Licencia
 
-[PolyForm Noncommercial License 1.0.0](./LICENSE).
+[MIT License](./LICENSE).
 
-Puedes usar, modificar y redistribuir el código libremente para cualquier propósito **no comercial** (personal, educativo, investigación, ONGs). El uso comercial está reservado a la titular del copyright. Si quieres uso comercial, abre un issue.
+Puedes usar, modificar y redistribuir el código libremente, incluido para uso comercial. La única condición es mantener el aviso de copyright original.
 
 ## Contribuir
 
