@@ -26,18 +26,20 @@ import {
   generateState,
   getAuthorizationUrl,
   getRedirectUri,
-  getSpotifyClientId,
   loadAuthFlow,
   loadTokens,
   refreshAccessToken,
+  resolveActiveClientId,
   saveAuthFlow,
   saveTokens,
   tokensAreFresh,
   SPOTIFY_SCOPES,
   SpotifyAuthorizationError,
+  type ClientIdSource,
   type CreatedPlaylist,
 } from '@integrations/spotify';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
+import { ByocTutorialDialog } from '@ui/components/ByocTutorialDialog';
 import { SpotifyAccessDeniedDialog } from '@ui/components/SpotifyAccessDeniedDialog';
 import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { SpotifyErrorReporter } from '@ui/components/SpotifyErrorReporter';
@@ -132,7 +134,14 @@ export function ResultStep({
 }: ResultStepProps): JSX.Element {
   void validation;
   void validatedInputs;
-  const clientId = getSpotifyClientId();
+  // Cascada custom > default > null. Capturamos el `source` para que el modal
+  // de 403 ramifique entre "configura tu Client ID" (default) y "anade tu
+  // cuenta a tu app" (custom). Si la cascada se agota (clientId === null),
+  // dejamos que el wizard funcione igual y solo bloqueamos al pulsar
+  // "Crear playlist" abriendo el modal BYOC.
+  const resolved = resolveActiveClientId();
+  const clientId = resolved?.clientId ?? null;
+  const clientIdSource: ClientIdSource = resolved?.source ?? 'default';
   // Catalogo activo: el que viene del paso Musica (incluye uploads del
   // usuario). Si no hay (refresh de pestaña, callback OAuth), fallback a
   // los CSVs nativos para no quedarnos sin pool.
@@ -144,6 +153,7 @@ export function ResultStep({
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [accessDeniedOpen, setAccessDeniedOpen] = useState<boolean>(false);
+  const [byocOpen, setByocOpen] = useState<boolean>(false);
   const [created, setCreated] = useState<CreatedPlaylist | null>(null);
   const [hasSpotifySession, setHasSpotifySession] = useState<boolean>(() => loadTokens() !== null);
 
@@ -190,8 +200,6 @@ export function ResultStep({
   // ConfirmDialog. Tras confirmar: persistimos la URI en cadenciaStore
   // (sincronizado con Drive) y sustituimos el slot afectado en la playlist
   // actual con `replaceTrackInSegment` para no dejar huecos visibles.
-  // (Declarados ANTES del early return de clientId para no violar
-  // rules-of-hooks.)
   const [dismissTarget, setDismissTarget] = useState<{
     uri: string;
     name: string;
@@ -199,10 +207,6 @@ export function ResultStep({
   // Contador local de descartes en esta sesion del wizard. Util para el
   // toast informativo "Has descartado N · Ver descartes en Mis preferencias".
   const [sessionDismissCount, setSessionDismissCount] = useState<number>(0);
-
-  if (clientId === null) {
-    return <MissingClientIdMessage onBack={onBack} />;
-  }
 
   const handleReplaceWith = (index: number, uri: string): void => {
     const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
@@ -250,8 +254,20 @@ export function ResultStep({
     setDismissTarget(null);
   };
 
-  const handleCreatePlaylist = async (): Promise<void> => {
+  const handleCreatePlaylist = async (overrideClientId?: string): Promise<void> => {
     setError(null);
+    // Resolucion del Client ID activo: si el caller pasa un override (caso
+    // tipico: el modal BYOC acaba de guardar uno y reintenta), lo usamos sin
+    // depender del closure (que tendria el null del render previo).
+    const effectiveClientId = overrideClientId ?? clientId;
+    if (effectiveClientId === null) {
+      // Cascada agotada: ni Client ID custom ni VITE_SPOTIFY_CLIENT_ID. No
+      // arrancamos OAuth — abrimos el modal BYOC para que el usuario configure
+      // el suyo. Cuando guarde, su onSaved nos llamara de vuelta con el
+      // override y reintentaremos automaticamente.
+      setByocOpen(true);
+      return;
+    }
     let tokens = loadTokens();
     if (!tokens) {
       // Inicia el flow OAuth
@@ -261,7 +277,7 @@ export function ResultStep({
       const state = generateState();
       saveAuthFlow({ codeVerifier: verifier, state });
       const url = getAuthorizationUrl({
-        clientId,
+        clientId: effectiveClientId,
         redirectUri: getRedirectUri(),
         codeChallenge: challenge,
         state,
@@ -273,7 +289,7 @@ export function ResultStep({
     if (!tokensAreFresh(tokens)) {
       try {
         tokens = await refreshAccessToken({
-          clientId,
+          clientId: effectiveClientId,
           refreshToken: tokens.refreshToken,
         });
         saveTokens(tokens);
@@ -608,6 +624,19 @@ export function ResultStep({
       <SpotifyAccessDeniedDialog
         open={accessDeniedOpen}
         onClose={() => setAccessDeniedOpen(false)}
+        source={clientIdSource}
+        onConfigureCustom={() => setByocOpen(true)}
+      />
+      <ByocTutorialDialog
+        open={byocOpen}
+        onClose={() => setByocOpen(false)}
+        onSaved={(newClientId) => {
+          // Reintento automatico tras guardar: el usuario pulso "Crear
+          // playlist", se le abrio el modal BYOC, lo rellena, y queremos
+          // continuar el flujo OAuth sin que tenga que volver a pulsar.
+          // Pasamos el id como override para no depender del closure.
+          void handleCreatePlaylist(newClientId);
+        }}
       />
 
       <div className="flex justify-center pt-4">
@@ -892,57 +921,3 @@ async function copyShareToClipboard(text: string): Promise<void> {
   }
 }
 
-interface MissingClientIdMessageProps {
-  onBack: () => void;
-}
-
-function MissingClientIdMessage({ onBack }: MissingClientIdMessageProps): JSX.Element {
-  return (
-    <div className="mx-auto w-full max-w-2xl px-3 py-6 md:py-12 space-y-4">
-      <Card variant="info" title="Configura tu Client ID de Spotify" titleIcon="settings">
-        <p className="text-gris-700 mb-3">
-          Para crear listas en tu cuenta necesitas registrar la app en Spotify (gratis,
-          5 minutos):
-        </p>
-        <ol className="list-decimal pl-5 space-y-1 text-sm text-gris-700">
-          <li>
-            Entra en{' '}
-            <a
-              href="https://developer.spotify.com/dashboard"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-turquesa-700 hover:underline"
-            >
-              developer.spotify.com/dashboard
-            </a>
-          </li>
-          <li>Pulsa "Create an App" e introduce un nombre cualquiera.</li>
-          <li>
-            En "Redirect URIs" añade exactamente:{' '}
-            <code className="bg-gris-100 px-1 py-0.5 rounded text-xs">
-              {`${window.location.origin}/callback`}
-            </code>
-          </li>
-          <li>Marca "Web API" y acepta los términos.</li>
-          <li>Copia el "Client ID" que aparece en el dashboard de tu app.</li>
-          <li>
-            Crea o edita el fichero{' '}
-            <code className="bg-gris-100 px-1 py-0.5 rounded text-xs">.env.local</code>{' '}
-            en la raíz del proyecto con esta línea:
-          </li>
-        </ol>
-        <pre className="bg-gris-900 text-turquesa-100 text-xs rounded-lg p-3 mt-2 overflow-x-auto">
-          VITE_SPOTIFY_CLIENT_ID=tu-client-id-aquí
-        </pre>
-        <p className="text-xs text-gris-500 mt-2">
-          Reinicia <code className="bg-gris-100 px-1 rounded">pnpm dev</code> y vuelve aquí.
-        </p>
-        <div className="mt-4">
-          <Button variant="secondary" iconLeft="arrow_back" onClick={onBack}>
-            Volver atrás
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-}

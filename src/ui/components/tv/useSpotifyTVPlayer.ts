@@ -123,13 +123,15 @@ export function useSpotifyTVPlayer(
     async <T>(
       fn: (accessToken: string) => Promise<PlayerResult<T>>,
     ): Promise<PlayerResult<T>> => {
-      // Sin clientId no podemos refrescar el token. Si llegamos aqui sin
-      // clientId el .env no esta bien configurado — devolvemos error clasificable.
+      // Sin clientId no podemos refrescar el token. La causa habitual: el
+      // usuario borro su Client ID custom desde "Mis preferencias" mientras
+      // estaba en Modo TV y el .env tampoco tiene fallback. Devolvemos error
+      // clasificable para que la UI lo presente con accion "ir a preferencias".
       const clientId = getSpotifyClientId();
       if (clientId === null) {
         return {
           ok: false,
-          error: { kind: 'network', message: 'Falta VITE_SPOTIFY_CLIENT_ID' },
+          error: { kind: 'network', message: 'No hay Client ID de Spotify configurado.' },
         };
       }
       let tokens = tokensRef.current;

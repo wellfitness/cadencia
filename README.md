@@ -37,6 +37,34 @@ pnpm deploy:full        # build + deploy en una sola tanda
 
 La app se publica como webapp + PWA (instalable desde el navegador con "Añadir a pantalla de inicio") en [cadencia.movimientofuncional.app](https://cadencia.movimientofuncional.app).
 
+## Modelo BYOC (Bring Your Own Client ID)
+
+Cadencia funciona con BYOC: cada usuario crea **su propia app de Spotify** (gratis, 3 minutos en [developer.spotify.com](https://developer.spotify.com/dashboard)) y pega su **Client ID** dentro de Cadencia (modal guiado al pulsar «Crear playlist»). El Client ID se guarda en `localStorage` y solo lo configuras una vez.
+
+**¿Por qué?** Spotify endureció el acceso a Extended Quota Mode el 15-mayo-2025 (exige ≥250.000 MAU + empresa registrada + revenue verificable). Para apps indie como Cadencia ese camino está cerrado. La salida es BYOC: cada usuario es dueño de su propia cuota de Development Mode (5 testers por Client ID, suficiente para uso personal).
+
+**¿Qué necesita el usuario?**
+
+1. Cuenta de Spotify **Premium**.
+2. Tres minutos para crear su Client ID (la app le guía paso a paso con capturas).
+3. Pegar el id en Cadencia. Listo.
+
+## Self-hosting
+
+Cadencia es 100% client-side y MIT. Puedes hostearla donde quieras (Hostinger, Netlify, Vercel, GitHub Pages, tu propio nginx). Pasos:
+
+1. `git clone` este repo.
+2. `cp .env.example .env.local` y configura los valores que necesites:
+   - **`VITE_SPOTIFY_CLIENT_ID`**: opcional. Si lo dejas vacío, todos los usuarios irán por BYOC. Si lo pones, hasta 5 cuentas que tú autorices a mano en tu Developer Dashboard de Spotify podrán usar tu Client ID compartido.
+   - **`VITE_GOOGLE_CLIENT_ID`**: opcional. Activa la sincronización con Drive (carpeta `appdata` privada del usuario).
+3. **Si usas tu propio Client ID de Spotify**, registra en su dashboard (Settings → Redirect URIs) las URLs donde correrá Cadencia, por ejemplo:
+   - `http://127.0.0.1:5173/callback` (desarrollo)
+   - `https://tu-dominio.com/callback` (producción)
+4. **Si usas tu propio Client ID de Google Drive**, autoriza tu dominio en su Cloud Console.
+5. `pnpm install && pnpm build` y sube `dist/` a tu hosting.
+
+Si tus usuarios traen su propio Client ID (BYOC puro), en su app de Spotify deben registrar el mismo Redirect URI de la URL donde tú alojes Cadencia.
+
 ## Estructura
 
 - `src/core/` — Lógica pura (sin React, sin DOM): cálculos fisiológicos (Karvonen, Coggan, Gulati ♀ / Tanaka ♂), parser GPX, ecuación de potencia, motor de matching, plantillas de sesión. 100% unitestable.

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
-import { clearAuthFlow, clearTokens, loadTokens } from '@integrations/spotify';
+import {
+  clearAuthFlow,
+  clearStoredClientId,
+  clearTokens,
+  getStoredClientId,
+  loadTokens,
+  resolveActiveClientId,
+} from '@integrations/spotify';
+import { ByocTutorialDialog } from '@ui/components/ByocTutorialDialog';
 import { Card } from '@ui/components/Card';
 import { Button } from '@ui/components/Button';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
@@ -76,6 +84,8 @@ export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Elem
           <CatalogSection data={data} />
 
           <SpotifyConnectionSection />
+
+          <SpotifyClientIdSection />
 
           <TvModeSection data={data} />
 
@@ -348,6 +358,171 @@ function SpotifyConnectionSection(): JSX.Element {
           </span>
         </p>
       )}
+    </Card>
+  );
+}
+
+/**
+ * Gestion del Client ID custom (BYOC). Permite ver el origen del Client ID
+ * activo (custom del usuario o fallback compartido), configurar uno propio
+ * via ByocTutorialDialog, o borrarlo para volver al fallback.
+ *
+ * Por que aparece como seccion permanente y no solo via modal lazy: el
+ * usuario que ya configuro el suyo necesita un sitio donde ver el estado y
+ * cambiarlo (caso real: cambia de cuenta de Spotify y necesita rotar el
+ * Client ID). Este es el "panel de gestion" del feature.
+ */
+function SpotifyClientIdSection(): JSX.Element {
+  const [byocOpen, setByocOpen] = useState<boolean>(false);
+  // Refresh trigger: localStorage no dispara eventos React. Lo bumpeamos
+  // tras guardar/borrar para forzar re-render de la card.
+  const [refreshTick, setRefreshTick] = useState<number>(0);
+  const [confirmClear, setConfirmClear] = useState<boolean>(false);
+
+  // ESLint marca refreshTick como innecesario porque las funciones leen de
+  // localStorage (efecto fuera del modelo React), pero precisamente eso es
+  // lo que hace falta: cuando bumpeamos el tick tras guardar/borrar, queremos
+  // re-leer aunque las funciones sean tecnicamente "estables" para React.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const customId = useMemo(() => getStoredClientId(), [refreshTick]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const resolved = useMemo(() => resolveActiveClientId(), [refreshTick]);
+
+  const hasCustom = customId !== null;
+  const hasFallback = resolved !== null && resolved.source === 'default';
+  const hasNothing = resolved === null;
+
+  // Mostramos solo los 4 ultimos chars del id por privacidad visual: si el
+  // usuario hace screen-share del panel, no expone su id entero.
+  const customIdPreview = hasCustom ? `${'•'.repeat(28)}${customId.slice(-4)}` : null;
+
+  const handleClear = (): void => {
+    clearStoredClientId();
+    setRefreshTick((n) => n + 1);
+    setConfirmClear(false);
+  };
+
+  return (
+    <Card title="Client ID de Spotify" titleIcon="vpn_key">
+      {hasCustom && (
+        <>
+          <p className="text-sm text-gris-700 flex items-start gap-2">
+            <MaterialIcon
+              name="check_circle"
+              size="small"
+              className="text-turquesa-600 mt-0.5 shrink-0"
+            />
+            <span>
+              <strong>Estás usando tu propio Client ID.</strong>{' '}
+              <span className="text-gris-500">
+                Cadencia usa la app de Spotify que tú creaste. Los 5 huecos
+                de testers están a tu nombre.
+              </span>
+            </span>
+          </p>
+          <p className="mt-3 text-xs text-gris-500 font-mono break-all">
+            {customIdPreview}
+          </p>
+          <div className="mt-3 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+            <Button
+              variant="critical"
+              size="sm"
+              iconLeft="delete"
+              onClick={() => setConfirmClear(true)}
+            >
+              Borrar
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft="edit"
+              onClick={() => setByocOpen(true)}
+            >
+              Cambiar
+            </Button>
+          </div>
+        </>
+      )}
+
+      {!hasCustom && hasFallback && (
+        <>
+          <p className="text-sm text-gris-700 flex items-start gap-2">
+            <MaterialIcon
+              name="info"
+              size="small"
+              className="text-tulipTree-600 mt-0.5 shrink-0"
+            />
+            <span>
+              <strong>Estás usando el Client ID compartido de Cadencia.</strong>{' '}
+              <span className="text-gris-500">
+                Si tu cuenta no está en mi lista de testers (5 cuentas máx),
+                Spotify rechazará la creación de listas. Configura el tuyo
+                propio en 3 minutos para usar Cadencia sin límites.
+              </span>
+            </span>
+          </p>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="primary"
+              size="sm"
+              iconLeft="vpn_key"
+              onClick={() => setByocOpen(true)}
+            >
+              Configurar el mío
+            </Button>
+          </div>
+        </>
+      )}
+
+      {hasNothing && (
+        <>
+          <p className="text-sm text-gris-700 flex items-start gap-2">
+            <MaterialIcon
+              name="error_outline"
+              size="small"
+              className="text-rosa-600 mt-0.5 shrink-0"
+            />
+            <span>
+              <strong>No hay Client ID configurado.</strong>{' '}
+              <span className="text-gris-500">
+                Sin él, Cadencia no puede crear listas en tu cuenta de Spotify.
+                Configura el tuyo en 3 minutos (es gratis).
+              </span>
+            </span>
+          </p>
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="primary"
+              size="sm"
+              iconLeft="vpn_key"
+              onClick={() => setByocOpen(true)}
+            >
+              Configurar el mío
+            </Button>
+          </div>
+        </>
+      )}
+
+      <ByocTutorialDialog
+        open={byocOpen}
+        onClose={() => setByocOpen(false)}
+        onSaved={() => setRefreshTick((n) => n + 1)}
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Borrar tu Client ID"
+        icon="warning"
+        message={
+          hasFallback
+            ? 'Volverás al Client ID compartido de Cadencia. Si tu cuenta no está en su lista de testers, no podrás crear listas hasta que vuelvas a configurar el tuyo.'
+            : 'Sin Client ID Cadencia no podrá crear listas en tu Spotify hasta que configures uno nuevo.'
+        }
+        confirmLabel="Borrar"
+        confirmVariant="critical"
+        onConfirm={handleClear}
+        onCancel={() => setConfirmClear(false)}
+      />
     </Card>
   );
 }

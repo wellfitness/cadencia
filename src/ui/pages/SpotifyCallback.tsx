@@ -47,7 +47,9 @@ export function SpotifyCallback(): JSX.Element {
 
     const clientId = getSpotifyClientId();
     if (clientId === null) {
-      setErrorMsg('Falta VITE_SPOTIFY_CLIENT_ID en tu configuración.');
+      setErrorMsg(
+        'No hay Client ID configurado. Vuelve a la app y configura tu Client ID en «Mis preferencias».',
+      );
       setPhase('error');
       return;
     }
