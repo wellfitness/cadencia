@@ -1,14 +1,21 @@
-import type { GenreCount, GenreCoverage } from '@core/tracks';
+import type { GenreCoverage, MacroGenreCount } from '@core/tracks';
 import type { HeartRateZone } from '@core/physiology/karvonen';
 
 export interface GenrePillsProps {
-  availableGenres: readonly GenreCount[];
+  /**
+   * Lista de macro-generos a mostrar como pills. Cada uno con su id estable
+   * (`'house'`, `'rock'`...), label legible (`'House'`, `'Rock'`...) y count
+   * de tracks que pertenecen a ese macro en el catalogo activo.
+   */
+  availableGenres: readonly MacroGenreCount[];
+  /** Macro-IDs actualmente seleccionados por el usuario. */
   selectedGenres: readonly string[];
+  /** Callback con los macro-IDs seleccionados tras toggle. */
   onChange: (genres: string[]) => void;
   /**
-   * Cobertura por zona × profile. Si esta presente, cada pill muestra una
-   * mini-rejilla Z1-Z6 con celdas coloreadas segun candidateCount agregado
-   * por zona (suma de profiles).
+   * Cobertura por zona × profile, una entrada por macro. Si esta presente,
+   * cada pill muestra una mini-rejilla Z1-Z6 con celdas coloreadas segun
+   * candidateCount agregado por zona (suma de profiles).
    */
   coverage?: readonly GenreCoverage[];
   /**
@@ -53,7 +60,7 @@ function ZoneCoverageGrid({ coverage }: ZoneCoverageGridProps): JSX.Element {
     <div
       className="flex items-center gap-[2px] mt-1"
       role="group"
-      aria-label={`Cobertura del genero ${coverage.genre} por zona`}
+      aria-label={`Cobertura del género ${coverage.label} por zona`}
     >
       {ZONES.map((z) => {
         const count = byZone[z];
@@ -98,17 +105,17 @@ export function GenrePills({
   coverage,
   interactive = true,
 }: GenrePillsProps): JSX.Element {
-  const toggle = (genre: string): void => {
-    if (selectedGenres.includes(genre)) {
-      onChange(selectedGenres.filter((g) => g !== genre));
+  const toggle = (id: string): void => {
+    if (selectedGenres.includes(id)) {
+      onChange(selectedGenres.filter((g) => g !== id));
     } else {
-      onChange([...selectedGenres, genre]);
+      onChange([...selectedGenres, id]);
     }
   };
 
-  const coverageByGenre = new Map<string, GenreCoverage>();
+  const coverageByMacro = new Map<string, GenreCoverage>();
   if (coverage !== undefined) {
-    for (const c of coverage) coverageByGenre.set(c.genre, c);
+    for (const c of coverage) coverageByMacro.set(c.genre, c);
   }
   const showCoverage = coverage !== undefined;
 
@@ -119,9 +126,9 @@ export function GenrePills({
         role={interactive ? 'group' : 'list'}
         aria-label="Géneros disponibles"
       >
-        {availableGenres.map(({ genre, count }) => {
-          const selected = selectedGenres.includes(genre);
-          const cov = coverageByGenre.get(genre);
+        {availableGenres.map(({ id, label, count }) => {
+          const selected = selectedGenres.includes(id);
+          const cov = coverageByMacro.get(id);
           const baseClasses = `inline-flex flex-col items-start gap-0.5 rounded-xl border-2 px-3 py-1.5 ${
             showCoverage ? 'min-h-[52px]' : 'min-h-[36px]'
           } text-sm font-semibold transition-colors duration-200`;
@@ -136,7 +143,7 @@ export function GenrePills({
           const inner = (
             <>
               <div className="inline-flex items-center gap-1.5">
-                <span className="capitalize">{genre}</span>
+                <span>{label}</span>
                 <span
                   className={`text-xs tabular-nums ${
                     interactive && selected ? 'text-turquesa-100' : 'text-gris-400'
@@ -150,18 +157,18 @@ export function GenrePills({
           );
           if (!interactive) {
             return (
-              <span key={genre} role="listitem" className={className}>
+              <span key={id} role="listitem" className={className}>
                 {inner}
               </span>
             );
           }
           return (
             <button
-              key={genre}
+              key={id}
               type="button"
               role="checkbox"
               aria-checked={selected}
-              onClick={() => toggle(genre)}
+              onClick={() => toggle(id)}
               className={className}
             >
               {inner}

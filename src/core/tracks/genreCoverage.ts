@@ -4,12 +4,14 @@ import type { HeartRateZone } from '../physiology/karvonen';
 import type { CadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Sport } from '../user/userInputs';
-import { getTopGenres } from './topGenres';
+import { categorizeTag, MACRO_GENRES, type MacroGenreId } from './genreCategories';
+import { getTopMacroGenres } from './topGenres';
 import type { Track } from './types';
 
 /**
- * Una celda de cobertura: cuantos tracks de un genero pasan el filtro de
- * cadencia (1:1 ∪ 2:1) para una combinacion concreta (zona, profile, sport).
+ * Una celda de cobertura: cuantos tracks de un macro-genero pasan el
+ * filtro de cadencia (1:1 ∪ 2:1) para una combinacion concreta
+ * (zona, profile, sport).
  */
 export interface GenreZoneCell {
   zone: HeartRateZone;
@@ -18,11 +20,15 @@ export interface GenreZoneCell {
 }
 
 /**
- * Cobertura de un genero sobre el catalogo activo: total de tracks que lo
- * llevan en sus tags y desglose por celda (zona × profile).
+ * Cobertura de un macro-genero sobre el catalogo activo: total de tracks
+ * que lo contienen y desglose por celda (zona × profile). El campo
+ * `genre` es el id estable del macro (compatibilidad de API con UI).
  */
 export interface GenreCoverage {
-  genre: string;
+  /** Id estable del macro (`'house'`, `'rock'`, ...). */
+  genre: MacroGenreId;
+  /** Etiqueta legible para mostrar al usuario (`'House'`, `'Rock'`, ...). */
+  label: string;
   totalTracks: number;
   cells: readonly GenreZoneCell[];
 }
@@ -97,10 +103,12 @@ export function deriveSessionCombos(
 }
 
 /**
- * Calcula la cobertura por genero sobre un pool de tracks y una lista de
- * combinaciones (zona, profile). Usa getTopGenres para limitar al top-N
- * mas frecuentes (default 12), y para cada genero cuenta cuantos tracks
- * con ese tag pasan el filtro de cadencia (1:1 ∪ 2:1) en cada celda.
+ * Calcula la cobertura por macro-genero sobre un pool de tracks y una
+ * lista de combinaciones (zona, profile). Usa getTopMacroGenres para
+ * limitar al top-N macros mas frecuentes (default = todos los macros con
+ * al menos un track), y para cada macro cuenta cuantos tracks (unicos)
+ * con tags de ese macro pasan el filtro de cadencia (1:1 ∪ 2:1) en cada
+ * celda.
  *
  * Pure: no depende de DOM, fetch ni reloj. Determinista.
  */
@@ -108,34 +116,38 @@ export function computeGenreCoverage(
   tracks: readonly Track[],
   combos: readonly ZoneProfileCombo[],
   sport: Sport,
-  topN = 12,
+  topN: number = MACRO_GENRES.length,
 ): readonly GenreCoverage[] {
   if (tracks.length === 0 || combos.length === 0) return [];
-  const top = getTopGenres(tracks, topN);
+  const top = getTopMacroGenres(tracks, topN);
   if (top.length === 0) return [];
 
   // Pre-construye los criterios de cada combo una sola vez (compartido entre
-  // generos): evita llamar a getZoneCriteria N×M veces.
+  // macros): evita llamar a getZoneCriteria N×M veces.
   const criteriaByCombo = combos.map((c) => ({
     combo: c,
     criteria: getZoneCriteria(c.zone, c.cadenceProfile, sport),
   }));
 
-  // Agrupa los tracks por genero (un track con N tags aparece en N grupos)
-  // para poder contar candidates por celda en O(tracks × combos) global.
-  const tracksByGenre = new Map<string, Track[]>();
-  for (const genre of top) {
-    tracksByGenre.set(genre.genre, []);
+  // Agrupa los tracks por macro categorizando sus tags. Un track con varios
+  // tags del mismo macro entra UNA sola vez en ese macro (Set dedup).
+  const tracksByMacro = new Map<MacroGenreId, Set<Track>>();
+  for (const m of top) {
+    tracksByMacro.set(m.id, new Set());
   }
   for (const t of tracks) {
+    const seen = new Set<MacroGenreId>();
     for (const g of t.genres) {
-      const bucket = tracksByGenre.get(g);
-      if (bucket !== undefined) bucket.push(t);
+      const macro = categorizeTag(g);
+      if (macro !== null && !seen.has(macro)) {
+        seen.add(macro);
+        tracksByMacro.get(macro)?.add(t);
+      }
     }
   }
 
-  return top.map(({ genre, count }) => {
-    const bucket = tracksByGenre.get(genre) ?? [];
+  return top.map(({ id, label, count }) => {
+    const bucket = tracksByMacro.get(id) ?? new Set<Track>();
     const cells: GenreZoneCell[] = criteriaByCombo.map(({ combo, criteria }) => {
       let candidateCount = 0;
       for (const t of bucket) {
@@ -147,6 +159,6 @@ export function computeGenreCoverage(
         candidateCount,
       };
     });
-    return { genre, totalTracks: count, cells };
+    return { genre: id, label, totalTracks: count, cells };
   });
 }

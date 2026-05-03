@@ -30,8 +30,9 @@ describe('scoreTrack', () => {
   const z3 = getZoneCriteria(3, 'flat', 'bike');
 
   it('track perfecto en todas las dimensiones puntua cerca de 1', () => {
+    // `electronic` es el macro que contiene el tag 'edm'.
     const t = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['edm'] });
-    const score = scoreTrack(t, z3, ['edm']);
+    const score = scoreTrack(t, z3, ['electronic']);
     expect(score).toBeCloseTo(1.0, 1);
   });
 
@@ -52,8 +53,9 @@ describe('scoreTrack', () => {
     // Con preferencias activas el peso del genero sube de 0.20 a 0.35 para
     // que la eleccion explicita pese mas que el sesgo del catalogo.
     const matched = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['edm'] });
-    const unmatched = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['classical'] });
-    const diff = scoreTrack(matched, z3, ['edm']) - scoreTrack(unmatched, z3, ['edm']);
+    const unmatched = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['rock'] });
+    const diff =
+      scoreTrack(matched, z3, ['electronic']) - scoreTrack(unmatched, z3, ['electronic']);
     expect(diff).toBeCloseTo(0.35, 2);
   });
 
@@ -61,22 +63,48 @@ describe('scoreTrack', () => {
     // Pesos PREF: 0.30 + 0.25 + 0.10 + 0.35 = 1.00.
     // Track perfecto = cadencia 1, energy 1, valence 1, genero matched 1.
     const t = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['edm'] });
-    expect(scoreTrack(t, z3, ['edm'])).toBeCloseTo(1.0, 5);
+    expect(scoreTrack(t, z3, ['electronic'])).toBeCloseTo(1.0, 5);
   });
 
   it('reweight con preferencias: el peso de genero supera al de cadencia perdida', () => {
-    // Track A: cadencia mediocre pero genero preferido.
-    //   cad ~0.5 (a media via entre midpoint y borde), energy 1, valence 1, genre 1
-    //   = 0.30*0.5 + 0.25*1 + 0.10*1 + 0.35*1 = 0.15 + 0.25 + 0.10 + 0.35 = 0.85
-    // Track B: cadencia perfecta pero genero NO preferido (resto identico).
-    //   cad 1, energy 1, valence 1, genre 0
-    //   = 0.30*1 + 0.25*1 + 0.10*1 + 0.35*0 = 0.30 + 0.25 + 0.10 + 0 = 0.65
-    // El track A debe ganar: 0.85 > 0.65. La preferencia compensa la cadencia.
     const trackA = track({ tempoBpm: 85, energy: 0.7, valence: 0.55, genres: ['edm'] });
     const trackB = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['rock'] });
-    const scoreA = scoreTrack(trackA, z3, ['edm']);
-    const scoreB = scoreTrack(trackB, z3, ['edm']);
+    const scoreA = scoreTrack(trackA, z3, ['electronic']);
+    const scoreB = scoreTrack(trackB, z3, ['electronic']);
     expect(scoreA).toBeGreaterThan(scoreB);
+  });
+
+  it('preferredGenres expande de macro a tags: marcar "house" matchea cualquier sub-house', () => {
+    // Si el usuario marca el macro 'house', un track con tag 'tropical house'
+    // debe puntuar como matched (1), no como no-matched (0).
+    const tropical = track({
+      tempoBpm: 80,
+      energy: 0.7,
+      valence: 0.55,
+      genres: ['tropical house'],
+    });
+    const noHouse = track({
+      tempoBpm: 80,
+      energy: 0.7,
+      valence: 0.55,
+      genres: ['rock'],
+    });
+    const diff = scoreTrack(tropical, z3, ['house']) - scoreTrack(noHouse, z3, ['house']);
+    expect(diff).toBeCloseTo(0.35, 2);
+  });
+
+  it('compatibilidad: tag literal en preferredGenres se trata como antes', () => {
+    // Datos antiguos en storage podian guardar tags directos. El motor los
+    // sigue tratando como literales para no romper la transicion.
+    const matched = track({
+      tempoBpm: 80,
+      energy: 0.7,
+      valence: 0.55,
+      genres: ['edm-tag-raro'],
+    });
+    const score = scoreTrack(matched, z3, ['edm-tag-raro']);
+    // Con un literal cualquiera el match aplica via fallback de tag literal.
+    expect(score).toBeGreaterThan(0.9);
   });
 
   it('cadencia en el borde (90 rpm 1:1) y energy/valence lejos: score bajo', () => {

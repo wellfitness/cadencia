@@ -56,19 +56,26 @@ describe('computeGenreCoverage', () => {
     expect(result).toEqual([]);
   });
 
-  it('un track 80 BPM con genero rock cubre Z2 flat (1:1)', () => {
+  it('tracks con tags solo de macros desconocidos devuelve cobertura vacia', () => {
+    const t = track({ uri: 'spotify:track:1', genres: ['jazz'], tempoBpm: 80 });
+    const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');
+    expect(result).toEqual([]);
+  });
+
+  it('un track 80 BPM con tag rock cubre Z2 flat (1:1) bajo macro rock', () => {
     const t = track({ uri: 'spotify:track:1', genres: ['rock'], tempoBpm: 80 });
     const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');
     expect(result).toHaveLength(1);
     expect(result[0]?.genre).toBe('rock');
+    expect(result[0]?.label).toBe('Rock');
     expect(result[0]?.totalTracks).toBe(1);
     expect(result[0]?.cells[0]?.candidateCount).toBe(1);
   });
 
-  it('track 160 BPM cubre Z2 flat via 2:1 half-time bike', () => {
-    // Z2 flat bike: cadenceMin=70, cadenceMax=90. 1:1 → [70,90], 2:1 → [140,180].
+  it('track 160 BPM con tag edm cubre Z2 flat via 2:1 half-time bajo macro electronic', () => {
     const t = track({ uri: 'spotify:track:1', genres: ['edm'], tempoBpm: 160 });
     const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');
+    expect(result[0]?.genre).toBe('electronic');
     expect(result[0]?.cells[0]?.candidateCount).toBe(1);
   });
 
@@ -78,25 +85,25 @@ describe('computeGenreCoverage', () => {
     expect(result[0]?.cells[0]?.candidateCount).toBe(0);
   });
 
-  it('respeta el limite topN', () => {
-    const tracks: Track[] = [
-      track({ uri: 'spotify:track:1', genres: ['a'], tempoBpm: 80 }),
-      track({ uri: 'spotify:track:2', genres: ['b'], tempoBpm: 80 }),
-      track({ uri: 'spotify:track:3', genres: ['c'], tempoBpm: 80 }),
-    ];
-    const result = computeGenreCoverage(
-      tracks,
-      [{ zone: 2, cadenceProfile: 'flat' }],
-      'bike',
-      2,
-    );
-    expect(result).toHaveLength(2);
-  });
-
-  it('un track con multiples generos cuenta en cada uno', () => {
+  it('un track con varios tags del mismo macro cuenta UNA sola vez', () => {
+    // Ambos tags caen en el macro rock — debe contar 1, no 2.
     const t = track({
       uri: 'spotify:track:1',
-      genres: ['rock', 'classic rock'],
+      genres: ['rock', 'rock clásico'],
+      tempoBpm: 80,
+    });
+    const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');
+    expect(result).toHaveLength(1);
+    expect(result[0]?.genre).toBe('rock');
+    expect(result[0]?.totalTracks).toBe(1);
+    expect(result[0]?.cells[0]?.candidateCount).toBe(1);
+  });
+
+  it('un track con tags de macros distintos cuenta una vez en cada macro', () => {
+    // 'edm' → electronic, 'rock' → rock — el track aparece en ambos.
+    const t = track({
+      uri: 'spotify:track:1',
+      genres: ['edm', 'rock'],
       tempoBpm: 80,
     });
     const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');

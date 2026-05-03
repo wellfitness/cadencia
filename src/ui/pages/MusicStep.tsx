@@ -7,7 +7,7 @@ import {
   type PoolCoverage,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import { getTopGenres, parseTrackCsv, type Track } from '@core/tracks';
+import { getTopMacroGenres, parseTrackCsv, type Track } from '@core/tracks';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
@@ -95,11 +95,11 @@ export function MusicStep({
   // Default 'bike' por seguridad si la lista esta vacia.
   const sport = segments[0]?.sport ?? 'bike';
 
-  // Top generos del catalogo activo + cobertura por zona segun la sesion
-  // actual. Se muestran en una card informativa para que el usuario vea que
-  // tiene a mano antes de marcar preferencias en /preferencias.
-  const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
-  const genreCoverage = useGenreCoverage(tracks, segments, sport, 12);
+  // Top macro-generos del catalogo activo + cobertura por zona segun la
+  // sesion actual. Se muestran en una card informativa para que el usuario
+  // vea que tiene a mano antes de marcar preferencias en /preferencias.
+  const topGenres = useMemo(() => getTopMacroGenres(tracks), [tracks]);
+  const genreCoverage = useGenreCoverage(tracks, segments, sport);
 
   // Lista efectiva renderizada: si App aun no ha calculado el matching base
   // (matched === null en el primer mount tras procesar la ruta), mostramos

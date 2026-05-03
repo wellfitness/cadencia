@@ -15,7 +15,7 @@ import { expandRecurrences, type EventInstance } from '@core/calendar';
 import type { SavedSession } from '@core/sync/types';
 import { navigateInApp } from '@ui/utils/navigation';
 import { BIKE_TYPE_LABELS } from '@core/power';
-import { getTopGenres, loadNativeTracks } from '@core/tracks';
+import { getTopMacroGenres, loadNativeTracks, migrateLegacyGenres } from '@core/tracks';
 import { EMPTY_PREFERENCES, type MatchPreferences } from '@core/matching';
 import { useGenreCoverage } from '@ui/hooks/useGenreCoverage';
 import {
@@ -676,7 +676,7 @@ function CatalogSection({ data }: SectionProps): JSX.Element {
     ],
     [uploadedLists],
   );
-  const topGenres = useMemo(() => getTopGenres(allTracks, 12), [allTracks]);
+  const topGenres = useMemo(() => getTopMacroGenres(allTracks), [allTracks]);
   // Sin sesion activa, usamos la rejilla canonica de bike (8 combos).
   // En run la cobertura se mostraria igual pero la pagina /preferencias
   // sirve a ambos deportes y bike es el caso mas comun. Trade-off aceptado.
@@ -706,7 +706,7 @@ function CatalogSection({ data }: SectionProps): JSX.Element {
           </p>
           <GenrePills
             availableGenres={topGenres}
-            selectedGenres={prefs.preferredGenres}
+            selectedGenres={migrateLegacyGenres(prefs.preferredGenres)}
             onChange={handleGenresChange}
             coverage={genreCoverage}
           />

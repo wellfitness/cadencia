@@ -1,3 +1,4 @@
+import { expandMacroToTags, isValidMacroId } from '../tracks/genreCategories';
 import type { Track } from '../tracks/types';
 import type { ZoneMusicCriteria } from './types';
 import { getAlternativeBpmRange } from './zoneCriteria';
@@ -107,10 +108,24 @@ export function scoreTrack(
   const valenceScore = Math.pow(Math.max(0, 1 - valenceDist), 2);
 
   // === GENRE ===
+  // `preferredGenres` son macro-IDs (`'house'`, `'rock'`, ...). Expandimos
+  // a sus tags concretos de Spotify y comprobamos si el track lleva al
+  // menos uno de esos tags. Por compatibilidad hacia atras: si un valor
+  // no es macro-ID valido, lo tratamos como tag literal — esto cubre
+  // datos antiguos en sessionStorage o llegados de Drive desde versiones
+  // previas, hasta que el motor de migracion los limpie.
+  const expandedTags = new Set<string>();
+  for (const pref of preferredGenres) {
+    if (isValidMacroId(pref)) {
+      for (const t of expandMacroToTags(pref)) expandedTags.add(t);
+    } else {
+      expandedTags.add(pref);
+    }
+  }
   const genreScore =
     preferredGenres.length === 0
       ? NEUTRAL_GENRE_SCORE
-      : track.genres.some((g) => preferredGenres.includes(g))
+      : track.genres.some((g) => expandedTags.has(g))
         ? 1
         : 0;
 
