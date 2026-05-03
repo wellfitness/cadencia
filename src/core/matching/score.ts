@@ -3,14 +3,29 @@ import type { ZoneMusicCriteria } from './types';
 import { getAlternativeBpmRange } from './zoneCriteria';
 
 /**
- * Pesos del score. Todos suman 1.00. Cadencia y energy son los factores
- * principales (pedaleo y intensidad sonora). Valence (positividad emocional)
- * y genero preferido son discriminadores secundarios.
+ * Pesos del score. Todos suman 1.00 en cada juego. Hay dos juegos:
+ *
+ *  - BASE (sin preferencias de genero): cadencia y energy dominan, genero
+ *    queda como discriminador secundario aplicado de forma neutra (0.5).
+ *  - PREF (con preferencias activas): el peso del genero sube a 0.35 para
+ *    combatir el sesgo estructural del catalogo. Cuando un catalogo bundled
+ *    concentra un genero en BPM dulce de varias zonas (ej. rock clasico en
+ *    bike Z1-Z4 flat), el reparto base 0.20 no basta para que la preferencia
+ *    explicita del usuario gane el ranking. Subimos genero quitando peso a
+ *    valence (mas fino, menos critico) y a energy (sigue dominando a 0.25).
+ *
+ * Ambas variantes mantienen cadencia en 0.30: la sincronia tempo<->esfuerzo
+ * es el unico factor con evidencia empirica fuerte (Bacon et al. 2012).
  */
-const W_CADENCE = 0.3;
-const W_ENERGY = 0.3;
-const W_VALENCE = 0.2;
-const W_GENRE = 0.2;
+const W_CADENCE_BASE = 0.3;
+const W_ENERGY_BASE = 0.3;
+const W_VALENCE_BASE = 0.2;
+const W_GENRE_BASE = 0.2;
+
+const W_CADENCE_PREF = 0.3;
+const W_ENERGY_PREF = 0.25;
+const W_VALENCE_PREF = 0.1;
+const W_GENRE_PREF = 0.35;
 
 const NEUTRAL_GENRE_SCORE = 0.5; // sin preferencias o catalogo sin generos
 
@@ -42,6 +57,14 @@ const USER_SOURCE_BONUS = 0.08;
  *                   ideal de positividad emocional.
  *  - genreScore:    1 si el track matchea preferenciaUsuario, 0 si no
  *                   matchea, 0.5 si lista de preferidos vacia.
+ *
+ * Pesos:
+ *  - Sin preferencias: cadencia 0.30, energy 0.30, valence 0.20, genero 0.20
+ *    (con genreScore=0.5 neutro, el componente genero aporta 0.10 fijo).
+ *  - Con preferencias: cadencia 0.30, energy 0.25, valence 0.10, genero 0.35.
+ *    El peso del genero sube para que la preferencia explicita del usuario
+ *    gane el ranking aunque el catalogo este sesgado a otro genero en la
+ *    misma banda BPM.
  *
  * El motor escoge en cada slot el track con mayor score que no este ya
  * usado (regla cero repeticiones).
@@ -98,11 +121,19 @@ export function scoreTrack(
   // ranking: solo desempata cuando coexisten origenes distintos ("Combinar").
   const sourceBonus = track.source === 'user' ? USER_SOURCE_BONUS : 0;
 
+  // Selecciona el juego de pesos: BASE si no hay preferencias, PREF si las hay.
+  // Suma siempre 1.00 en cada juego.
+  const hasPrefs = preferredGenres.length > 0;
+  const wCadence = hasPrefs ? W_CADENCE_PREF : W_CADENCE_BASE;
+  const wEnergy = hasPrefs ? W_ENERGY_PREF : W_ENERGY_BASE;
+  const wValence = hasPrefs ? W_VALENCE_PREF : W_VALENCE_BASE;
+  const wGenre = hasPrefs ? W_GENRE_PREF : W_GENRE_BASE;
+
   return (
-    W_CADENCE * cadenceScore +
-    W_ENERGY * energyScore +
-    W_VALENCE * valenceScore +
-    W_GENRE * genreScore +
+    wCadence * cadenceScore +
+    wEnergy * energyScore +
+    wValence * valenceScore +
+    wGenre * genreScore +
     sourceBonus
   );
 }

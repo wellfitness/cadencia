@@ -23,7 +23,10 @@ function track(overrides: Partial<Track> = {}): Track {
 describe('scoreTrack', () => {
   // Z3 flat: cadencia 70-90 rpm. Midpoint 1:1 = 80, midpoint 2:1 = 160.
   // energyIdeal = 0.70, valenceIdeal = 0.55.
-  // Pesos: cadencia 0.30, energy 0.30, valence 0.20, genre 0.20.
+  // Pesos sin preferencias (BASE): cadencia 0.30, energy 0.30, valence 0.20,
+  //                                 genre 0.20 (con genreScore=0.5 neutro).
+  // Pesos con preferencias (PREF): cadencia 0.30, energy 0.25, valence 0.10,
+  //                                 genre 0.35.
   const z3 = getZoneCriteria(3, 'flat', 'bike');
 
   it('track perfecto en todas las dimensiones puntua cerca de 1', () => {
@@ -45,11 +48,35 @@ describe('scoreTrack', () => {
     expect(scoreTrack(t1, z3, [])).toBeCloseTo(scoreTrack(t2, z3, []), 2);
   });
 
-  it('genero matcheado vs no matcheado: diferencia exactamente W_GENRE = 0.20', () => {
+  it('genero matcheado vs no matcheado: diferencia exactamente W_GENRE_PREF = 0.35', () => {
+    // Con preferencias activas el peso del genero sube de 0.20 a 0.35 para
+    // que la eleccion explicita pese mas que el sesgo del catalogo.
     const matched = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['edm'] });
     const unmatched = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['classical'] });
     const diff = scoreTrack(matched, z3, ['edm']) - scoreTrack(unmatched, z3, ['edm']);
-    expect(diff).toBeCloseTo(0.2, 2);
+    expect(diff).toBeCloseTo(0.35, 2);
+  });
+
+  it('reweight con preferencias activas: track perfecto suma 1.00 con pesos PREF', () => {
+    // Pesos PREF: 0.30 + 0.25 + 0.10 + 0.35 = 1.00.
+    // Track perfecto = cadencia 1, energy 1, valence 1, genero matched 1.
+    const t = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['edm'] });
+    expect(scoreTrack(t, z3, ['edm'])).toBeCloseTo(1.0, 5);
+  });
+
+  it('reweight con preferencias: el peso de genero supera al de cadencia perdida', () => {
+    // Track A: cadencia mediocre pero genero preferido.
+    //   cad ~0.5 (a media via entre midpoint y borde), energy 1, valence 1, genre 1
+    //   = 0.30*0.5 + 0.25*1 + 0.10*1 + 0.35*1 = 0.15 + 0.25 + 0.10 + 0.35 = 0.85
+    // Track B: cadencia perfecta pero genero NO preferido (resto identico).
+    //   cad 1, energy 1, valence 1, genre 0
+    //   = 0.30*1 + 0.25*1 + 0.10*1 + 0.35*0 = 0.30 + 0.25 + 0.10 + 0 = 0.65
+    // El track A debe ganar: 0.85 > 0.65. La preferencia compensa la cadencia.
+    const trackA = track({ tempoBpm: 85, energy: 0.7, valence: 0.55, genres: ['edm'] });
+    const trackB = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, genres: ['rock'] });
+    const scoreA = scoreTrack(trackA, z3, ['edm']);
+    const scoreB = scoreTrack(trackB, z3, ['edm']);
+    expect(scoreA).toBeGreaterThan(scoreB);
   });
 
   it('cadencia en el borde (90 rpm 1:1) y energy/valence lejos: score bajo', () => {
