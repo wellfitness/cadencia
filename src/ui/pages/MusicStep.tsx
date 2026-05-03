@@ -7,14 +7,16 @@ import {
   type PoolCoverage,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
-import { parseTrackCsv, type Track } from '@core/tracks';
+import { getTopGenres, parseTrackCsv, type Track } from '@core/tracks';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
 import { Button } from '@ui/components/Button';
 import { Card } from '@ui/components/Card';
 import { ExportifyHowto } from '@ui/components/ExportifyHowto';
 import { FileDropzone } from '@ui/components/FileDropzone';
+import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistPreviewRow } from '@ui/components/PlaylistPreviewRow';
+import { useGenreCoverage } from '@ui/hooks/useGenreCoverage';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
 import type { MusicSourceMode } from '@ui/state/wizardStorage';
 import { navigateInApp } from '@ui/utils/navigation';
@@ -89,6 +91,16 @@ export function MusicStep({
     [segments, tracks, preferences],
   );
 
+  // Sport derivado de los segmentos (todos los segments comparten sport).
+  // Default 'bike' por seguridad si la lista esta vacia.
+  const sport = segments[0]?.sport ?? 'bike';
+
+  // Top generos del catalogo activo + cobertura por zona segun la sesion
+  // actual. Se muestran en una card informativa para que el usuario vea que
+  // tiene a mano antes de marcar preferencias en /preferencias.
+  const topGenres = useMemo(() => getTopGenres(tracks, 12), [tracks]);
+  const genreCoverage = useGenreCoverage(tracks, segments, sport, 12);
+
   // Lista efectiva renderizada: si App aun no ha calculado el matching base
   // (matched === null en el primer mount tras procesar la ruta), mostramos
   // lista vacia hasta que el effect de App dispare. Es un caso fugaz.
@@ -153,6 +165,13 @@ export function MusicStep({
             onChange={onSourceModeChange}
             title="Combinar ambas"
             desc="La biblioteca predefinida más tus CSV. Damos preferencia a tus canciones cuando encajan; si te quedas corto, completamos con la predefinida."
+          />
+          <SourceRadio
+            value="predefined"
+            current={sourceMode}
+            onChange={onSourceModeChange}
+            title="Solo predefinida"
+            desc="La biblioteca curada de Cadencia. Útil para descubrir géneros sin mezclar con tus listas."
           />
           <SourceRadio
             value="mine"
@@ -269,6 +288,34 @@ export function MusicStep({
       </Card>
 
       <PreferencesSummary preferences={preferences} />
+
+      {topGenres.length > 0 && (
+        <Card title="Géneros disponibles para esta sesión" titleIcon="palette">
+          <p className="text-sm text-gris-600 mb-3">
+            Tu fuente actual ofrece <strong className="text-gris-800">{topGenres.length}</strong>{' '}
+            géneros principales. La rejilla bajo cada uno muestra cuántas canciones tiene
+            por zona en tu sesión: gris = ninguna, naranja = pocas (1-2), turquesa = ≥3.
+            Para marcar tus favoritos, ve a{' '}
+            <button
+              type="button"
+              onClick={() => navigateInApp('/preferencias')}
+              className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline font-medium"
+            >
+              tus preferencias
+            </button>
+            .
+          </p>
+          <GenrePills
+            availableGenres={topGenres}
+            selectedGenres={preferences.preferredGenres}
+            onChange={() => {
+              // Read-only desde MusicStep — la edicion vive en /preferencias.
+            }}
+            interactive={false}
+            coverage={genreCoverage}
+          />
+        </Card>
+      )}
 
       {!coverage.ok && (
         <PoolCoverageWarning

@@ -17,6 +17,7 @@ import { navigateInApp } from '@ui/utils/navigation';
 import { BIKE_TYPE_LABELS } from '@core/power';
 import { getTopGenres, loadNativeTracks } from '@core/tracks';
 import { EMPTY_PREFERENCES, type MatchPreferences } from '@core/matching';
+import { useGenreCoverage } from '@ui/hooks/useGenreCoverage';
 import {
   isPersistentStorageEnabled,
   loadUserInputsFromSession,
@@ -665,17 +666,21 @@ function CatalogSection({ data }: SectionProps): JSX.Element {
   const dismissedCount = data.dismissedTrackUris.length;
   const excludedCount = data.nativeCatalogPrefs?.excludedUris.length ?? 0;
 
-  // Top 12 generos del pool actual (nativo + tus listas, dedup por
-  // implicito ya que getTopGenres trabaja sobre la lista que le pases).
-  // Memo unico por mount: loadNativeTracks esta cacheado a nivel modulo
-  // y los uploaded ya estan hidratados.
-  const topGenres = useMemo(() => {
-    const allTracks = [
+  // Pool unificado para el calculo de generos y cobertura. Memo unico por
+  // mount: loadNativeTracks esta cacheado a nivel modulo y los uploaded ya
+  // estan hidratados.
+  const allTracks = useMemo(
+    () => [
       ...loadNativeTracks(),
       ...uploadedLists.flatMap((l) => [...l.tracks]),
-    ];
-    return getTopGenres(allTracks, 12);
-  }, [uploadedLists]);
+    ],
+    [uploadedLists],
+  );
+  const topGenres = useMemo(() => getTopGenres(allTracks, 12), [allTracks]);
+  // Sin sesion activa, usamos la rejilla canonica de bike (8 combos).
+  // En run la cobertura se mostraria igual pero la pagina /preferencias
+  // sirve a ambos deportes y bike es el caso mas comun. Trade-off aceptado.
+  const genreCoverage = useGenreCoverage(allTracks, undefined, 'bike', 12);
 
   const prefs: MatchPreferences = data.musicPreferences ?? EMPTY_PREFERENCES;
 
@@ -703,6 +708,7 @@ function CatalogSection({ data }: SectionProps): JSX.Element {
             availableGenres={topGenres}
             selectedGenres={prefs.preferredGenres}
             onChange={handleGenresChange}
+            coverage={genreCoverage}
           />
         </div>
         <label className="flex items-start gap-3 cursor-pointer min-h-[44px]">

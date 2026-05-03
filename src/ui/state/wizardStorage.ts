@@ -15,13 +15,18 @@ import type { ClassifiedSegment, EditableSessionPlan, RouteMeta } from '@core/se
 export type RouteSourceType = 'gpx' | 'session';
 
 /**
- * Modos vivos de fuente de catalogo. La opcion "solo predefinida" se retiro
- * del UI: con catalogo predefinido por defecto, "Combinar ambas" cubre el
- * mismo caso cuando el usuario no sube CSVs. Si el sessionStorage de un
- * usuario antiguo trae 'predefined', `loadWizardState` lo coerce a 'both'
- * antes de devolverlo.
+ * Modos de fuente de catalogo:
+ *   - 'predefined': solo el catalogo bundled (`all.csv`). El usuario puede
+ *     evaluar el catalogo curado de forma aislada, util para descubrir
+ *     generos sin la influencia de sus listas propias.
+ *   - 'mine': solo CSVs subidos por el usuario. Maxima personalizacion.
+ *   - 'both': merge de predefinido + mios (default).
+ *
+ * Esta opcion estuvo retirada brevemente y se reintrodujo cuando el
+ * catalogo bundled se curo. No hay coercion legacy: los tres valores son
+ * validos en sessionStorage.
  */
-export type MusicSourceMode = 'mine' | 'both';
+export type MusicSourceMode = 'mine' | 'both' | 'predefined';
 
 /**
  * Contexto inyectado al wizard cuando el usuario carga una entrada outdoor
@@ -87,25 +92,12 @@ export function loadWizardState(): WizardState | null {
     if (typeof sessionStorage === 'undefined') return null;
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw === null) return null;
-    const parsedRaw: unknown = JSON.parse(raw);
-    // Coercion de modo retirado: 'predefined' (legacy) -> 'both'. Lo hacemos
-    // sobre el objeto crudo antes del type guard, porque `isWizardState`
-    // rechaza ahora 'predefined' como valor valido.
-    const coerced = coerceLegacyMusicSourceMode(parsedRaw);
-    if (!isWizardState(coerced)) return null;
-    return coerced;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isWizardState(parsed)) return null;
+    return parsed;
   } catch {
     return null;
   }
-}
-
-function coerceLegacyMusicSourceMode(value: unknown): unknown {
-  if (typeof value !== 'object' || value === null) return value;
-  const v = value as Record<string, unknown>;
-  if (v['musicSourceMode'] === 'predefined') {
-    return { ...v, musicSourceMode: 'both' };
-  }
-  return value;
 }
 
 export function clearWizardState(): void {
@@ -138,7 +130,8 @@ function isWizardState(value: unknown): value is WizardState {
       typeof v['activeTemplateId'] === 'string') &&
     (v['musicSourceMode'] === undefined ||
       v['musicSourceMode'] === 'mine' ||
-      v['musicSourceMode'] === 'both') &&
+      v['musicSourceMode'] === 'both' ||
+      v['musicSourceMode'] === 'predefined') &&
     (v['replacedIndices'] === undefined || Array.isArray(v['replacedIndices'])) &&
     (v['playlistName'] === undefined || typeof v['playlistName'] === 'string') &&
     (v['plannedRouteContext'] === undefined ||

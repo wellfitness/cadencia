@@ -356,7 +356,10 @@ function WizardApp(): JSX.Element {
   // el usuario no tenga que reescribirlo si vuelve a Datos/Musica y vuelve.
   const [playlistName, setPlaylistName] = useState<string>(persisted?.playlistName ?? '');
 
-  // Catalogo activo del paso Musica (solo CSVs propios o ambos combinados).
+  // Catalogo activo del paso Musica. Tres modos:
+  //   - 'predefined': solo el catalogo bundled (ignora userTracks).
+  //   - 'mine': solo CSVs propios subidos en runtime.
+  //   - 'both': merge predefinido + propios (default).
   // Filtra dismissedTrackUris (descartes globales desde ResultStep) y
   // excludedUris del nativo (denylist del editor de catalogo). Una sola
   // fuente de verdad que alimenta tanto el matching como el dropdown de
@@ -366,10 +369,19 @@ function WizardApp(): JSX.Element {
     const excludedNative = new Set(cadenciaData.nativeCatalogPrefs?.excludedUris ?? []);
     const userTracks: Track[] = uploadedCsvs.flatMap((c) => [...c.tracks]);
     const native = loadNativeTracks().filter((t) => !excludedNative.has(t.uri));
-    const merged =
-      musicSourceMode === 'mine'
-        ? dedupeByUri(userTracks)
-        : dedupeByUri([...native, ...userTracks]);
+    let merged: readonly Track[];
+    switch (musicSourceMode) {
+      case 'mine':
+        merged = dedupeByUri(userTracks);
+        break;
+      case 'predefined':
+        merged = dedupeByUri(native);
+        break;
+      case 'both':
+      default:
+        merged = dedupeByUri([...native, ...userTracks]);
+        break;
+    }
     return merged.filter((t) => !dismissed.has(t.uri));
   }, [
     musicSourceMode,
