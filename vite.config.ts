@@ -8,6 +8,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        // El bundle principal supera los 2 MiB por defecto desde la expansion
+        // del catalogo a 10.000 tracks (CSV bundled). Subimos el limite a
+        // 5 MiB para que el SW lo precachee igualmente — sin esto la PWA no
+        // funcionaria offline tras la primera carga.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+      },
       includeAssets: [
         'favicon-16x16.png',
         'favicon-32x32.png',
