@@ -133,44 +133,48 @@ export function PlaylistTrackRow({
           <span className="text-xs text-gris-500 tabular-nums">
             {Math.round(track.tempoBpm)} bpm
           </span>
-          {spotifyWebUrl !== null && (
-            <ExternalLink
-              href={spotifyWebUrl}
-              className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-turquesa-700 hover:text-turquesa-800 hover:underline no-underline"
-              aria-label={`Abrir ${track.name} en Spotify`}
-              title="Abrir en Spotify"
-            >
-              Abrir en Spotify
-              <MaterialIcon name="open_in_new" size="small" decorative />
-            </ExternalLink>
-          )}
         </div>
       </div>
-      {showPicker && (
+      {(showPicker || spotifyWebUrl !== null) && (
         <div className="mt-2 pt-2 border-t border-gris-100 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">
-            <AlternativesPicker
-              alternatives={alternatives ?? []}
-              onSelect={onReplaceWith}
-              rowIndex={index}
-            />
-            <RandomPickButton
-              alternatives={alternatives ?? []}
-              onSelect={onReplaceWith}
-              rowIndex={index}
-            />
-            {onDismiss !== undefined && (
-              <Button
-                variant="secondary"
-                size="sm"
-                iconLeft="block"
-                onClick={() => onDismiss(track.uri, track.name)}
-                aria-label={`Descartar definitivamente ${track.name}`}
-                title="No la quiero en futuras playlists"
-                className="!text-rosa-600 hover:!bg-rosa-50 hover:!border-rosa-300"
+            {showPicker && (
+              <>
+                <AlternativesPicker
+                  alternatives={alternatives ?? []}
+                  onSelect={onReplaceWith}
+                  rowIndex={index}
+                />
+                <RandomPickButton
+                  alternatives={alternatives ?? []}
+                  onSelect={onReplaceWith}
+                  rowIndex={index}
+                />
+                {onDismiss !== undefined && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    iconLeft="block"
+                    onClick={() => onDismiss(track.uri, track.name)}
+                    aria-label={`Descartar definitivamente ${track.name}`}
+                    title="No la quiero en futuras playlists"
+                    className="!text-rosa-600 hover:!bg-rosa-50 hover:!border-rosa-300"
+                  >
+                    <span className="hidden sm:inline">No la quiero</span>
+                  </Button>
+                )}
+              </>
+            )}
+            {spotifyWebUrl !== null && (
+              <ExternalLink
+                href={spotifyWebUrl}
+                className="inline-flex items-center justify-center gap-2 font-semibold rounded-lg border-2 transition-all duration-200 ease-out bg-white text-gris-700 border-gris-300 hover:bg-gris-50 hover:border-gris-400 text-sm px-3 py-2 min-h-[36px] no-underline"
+                aria-label={`Abrir ${track.name} en Spotify`}
+                title="Abrir en Spotify"
               >
-                <span className="hidden sm:inline">No la quiero</span>
-              </Button>
+                <MaterialIcon name="open_in_new" size="small" decorative />
+                <span className="hidden sm:inline">Abrir</span>
+              </ExternalLink>
             )}
           </div>
           {qualityLabel && (
