@@ -989,7 +989,7 @@ function Footer(): JSX.Element {
           </a>
           <span aria-hidden className="text-gris-300">·</span>
           <a
-            href="https://opensource.org/licenses/MIT"
+            href="https://polyformproject.org/licenses/noncommercial/1.0.0"
             target="_blank"
             rel="noopener noreferrer"
             className="text-turquesa-700 hover:text-turquesa-800 underline-offset-2 hover:underline"

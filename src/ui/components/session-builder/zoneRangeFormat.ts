@@ -83,7 +83,7 @@ export function formatRecommendedCadenceForSport(
  * del deporte ni de los datos del usuario, solo de la zona Z1-Z6.
  *
  * El uso de comillas tipograficas «...» sigue la convencion del copy de
- * usuario del proyecto (CLAUDE.md, seccion "Open source colaborativo").
+ * usuario del proyecto (CLAUDE.md, seccion "Convenciones de codigo y copy").
  */
 export function formatZoneFeeling(zone: HeartRateZone): string {
   const feeling = getZoneFeeling(zone);

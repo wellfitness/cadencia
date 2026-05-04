@@ -264,14 +264,14 @@ export function SiteFooter(): JSX.Element {
       {/* Bottom bar */}
       <div className="max-w-6xl mx-auto mt-8 pt-6 border-t border-turquesa-400 text-center">
         <p className="text-sm text-white">
-          © 2026 MOVIMIENTO FUNCIONAL. Código abierto bajo{' '}
+          © 2026 MOVIMIENTO FUNCIONAL. Código fuente público (uso no comercial) bajo{' '}
           <a
             href="https://github.com/wellfitness/cadencia/blob/main/LICENSE"
             target="_blank"
             rel="noopener noreferrer"
             className="text-turquesa-400 hover:text-turquesa-300 hover:underline transition-colors"
           >
-            Licencia MIT
+            licencia PolyForm Noncommercial 1.0.0
           </a>
           .
         </p>

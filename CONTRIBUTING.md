@@ -1,76 +1,28 @@
 # Contributing to Cadencia
 
-¡Gracias por querer colaborar! Antes de abrir un PR lee esto.
+¡Gracias por tu interés en Cadencia!
 
 ---
 
-## Licencia
+## Issues bienvenidos, PRs cerrados
 
-Este proyecto se distribuye bajo **MIT License** (ver [LICENSE](./LICENSE)).
+Cadencia se distribuye como **código fuente público de uso no comercial** (licencia [PolyForm Noncommercial 1.0.0](./LICENSE)). El proyecto lo mantiene una sola autora con una visión específica del producto, así que las vías de colaboración son limitadas pero claras:
 
-Cualquier persona puede usar, modificar, redistribuir y contribuir al código
-libremente, incluido para uso comercial. La única condición es mantener el
-aviso de copyright original.
-
----
-
-## Developer Certificate of Origin (DCO)
-
-Para que el proyecto pueda mantenerse y eventualmente relicenciarse o usarse
-comercialmente por la autora, **todos los commits deben llevar la firma DCO**.
-
-DCO es un mecanismo simple por el que tú, como contributor, certificas que:
-
-1. Tienes derecho a aportar el código que envías.
-2. Aceptas que tu contribución se distribuya bajo la licencia del proyecto.
-
-El texto completo está en <https://developercertificate.org/>.
-
-### Cómo firmar tus commits
-
-Añade la flag `-s` (o `--signoff`) cada vez que hagas commit:
-
-```bash
-git commit -s -m "fix: corregir cálculo de pendiente en GPX parser"
-```
-
-Esto añade automáticamente al mensaje del commit:
-
-```
-Signed-off-by: Tu Nombre <tu@email.com>
-```
-
-Para no tener que recordarlo cada vez, configura git:
-
-```bash
-git config --global format.signoff true
-```
-
-Los PRs sin commits firmados no se mergean. Si te olvidas, puedes
-re-firmar con `git commit --amend -s` (o rebase signoff sobre todos los
-commits).
+- **Issues — bienvenidos.** Si encuentras un bug, quieres proponer una mejora o pedir una feature, abre uno en [GitHub Issues](https://github.com/wellfitness/cadencia/issues). Describe el caso de uso, el comportamiento esperado y el actual; si es un bug, añade pasos para reproducirlo.
+- **Forks personales — bienvenidos** para cualquier uso no comercial (estudio, hobby, adaptarlo a tu club ciclista, investigación). Mantén el aviso de copyright original.
+- **Pull requests externos — no se aceptan.** Mergear contribuciones bajo una licencia no comercial introduce fricciones legales (cesión de copyright, ambigüedad sobre derechos de la autora a relicenciar en el futuro) que no compensan el beneficio para un proyecto de este tamaño. Si tienes una idea concreta, ábrela como issue y la discutimos.
 
 ---
 
-## Antes de abrir un PR
+## Uso comercial
 
-1. `pnpm install`
-2. `pnpm typecheck` → 0 errores
-3. `pnpm lint` → 0 errores, 0 warnings
-4. `pnpm test:run` → todos los tests verdes
-5. Si tu cambio afecta lógica en `src/core/` → añade tests unitarios
-6. Si tu cambio afecta la UI → corre `pnpm test:e2e` y verifica visualmente
-
-El pre-commit hook de Husky corre `typecheck` + `lint` automáticamente.
-**Nunca uses `git commit --no-verify`**: si algo falla, arregla la causa.
+El uso, despliegue o modificación con fines comerciales (incluyendo SaaS, productos derivados de pago, integraciones en servicios comerciales, etc.) **requiere permiso expreso del autor**. Escribe a [movimientofuncional.net@gmail.com](mailto:movimientofuncional.net@gmail.com) describiendo el caso de uso.
 
 ---
 
 ## Reglas del proyecto
 
-Las reglas vinculantes (arquitectura, separación de capas, qué se puede y no
-se puede hacer) viven en [CLAUDE.md](./CLAUDE.md). Léelo antes de hacer
-cambios estructurales.
+Las reglas vinculantes (arquitectura, separación de capas, qué se puede y no se puede hacer) viven en [CLAUDE.md](./CLAUDE.md). Si abres un issue proponiendo un cambio estructural, léelo primero.
 
 Resumen rápido:
 
@@ -79,11 +31,3 @@ Resumen rápido:
 - Nada de `any` en TypeScript.
 - Identificadores de código en inglés, comentarios en español OK.
 - El motor de matching debe ser determinista.
-
----
-
-## Cómo proponer cambios grandes
-
-Antes de invertir tiempo en un cambio grande (nuevo módulo, refactor amplio,
-nueva integración), abre un **issue** describiendo qué quieres hacer y por qué.
-Ahorra trabajo a todos.

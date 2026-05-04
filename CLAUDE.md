@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Objetivo
 
-**Cadencia** — *disfruta del cardio a tu ritmo*. App **open source** (licencia MIT) que sincroniza música de Spotify con la intensidad de tus entrenamientos de cardio. Da soporte a dos deportes (**ciclismo** y **carrera**) y dos modalidades por deporte (outdoor desde GPX o indoor por bloques):
+**Cadencia** — *disfruta del cardio a tu ritmo*. App de **código fuente público y uso no comercial** (licencia PolyForm Noncommercial 1.0.0) que sincroniza música de Spotify con la intensidad de tus entrenamientos de cardio. Da soporte a dos deportes (**ciclismo** y **carrera**) y dos modalidades por deporte (outdoor desde GPX o indoor por bloques):
 
 - **Bike outdoor**: subes un GPX de tu ruta, la app estima la **potencia (vatios)** por segmentos (ecuación gravedad + rodadura + aerodinámica) y mapea cada segmento a su zona Z1-Z6.
 - **Bike indoor**: construyes una sesión de rodillo o spinning por bloques (calentamiento, intervalos, recuperación, sprints…) desde cero o partiendo de **plantillas científicas de ciclismo** (SIT, HIIT 10-20-30, Noruego 4×4, Z2…).
@@ -506,7 +506,7 @@ Scope: `playlist-modify-private`.
 
 ### Modelo BYOC ("Bring Your Own Client ID") — puro
 
-**Por qué este modelo y no Extended Quota Mode**: Spotify endureció Extended Quota Mode el **15-mayo-2025** y solo lo concede a **organizaciones legalmente registradas con ≥250.000 MAU + revenue verificable + servicio lanzado**. En paralelo, Development Mode quedó limitado a **5 testers por Client ID** (no 25 como decía la doc anterior). Esto crea un círculo vicioso imposible para apps indie: necesitas 250k MAU para crecer pero solo puedes mostrar la app a 4 personas más para conseguirlos. Cadencia es un proyecto open-source sin SL ni monetización, así que la única vía de uso público es **BYOC**: cada usuario crea SU PROPIO Client ID en `developer.spotify.com` (3 minutos, gratis) y lo pega en Cadencia. Cada usuario es entonces dueño de su propia cuota de Development Mode.
+**Por qué este modelo y no Extended Quota Mode**: Spotify endureció Extended Quota Mode el **15-mayo-2025** y solo lo concede a **organizaciones legalmente registradas con ≥250.000 MAU + revenue verificable + servicio lanzado**. En paralelo, Development Mode quedó limitado a **5 testers por Client ID** (no 25 como decía la doc anterior). Esto crea un círculo vicioso imposible para apps indie: necesitas 250k MAU para crecer pero solo puedes mostrar la app a 4 personas más para conseguirlos. Cadencia es un proyecto de código fuente público (uso no comercial) sin SL ni monetización, así que la única vía de uso público es **BYOC**: cada usuario crea SU PROPIO Client ID en `developer.spotify.com` (3 minutos, gratis) y lo pega en Cadencia. Cada usuario es entonces dueño de su propia cuota de Development Mode.
 
 Resolución del Client ID activo, en [src/integrations/spotify/clientId.ts](src/integrations/spotify/clientId.ts):
 
@@ -729,7 +729,7 @@ Si el usuario no tiene entradas, el badge se oculta. No hay notificaciones nativ
 2. **Cálculos físicos viven en `src/core/`** y no tocan React/DOM. Cada fórmula nueva entra con su test unitario.
 3. **Nada de `any`** en TypeScript. Si un tipo es genuinamente desconocido, `unknown` + narrowing explícito.
 4. **El motor de matching debe ser determinista**: misma entrada → misma salida.
-5. **Open source colaborativo**: nombres de variables, funciones y archivos en **inglés**. Comentarios y commits en **castellano** correcto (con ñ y tildes). En **copy de usuario** (UI, FAQs, artículos de ayuda) evitar anglicismos innecesarios — usar el equivalente castellano cuando exista:
+5. **Convenciones de código y copy**: nombres de variables, funciones y archivos en **inglés**. Comentarios y commits en **castellano** correcto (con ñ y tildes). En **copy de usuario** (UI, FAQs, artículos de ayuda) evitar anglicismos innecesarios — usar el equivalente castellano cuando exista:
 
    | No usar | Usar |
    |---|---|
@@ -749,9 +749,9 @@ Si el usuario no tiene entradas, el badge se oculta. No hay notificaciones nativ
 
 ## Licencia y contribuciones
 
-- Licencia: **MIT** ([LICENSE](./LICENSE)). Uso libre incluido el comercial; la única condición es mantener el aviso de copyright.
-- Contribuciones externas: requieren **firma DCO** (`git commit -s`) en cada commit. Detalles en [CONTRIBUTING.md](./CONTRIBUTING.md). Sin DCO no se mergea.
-- Las dependencias instaladas son todas licencias permisivas (MIT, ISC, Apache-2.0, BSD). Si se va a añadir una dependencia con licencia copyleft fuerte (GPL, AGPL), parar y preguntar primero.
+- Licencia: **PolyForm Noncommercial 1.0.0** ([LICENSE](./LICENSE)). Uso, modificación y redistribución libres **para fines no comerciales** (personal, estudio, hobby, investigación, organizaciones sin ánimo de lucro). Uso comercial requiere permiso expreso del autor (escribir a movimientofuncional.net@gmail.com). Mantener el aviso `Required Notice: Copyright (c) 2026 Elena Cruces — Movimiento Funcional` en cualquier copia o trabajo derivado.
+- Contribuciones externas: **no se aceptan pull requests**. Issues bienvenidos en GitHub para reportar bugs o proponer mejoras. Ver [CONTRIBUTING.md](./CONTRIBUTING.md).
+- Las dependencias instaladas son todas licencias permisivas (MIT, ISC, Apache-2.0, BSD), compatibles con redistribución bajo PolyForm Noncommercial. Si se va a añadir una dependencia con licencia copyleft fuerte (GPL, AGPL) o con cláusulas anti-comerciales propias, parar y preguntar primero.
 
 ---
 

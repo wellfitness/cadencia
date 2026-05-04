@@ -363,7 +363,7 @@ function StepIntro(): JSX.Element {
   return (
     <div className="space-y-4 max-w-prose">
       <p className="text-base text-gris-700">
-        Cadencia es una herramienta <strong>open source</strong> que se conecta a tu
+        Cadencia es una herramienta <strong>gratuita y con código fuente público</strong> que se conecta a tu
         Spotify usando un código gratuito que Spotify llama <strong>Client ID</strong>.
         Crearlo te lleva unos <strong>3 minutos</strong> y solo lo haces una vez en la
         vida.

@@ -4,7 +4,7 @@
 
 Webapp que sincroniza música de Spotify con la intensidad de tu cardio, para corredores y ciclistas. Outdoor desde un GPX o indoor desde sesiones por bloques.
 
-> **Open source, abierto a colaboradores.** No hay backend, no hay base de datos, no hay registros: toda la lógica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist).
+> **Código fuente público, uso no comercial.** No hay backend, no hay base de datos, no hay registros: toda la lógica corre en cliente. Solo Spotify usa OAuth (PKCE, en el momento de crear la playlist).
 
 ## Qué puedes hacer
 
@@ -62,7 +62,7 @@ Nada relacionado con Spotify. El código no lee `VITE_SPOTIFY_CLIENT_ID`, no hay
 
 ## Self-hosting
 
-Cadencia es 100% client-side y MIT. Puedes hostearla donde quieras. Pasos:
+Cadencia es 100% client-side. Puedes hostearla donde quieras **para uso no comercial** (ver [LICENSE](./LICENSE)). Pasos:
 
 1. `git clone` este repo.
 2. `cp .env.example .env.local` y, si quieres, configura `VITE_GOOGLE_CLIENT_ID` para activar la sincronización opcional con Drive (carpeta `appdata` privada del usuario). Para Spotify no hay variable que configurar.
@@ -81,10 +81,10 @@ Para guías de contribución y reglas vinculantes del proyecto ver [CLAUDE.md](.
 
 ## Licencia
 
-[MIT License](./LICENSE).
+[PolyForm Noncommercial License 1.0.0](./LICENSE).
 
-Puedes usar, modificar y redistribuir el código libremente, incluido para uso comercial. La única condición es mantener el aviso de copyright original.
+Puedes usar, modificar y redistribuir el código libremente **para fines no comerciales** (uso personal, estudio, hobby, investigación, organizaciones sin ánimo de lucro). El uso comercial requiere permiso expreso del autor — escribe a [movimientofuncional.net@gmail.com](mailto:movimientofuncional.net@gmail.com). Mantén el aviso de copyright original en cualquier copia o trabajo derivado.
 
 ## Contribuir
 
-Lee [CONTRIBUTING.md](./CONTRIBUTING.md) — todos los commits deben firmarse con DCO (`git commit -s`).
+**Issues bienvenidos, pull requests cerrados.** Si encuentras un bug o quieres proponer una mejora, abre un issue en GitHub. Detalles en [CONTRIBUTING.md](./CONTRIBUTING.md).
