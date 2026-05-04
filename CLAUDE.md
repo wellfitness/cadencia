@@ -504,6 +504,22 @@ Scope: `playlist-modify-private`.
 
 > **Nota — rename feb-2026 de Spotify**: los endpoints antiguos `POST /v1/users/{user_id}/playlists` y `POST /v1/playlists/{id}/tracks` fueron retirados en febrero de 2026 y devuelven **403 silencioso** (sin razón, sin error legible). Los endpoints actuales son los listados arriba: `/me/playlists` para crear y `/items` para añadir tracks (renombrado para soportar episodios de podcast). Si en algún momento algo devuelve 403 en el OAuth flow después de autenticar correctamente, este es el primer sospechoso.
 
+### CSP necesario para el embed de previews Spotify
+
+El componente `TrackPreviewButton` usa la **IFrame Embed API** de Spotify (`embedController.ts`) para reproducir previews de 30 s sin OAuth. El CSP estricto del `.htaccess` debe abrir varios dominios; si falta cualquiera, el botón falla **solo en producción** (en local Vite no aplica los headers del `.htaccess`):
+
+| Directiva | Dominios obligatorios | Por qué |
+|---|---|---|
+| `script-src` | `'unsafe-eval'`, `https://open.spotify.com`, `https://embed-cdn.spotifycdn.com` | El bootstrap `iframe-api/v1` carga el código real desde el CDN via `eval()`. |
+| `frame-src` | `https://open.spotify.com`, `https://embed-cdn.spotifycdn.com` | El iframe oculto del player se monta desde el CDN. |
+| `connect-src` | `https://embed-cdn.spotifycdn.com`, `https://spclient.wg.spotify.com` | XHR del embed para metadata y streaming. |
+| `media-src` | `'self'`, `https://*.scdn.co`, `https://embed-cdn.spotifycdn.com` | El audio de la preview vive en el CDN de Spotify. |
+| `img-src` | `https://*.scdn.co` (además de `i.scdn.co`) | Artwork del track. |
+
+**Coste de seguridad de `'unsafe-eval'`**: limitado porque el resto de `script-src` queda restringido a self/Google/Spotify, no hay `'unsafe-inline'` y el código propio no usa eval. Sin esto, Spotify no puede ejecutar su loader.
+
+**Debugging**: si el botón falla solo en producción, abrir DevTools → Console y filtrar por `securitypolicyviolation`. El listado completo de violaciones es la única forma fiable de ver TODOS los dominios bloqueados de una pasada (iterar a ciegas añadiendo dominios uno a uno desperdicia deploys).
+
 ### Modelo BYOC ("Bring Your Own Client ID") — puro
 
 **Por qué este modelo y no Extended Quota Mode**: Spotify endureció Extended Quota Mode el **15-mayo-2025** y solo lo concede a **organizaciones legalmente registradas con ≥250.000 MAU + revenue verificable + servicio lanzado**. En paralelo, Development Mode quedó limitado a **5 testers por Client ID** (no 25 como decía la doc anterior). Esto crea un círculo vicioso imposible para apps indie: necesitas 250k MAU para crecer pero solo puedes mostrar la app a 4 personas más para conseguirlos. Cadencia es un proyecto de código fuente público (uso no comercial) sin SL ni monetización, así que la única vía de uso público es **BYOC**: cada usuario crea SU PROPIO Client ID en `developer.spotify.com` (3 minutos, gratis) y lo pega en Cadencia. Cada usuario es entonces dueño de su propia cuota de Development Mode.
