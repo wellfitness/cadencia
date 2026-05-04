@@ -1143,22 +1143,39 @@ function Privacy(): JSX.Element {
 // el resto. Despues: bici (modalidad fundadora), running (incorporacion
 // reciente, hay que afirmarla explicitamente) y Zwift (interoperabilidad con
 // la herramienta que ya usan). El resto del FAQ vive en /ayuda/spotify.
-const FAQ_ITEMS: readonly { q: string; a: string }[] = [
+const FAQ_ITEMS: readonly { q: string; a: string | readonly string[] }[] = [
   {
     q: '¿Funciona sin Spotify Premium?',
-    a: 'No. Cadencia necesita Spotify Premium para poder conectarte a tu cuenta, crear la lista y reproducirla en el orden establecido para que se sincronice con tu ruta o sesión de entrenamiento.',
+    a: 'No. Cadencia necesita Spotify Premium para poder conectarte a tu cuenta, crear la lista y reproducirla en el orden establecido para que se sincronice con tu sesión de entrenamiento.',
+  },
+  {
+    q: '¿Cómo puedo escuchar mi música en ruta?',
+    a: [
+      'En España (Reglamento General de Circulación, art. 18.2) está prohibido conducir cualquier vehículo, bici incluida, con auriculares conectados a un reproductor de sonido. La sanción son 200 € y 3 puntos del carné de coche. La prohibición abarca también los auriculares de conducción ósea, porque la norma no distingue por tipo.',
+      'Opciones legales: altavoz Bluetooth montado en el manillar o en el cuadro, o un altavoz portátil en la mochila o en el bolsillo del maillot.',
+      'Para sesiones indoor (rodillo, bici estática, Modo TV) no hay restricción: ahí los auriculares son perfectos.',
+    ],
   },
   {
     q: '¿Sirve para entrenar en interior (rodillo o bici estática)?',
-    a: 'Sí. Además de procesar GPX al aire libre (rutas en bici o carreras a pie), Cadencia tiene un constructor de sesiones en sala: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas — Noruego 4×4 y SIT en bici, Yasso 800 y Daniels en carrera, entre otras — y la app te genera la lista sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar (bici en rodillo) o frente a la cinta.',
+    a: [
+      'Sí. Además de procesar GPX al aire libre (rutas en bici o carreras a pie), Cadencia tiene un constructor de sesiones en sala: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas — Noruego 4×4 y SIT en bici, Yasso 800 y Daniels en carrera, entre otras — y la app te genera la lista sincronizada con cada bloque.',
+      'Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar (bici en rodillo) o frente a la cinta.',
+    ],
   },
   {
     q: '¿Sirve también para correr?',
-    a: 'Sí. Cadencia trabaja con bici y con carrera a pie por igual. En carrera estimamos la intensidad de cada tramo del GPX según pendiente y ritmo (modelo de coste energético de Minetti), y construimos las zonas a partir de tu frecuencia cardíaca. No necesitas potenciómetro ni sensores especiales: con tu pulsómetro (o tu edad y sexo si no tienes) basta. Las plantillas de carrera incluyen Yasso 800, intervalos de Daniels, Tempo y rodaje largo en Z2.',
+    a: [
+      'Sí. Cadencia trabaja con bici y con carrera a pie por igual. En carrera estimamos la intensidad de cada tramo del GPX según la pendiente del terreno (modelo de coste energético de Minetti), y construimos las zonas a partir de tu frecuencia cardíaca.',
+      'No necesitas potenciómetro ni sensores especiales: con tu pulsómetro (o tu edad y sexo si no tienes) basta. Las plantillas de carrera incluyen Yasso 800, intervalos de Daniels, Tempo y rodaje largo en Z2.',
+    ],
   },
   {
     q: '¿Es compatible con Zwift, TrainerRoad o TrainingPeaks?',
-    a: 'Sí, en bici. Cadencia exporta tu sesión en formato .zwo (estándar abierto de sesiones) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte una sesión ya hecha y darle música sincronizada.',
+    a: [
+      'Sí, en bici. Cadencia exporta tu sesión en formato .zwo (estándar abierto de sesiones) y también importa cualquier .zwo ajeno.',
+      'Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte una sesión ya hecha y darle música sincronizada.',
+    ],
   },
 ] as const;
 
@@ -1173,7 +1190,7 @@ function Faq(): JSX.Element {
       name: item.q,
       acceptedAnswer: {
         '@type': 'Answer',
-        text: item.a,
+        text: typeof item.a === 'string' ? item.a : item.a.join(' '),
       },
     })),
   };
@@ -1215,7 +1232,11 @@ function Faq(): JSX.Element {
                   className="text-turquesa-600 transition-transform group-open:rotate-180 shrink-0"
                 />
               </summary>
-              <p className="text-gris-700 mt-3">{item.a}</p>
+              <div className="mt-3 space-y-2">
+                {(typeof item.a === 'string' ? [item.a] : item.a).map((para, i) => (
+                  <p key={i} className="text-gris-700">{para}</p>
+                ))}
+              </div>
             </details>
           ))}
         </div>
