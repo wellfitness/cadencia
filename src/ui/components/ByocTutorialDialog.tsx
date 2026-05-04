@@ -21,7 +21,7 @@ export interface ByocTutorialDialogProps {
   onSaved?: (clientId: string) => void;
 }
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 /**
  * Modal BYOC ("Bring Your Own Client ID"): wizard de 4 pantallas que guia al
@@ -229,8 +229,9 @@ export function ByocTutorialDialog({
               onZoom={setZoomed}
             />
           )}
-          {step === 3 && (
-            <StepCopyClientId
+          {step === 3 && <StepAddTester onZoom={setZoomed} />}
+          {step === 4 && (
+            <StepCopyAndPasteClientId
               value={value}
               onChange={setValue}
               onBlur={() => setTouched(true)}
@@ -399,11 +400,6 @@ interface StepImageZoomProp {
 function StepCreateApp({ onZoom }: StepImageZoomProp): JSX.Element {
   return (
     <div className="space-y-4">
-      <StepImage
-        src="/byoc/step-1-create-app.png"
-        alt="Dashboard de Spotify con el botón Create app resaltado en amarillo"
-        onZoom={onZoom}
-      />
       <h3 className="text-lg font-semibold text-gris-800">
         Abre el dashboard y pulsa «Create app»
       </h3>
@@ -421,6 +417,11 @@ function StepCreateApp({ onZoom }: StepImageZoomProp): JSX.Element {
         <strong>Create app</strong> arriba a la derecha (resaltado en amarillo
         en la captura).
       </p>
+      <StepImage
+        src="/byoc/step-1-create-app.png"
+        alt="Dashboard de Spotify con el botón Create app resaltado en amarillo"
+        onZoom={onZoom}
+      />
     </div>
   );
 }
@@ -440,11 +441,6 @@ function StepFillForm({
 }: StepFillFormProps): JSX.Element {
   return (
     <div className="space-y-4">
-      <StepImage
-        src="/byoc/step-2-fill-form.png"
-        alt="Formulario de creación de app con los campos rellenos: nombre, descripción, redirect URI y APIs marcadas"
-        onZoom={onZoom}
-      />
       <h3 className="text-lg font-semibold text-gris-800">
         Rellena el formulario de la nueva app
       </h3>
@@ -485,11 +481,62 @@ function StepFillForm({
           Acepta los términos y pulsa <strong>Save</strong>.
         </li>
       </ul>
+      <StepImage
+        src="/byoc/step-2-fill-form.png"
+        alt="Formulario de creación de app con los campos rellenos: nombre, descripción, redirect URI y APIs marcadas"
+        onZoom={onZoom}
+      />
     </div>
   );
 }
 
-interface StepCopyClientIdProps {
+function StepAddTester({ onZoom }: StepImageZoomProp): JSX.Element {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gris-800">
+        Añade tu cuenta como tester autorizado
+      </h3>
+      <p className="text-sm text-gris-700 leading-relaxed">
+        Spotify limita tu app nueva a un máximo de <strong>5 cuentas</strong>{' '}
+        autorizadas. Tienes que añadirte tú primero, si no Spotify rechazará
+        la creación de la lista con un error «403 Forbidden».
+      </p>
+      <ol className="list-decimal pl-5 text-sm text-gris-700 leading-relaxed space-y-2">
+        <li>
+          En la página de tu app, abre la pestaña <strong>User Management</strong>{' '}
+          (arriba, junto a «Basic Information»).
+        </li>
+        <li>
+          Rellena <strong>Full Name</strong> con tu nombre y{' '}
+          <strong>Email</strong> con el correo de tu cuenta de Spotify Premium
+          (el mismo con el que harás login).
+        </li>
+        <li>
+          Pulsa <strong>Add user</strong>. Tu nombre aparecerá en la tabla de
+          abajo con un contador «1/5 added».
+        </li>
+      </ol>
+      <div className="px-4 py-3 rounded-lg border-2 border-turquesa-200 bg-turquesa-50 text-sm text-gris-700 flex items-start gap-2">
+        <MaterialIcon
+          name="lightbulb"
+          size="small"
+          className="mt-0.5 shrink-0 text-turquesa-700"
+        />
+        <span>
+          Si quieres permitir que otra persona use tu Client ID (por ejemplo
+          tu pareja), añade su cuenta también aquí. Hasta 5 en total.
+        </span>
+      </div>
+      <StepImage
+        src="/byoc/step-4-user.png"
+        alt="Pestaña User Management de la app con el formulario de Add user y la cuenta del propietario añadida"
+        onZoom={onZoom}
+      />
+    </div>
+  );
+}
+
+interface StepCopyAndPasteClientIdProps {
   value: string;
   onChange: (v: string) => void;
   onBlur: () => void;
@@ -498,28 +545,25 @@ interface StepCopyClientIdProps {
   onZoom: (img: { src: string; alt: string }) => void;
 }
 
-function StepCopyClientId({
+function StepCopyAndPasteClientId({
   value,
   onChange,
   onBlur,
   showError,
   storageError,
   onZoom,
-}: StepCopyClientIdProps): JSX.Element {
+}: StepCopyAndPasteClientIdProps): JSX.Element {
   return (
-    <div className="space-y-4">
-      <StepImage
-        src="/byoc/step-3-copy-id.png"
-        alt="Página de la app recién creada con el Client ID resaltado en amarillo"
-        onZoom={onZoom}
-      />
+    <div className="space-y-5">
       <h3 className="text-lg font-semibold text-gris-800">
         Copia tu Client ID y pégalo aquí
       </h3>
       <p className="text-sm text-gris-700 leading-relaxed">
-        En la página principal de tu app aparece un campo{' '}
-        <strong>Client ID</strong> (32 caracteres hexadecimales). Cópialo
-        completo y pégalo en el campo de abajo.
+        Vuelve a la pestaña <strong>Basic Information</strong> de tu app. Ahí
+        aparece un campo <strong>Client ID</strong> (32 caracteres
+        hexadecimales). Cópialo y pégalo abajo. Cuando pulses{' '}
+        <strong>Guardar y continuar</strong>, Cadencia conectará con tu
+        Spotify y empezará a crear la lista.
       </p>
 
       <div className="space-y-2">
@@ -580,6 +624,12 @@ function StepCopyClientId({
           <span>{storageError}</span>
         </div>
       )}
+
+      <StepImage
+        src="/byoc/step-3-copy-id.png"
+        alt="Página principal de la app con el Client ID resaltado en amarillo"
+        onZoom={onZoom}
+      />
     </div>
   );
 }

@@ -5,7 +5,6 @@ import {
   clearTokens,
   getStoredClientId,
   loadTokens,
-  resolveActiveClientId,
 } from '@integrations/spotify';
 import { ByocTutorialDialog } from '@ui/components/ByocTutorialDialog';
 import { Card } from '@ui/components/Card';
@@ -79,15 +78,13 @@ export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Elem
 
           <SavedSessionsSection />
 
+          <TvModeSection data={data} />
+
           <PlannedEventsSection />
 
           <CatalogSection data={data} />
 
-          <SpotifyConnectionSection />
-
-          <SpotifyClientIdSection />
-
-          <TvModeSection data={data} />
+          <SpotifyAccessSection />
 
           <PersistenceSection data={data} />
 
@@ -286,10 +283,14 @@ function PersistenceSection({ data }: SectionProps): JSX.Element {
  * efimero por diseño: muere al cerrar la pestaña. Aun asi, mientras la
  * pestana este abierta, el usuario debe poder desconectar a voluntad.
  */
-function SpotifyConnectionSection(): JSX.Element {
-  // sessionStorage no dispara eventos React; sondeamos al montar y tras
-  // pulsar desconectar. Lo suficiente — el usuario no se conecta/
-  // desconecta en otra pestana mientras esta en /preferencias.
+/**
+ * Sub-seccion 2 de SpotifyAccessSection: estado de la sesion OAuth.
+ *
+ * sessionStorage no dispara eventos React; sondeamos al montar y tras
+ * pulsar desconectar. Lo suficiente — el usuario no se conecta/desconecta
+ * en otra pestana mientras esta en /preferencias.
+ */
+function SessionSubsection(): JSX.Element {
   const [hasSession, setHasSession] = useState<boolean>(false);
 
   useEffect(() => {
@@ -303,7 +304,16 @@ function SpotifyConnectionSection(): JSX.Element {
   };
 
   return (
-    <Card title="Conexión con Spotify" titleIcon="link">
+    <div>
+      <h4 className="text-sm font-semibold text-gris-800 mb-2 flex items-center gap-2">
+        <span
+          className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-turquesa-100 text-turquesa-700 text-xs font-bold"
+          aria-hidden
+        >
+          2
+        </span>
+        Tu sesión
+      </h4>
       {hasSession ? (
         <>
           <p className="text-sm text-gris-700 flex items-start gap-2">
@@ -313,7 +323,7 @@ function SpotifyConnectionSection(): JSX.Element {
               className="text-turquesa-600 mt-0.5 shrink-0"
             />
             <span>
-              <strong>Tu cuenta de Spotify está conectada en esta pestaña.</strong>{' '}
+              <strong>Conectada en esta pestaña.</strong>{' '}
               <span className="text-gris-500">
                 Cadencia solo usa el permiso de modificar listas privadas (
                 <code className="font-mono text-[11px]">playlist-modify-private</code>
@@ -330,7 +340,7 @@ function SpotifyConnectionSection(): JSX.Element {
               iconLeft="logout"
               onClick={handleDisconnect}
             >
-              Desconectar Spotify
+              Desconectar
             </Button>
           </div>
         </>
@@ -342,11 +352,11 @@ function SpotifyConnectionSection(): JSX.Element {
             className="text-gris-500 mt-0.5 shrink-0"
           />
           <span>
-            <strong>Sin sesión Spotify activa en esta pestaña.</strong>{' '}
+            <strong>Sin sesión activa en esta pestaña.</strong>{' '}
             <span className="text-gris-500">
               Cadencia solo se conecta a Spotify cuando pulsas «Crear lista»
               en el último paso del asistente. Para revocar el permiso desde
-              tu cuenta de Spotify (más allá de esta pestaña), ve a{' '}
+              tu cuenta (más allá de esta pestaña), ve a{' '}
               <ExternalLink
                 href="https://www.spotify.com/account/apps/"
                 className="text-turquesa-700 hover:underline"
@@ -358,39 +368,37 @@ function SpotifyConnectionSection(): JSX.Element {
           </span>
         </p>
       )}
-    </Card>
+    </div>
   );
 }
 
 /**
- * Gestion del Client ID custom (BYOC). Permite ver el origen del Client ID
- * activo (custom del usuario o fallback compartido), configurar uno propio
- * via ByocTutorialDialog, o borrarlo para volver al fallback.
+ * Sub-seccion 1 de SpotifyAccessSection: gestion del Client ID custom (BYOC).
+ *
+ * Permite ver el origen del Client ID activo (custom del usuario o fallback
+ * compartido), configurar uno propio via ByocTutorialDialog, o borrarlo para
+ * volver al fallback.
  *
  * Por que aparece como seccion permanente y no solo via modal lazy: el
  * usuario que ya configuro el suyo necesita un sitio donde ver el estado y
  * cambiarlo (caso real: cambia de cuenta de Spotify y necesita rotar el
- * Client ID). Este es el "panel de gestion" del feature.
+ * Client ID).
  */
-function SpotifyClientIdSection(): JSX.Element {
+function ClientIdSubsection(): JSX.Element {
   const [byocOpen, setByocOpen] = useState<boolean>(false);
   // Refresh trigger: localStorage no dispara eventos React. Lo bumpeamos
   // tras guardar/borrar para forzar re-render de la card.
   const [refreshTick, setRefreshTick] = useState<number>(0);
   const [confirmClear, setConfirmClear] = useState<boolean>(false);
 
-  // ESLint marca refreshTick como innecesario porque las funciones leen de
-  // localStorage (efecto fuera del modelo React), pero precisamente eso es
-  // lo que hace falta: cuando bumpeamos el tick tras guardar/borrar, queremos
-  // re-leer aunque las funciones sean tecnicamente "estables" para React.
+  // ESLint marca refreshTick como innecesario porque getStoredClientId lee
+  // de localStorage (efecto fuera del modelo React), pero precisamente eso
+  // es lo que hace falta: cuando bumpeamos el tick tras guardar/borrar,
+  // queremos re-leer aunque la funcion sea tecnicamente "estable" para React.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const customId = useMemo(() => getStoredClientId(), [refreshTick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const resolved = useMemo(() => resolveActiveClientId(), [refreshTick]);
 
   const hasCustom = customId !== null;
-  const hasFallback = resolved !== null && resolved.source === 'default';
-  const hasNothing = resolved === null;
 
   // Mostramos solo los 4 ultimos chars del id por privacidad visual: si el
   // usuario hace screen-share del panel, no expone su id entero.
@@ -403,8 +411,17 @@ function SpotifyClientIdSection(): JSX.Element {
   };
 
   return (
-    <Card title="Client ID de Spotify" titleIcon="vpn_key">
-      {hasCustom && (
+    <div>
+      <h4 className="text-sm font-semibold text-gris-800 mb-2 flex items-center gap-2">
+        <span
+          className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-turquesa-100 text-turquesa-700 text-xs font-bold"
+          aria-hidden
+        >
+          1
+        </span>
+        Tu Client ID
+      </h4>
+      {hasCustom ? (
         <>
           <p className="text-sm text-gris-700 flex items-start gap-2">
             <MaterialIcon
@@ -413,7 +430,7 @@ function SpotifyClientIdSection(): JSX.Element {
               className="text-turquesa-600 mt-0.5 shrink-0"
             />
             <span>
-              <strong>Estás usando tu propio Client ID.</strong>{' '}
+              <strong>Configurado.</strong>{' '}
               <span className="text-gris-500">
                 Cadencia usa la app de Spotify que tú creaste. Los 5 huecos
                 de testers están a tu nombre.
@@ -442,39 +459,7 @@ function SpotifyClientIdSection(): JSX.Element {
             </Button>
           </div>
         </>
-      )}
-
-      {!hasCustom && hasFallback && (
-        <>
-          <p className="text-sm text-gris-700 flex items-start gap-2">
-            <MaterialIcon
-              name="info"
-              size="small"
-              className="text-tulipTree-600 mt-0.5 shrink-0"
-            />
-            <span>
-              <strong>Estás usando el Client ID compartido de Cadencia.</strong>{' '}
-              <span className="text-gris-500">
-                Si tu cuenta no está en mi lista de testers (5 cuentas máx),
-                Spotify rechazará la creación de listas. Configura el tuyo
-                propio en 3 minutos para usar Cadencia sin límites.
-              </span>
-            </span>
-          </p>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="primary"
-              size="sm"
-              iconLeft="vpn_key"
-              onClick={() => setByocOpen(true)}
-            >
-              Configurar el mío
-            </Button>
-          </div>
-        </>
-      )}
-
-      {hasNothing && (
+      ) : (
         <>
           <p className="text-sm text-gris-700 flex items-start gap-2">
             <MaterialIcon
@@ -483,7 +468,7 @@ function SpotifyClientIdSection(): JSX.Element {
               className="text-rosa-600 mt-0.5 shrink-0"
             />
             <span>
-              <strong>No hay Client ID configurado.</strong>{' '}
+              <strong>Sin configurar.</strong>{' '}
               <span className="text-gris-500">
                 Sin él, Cadencia no puede crear listas en tu cuenta de Spotify.
                 Configura el tuyo en 3 minutos (es gratis).
@@ -513,16 +498,36 @@ function SpotifyClientIdSection(): JSX.Element {
         open={confirmClear}
         title="Borrar tu Client ID"
         icon="warning"
-        message={
-          hasFallback
-            ? 'Volverás al Client ID compartido de Cadencia. Si tu cuenta no está en su lista de testers, no podrás crear listas hasta que vuelvas a configurar el tuyo.'
-            : 'Sin Client ID Cadencia no podrá crear listas en tu Spotify hasta que configures uno nuevo.'
-        }
+        message="Sin Client ID Cadencia no podrá crear listas en tu Spotify hasta que configures uno nuevo."
         confirmLabel="Borrar"
         confirmVariant="critical"
         onConfirm={handleClear}
         onCancel={() => setConfirmClear(false)}
       />
+    </div>
+  );
+}
+
+/**
+ * Card unificado «Conexión con Spotify». Contiene dos sub-secciones
+ * numeradas que reflejan los dos prerequisitos del flujo BYOC:
+ *
+ *  1. Tu Client ID — la identidad de la app de Spotify que vas a usar
+ *     (custom propia o fallback compartido del operador).
+ *  2. Tu sesión — el token OAuth vivo en este tab para crear listas.
+ *
+ * Numerado a proposito para que el usuario entienda el orden de causa →
+ * efecto: sin (1) no puede haber (2). El divisor `<hr>` entre ambas hace
+ * obvia la separacion logica sin desconectarlas visualmente.
+ */
+function SpotifyAccessSection(): JSX.Element {
+  return (
+    <Card title="Conexión con Spotify" titleIcon="link">
+      <div className="space-y-5">
+        <ClientIdSubsection />
+        <hr className="border-gris-200" />
+        <SessionSubsection />
+      </div>
     </Card>
   );
 }

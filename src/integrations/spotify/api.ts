@@ -19,17 +19,18 @@ function isSpotifyErrorResponse(v: unknown): v is { error: SpotifyError } {
 }
 
 /**
- * Error 403 Forbidden de la Web API de Spotify. Caso tipico en una app en
- * Development Mode: el usuario autenticado no esta en la lista de testers
- * del Developer Dashboard, asi que cualquier llamada autenticada falla con
- * 403. Se diferencia del Error generico para que la UI pueda abrir un
- * modal explicativo con CTA al formulario de alta como tester en lugar
- * del banner de error generico.
+ * Error 403 Forbidden de la Web API de Spotify. En el modelo BYOC puro de
+ * Cadencia, este 403 casi siempre significa que el usuario olvido anadir su
+ * propio email a "Users and Access" en SU PROPIA app de Spotify (Spotify
+ * limita Development Mode a 5 cuentas autorizadas explicitamente). Se
+ * diferencia del Error generico para que la UI pueda abrir el
+ * SpotifyAccessDeniedDialog con instrucciones de como autorizarse en su
+ * dashboard, en lugar del banner de error generico.
  *
  * Tambien aplica a otros 403 (scope insuficiente, endpoint retirado, rate
  * limit) — la UI los trata como mismo caso porque el remedio inmediato
- * (solicitar acceso autorizado) es tambien valido para los demas escenarios
- * poco frecuentes.
+ * (revisar la app del usuario en developer.spotify.com) es tambien valido
+ * para esos escenarios poco frecuentes.
  */
 export class SpotifyAuthorizationError extends Error {
   readonly status: number;

@@ -1,29 +1,26 @@
-import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import {
   clearStoredClientId,
   getSpotifyClientId,
   getStoredClientId,
   isValidClientIdFormat,
-  resolveActiveClientId,
   setStoredClientId,
 } from './clientId';
 
 const STORAGE_KEY = 'cadencia:spotify:custom-client-id:v1';
-const VALID_CUSTOM = 'a1b2c3d4e5f67890a1b2c3d4e5f67890';
-const VALID_DEFAULT = 'fedcba9876543210fedcba9876543210';
+const VALID_ID = 'a1b2c3d4e5f67890a1b2c3d4e5f67890';
 
 afterEach(() => {
   clearStoredClientId();
-  vi.unstubAllEnvs();
 });
 
 describe('isValidClientIdFormat', () => {
   it('acepta 32 chars hex en minusculas', () => {
-    expect(isValidClientIdFormat(VALID_CUSTOM)).toBe(true);
+    expect(isValidClientIdFormat(VALID_ID)).toBe(true);
   });
 
   it('acepta 32 chars hex en mayusculas (Spotify devuelve indistintamente)', () => {
-    expect(isValidClientIdFormat(VALID_CUSTOM.toUpperCase())).toBe(true);
+    expect(isValidClientIdFormat(VALID_ID.toUpperCase())).toBe(true);
   });
 
   it('rechaza si no son 32 chars', () => {
@@ -44,23 +41,23 @@ describe('isValidClientIdFormat', () => {
 
 describe('setStoredClientId / getStoredClientId / clearStoredClientId', () => {
   it('round-trip de Client ID custom', () => {
-    setStoredClientId(VALID_CUSTOM);
-    expect(getStoredClientId()).toBe(VALID_CUSTOM);
+    setStoredClientId(VALID_ID);
+    expect(getStoredClientId()).toBe(VALID_ID);
   });
 
   it('trimea espacios al guardar (los pegados desde el dashboard suelen llevar)', () => {
-    setStoredClientId(`  ${VALID_CUSTOM}  `);
-    expect(getStoredClientId()).toBe(VALID_CUSTOM);
+    setStoredClientId(`  ${VALID_ID}  `);
+    expect(getStoredClientId()).toBe(VALID_ID);
   });
 
   it('normaliza a lowercase al guardar (Spotify usa lowercase canonicamente)', () => {
-    setStoredClientId(VALID_CUSTOM.toUpperCase());
-    expect(getStoredClientId()).toBe(VALID_CUSTOM);
+    setStoredClientId(VALID_ID.toUpperCase());
+    expect(getStoredClientId()).toBe(VALID_ID);
   });
 
   it('normaliza a lowercase tambien al leer valores legacy con mayusculas', () => {
-    localStorage.setItem(STORAGE_KEY, VALID_CUSTOM.toUpperCase());
-    expect(getStoredClientId()).toBe(VALID_CUSTOM);
+    localStorage.setItem(STORAGE_KEY, VALID_ID.toUpperCase());
+    expect(getStoredClientId()).toBe(VALID_ID);
   });
 
   it('lanza si el formato es invalido (no se persiste basura silenciosamente)', () => {
@@ -69,7 +66,7 @@ describe('setStoredClientId / getStoredClientId / clearStoredClientId', () => {
   });
 
   it('clearStoredClientId borra y devuelve null', () => {
-    setStoredClientId(VALID_CUSTOM);
+    setStoredClientId(VALID_ID);
     clearStoredClientId();
     expect(getStoredClientId()).toBeNull();
   });
@@ -80,44 +77,13 @@ describe('setStoredClientId / getStoredClientId / clearStoredClientId', () => {
   });
 });
 
-describe('resolveActiveClientId — cascada de prioridad', () => {
-  it('usa el custom si existe (gana sobre el default)', () => {
-    vi.stubEnv('VITE_SPOTIFY_CLIENT_ID', VALID_DEFAULT);
-    setStoredClientId(VALID_CUSTOM);
-    expect(resolveActiveClientId()).toEqual({
-      clientId: VALID_CUSTOM,
-      source: 'custom',
-    });
+describe('getSpotifyClientId (alias publico)', () => {
+  it('devuelve el id custom guardado', () => {
+    setStoredClientId(VALID_ID);
+    expect(getSpotifyClientId()).toBe(VALID_ID);
   });
 
-  it('cae al default si no hay custom', () => {
-    vi.stubEnv('VITE_SPOTIFY_CLIENT_ID', VALID_DEFAULT);
-    expect(resolveActiveClientId()).toEqual({
-      clientId: VALID_DEFAULT,
-      source: 'default',
-    });
-  });
-
-  it('devuelve null si no hay custom ni default (self-host BYOC puro)', () => {
-    vi.stubEnv('VITE_SPOTIFY_CLIENT_ID', '');
-    expect(resolveActiveClientId()).toBeNull();
-  });
-
-  it('un default solo con espacios cuenta como ausente', () => {
-    vi.stubEnv('VITE_SPOTIFY_CLIENT_ID', '   ');
-    expect(resolveActiveClientId()).toBeNull();
-  });
-});
-
-describe('getSpotifyClientId (compat con call sites historicos)', () => {
-  it('devuelve solo el string del id activo', () => {
-    vi.stubEnv('VITE_SPOTIFY_CLIENT_ID', VALID_DEFAULT);
-    setStoredClientId(VALID_CUSTOM);
-    expect(getSpotifyClientId()).toBe(VALID_CUSTOM);
-  });
-
-  it('devuelve null cuando la cascada se agota', () => {
-    vi.stubEnv('VITE_SPOTIFY_CLIENT_ID', '');
+  it('devuelve null cuando no hay nada guardado (BYOC pendiente)', () => {
     expect(getSpotifyClientId()).toBeNull();
   });
 });
@@ -151,10 +117,8 @@ describe('comportamiento sin localStorage (Safari modo privado, WebView)', () =>
 
   it('setStoredClientId LANZA error explicito si el storage no persiste', () => {
     // La verificacion read-after-write detecta el fallo silencioso de
-    // localStorage y lanza para que la UI pueda surfaceárselo al usuario.
-    // Sin esta deteccion, el usuario teclearia su id y caeria en un bucle
-    // sin entender por que.
-    expect(() => setStoredClientId(VALID_CUSTOM)).toThrow(
+    // localStorage y lanza para que la UI pueda surfacearselo al usuario.
+    expect(() => setStoredClientId(VALID_ID)).toThrow(
       /no se pudo guardar/i,
     );
   });

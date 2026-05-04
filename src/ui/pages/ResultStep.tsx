@@ -29,13 +29,12 @@ import {
   loadAuthFlow,
   loadTokens,
   refreshAccessToken,
-  resolveActiveClientId,
+  getSpotifyClientId,
   saveAuthFlow,
   saveTokens,
   tokensAreFresh,
   SPOTIFY_SCOPES,
   SpotifyAuthorizationError,
-  type ClientIdSource,
   type CreatedPlaylist,
 } from '@integrations/spotify';
 import { BestEffortBanner } from '@ui/components/BestEffortBanner';
@@ -134,14 +133,10 @@ export function ResultStep({
 }: ResultStepProps): JSX.Element {
   void validation;
   void validatedInputs;
-  // Cascada custom > default > null. Capturamos el `source` para que el modal
-  // de 403 ramifique entre "configura tu Client ID" (default) y "anade tu
-  // cuenta a tu app" (custom). Si la cascada se agota (clientId === null),
-  // dejamos que el wizard funcione igual y solo bloqueamos al pulsar
-  // "Crear playlist" abriendo el modal BYOC.
-  const resolved = resolveActiveClientId();
-  const clientId = resolved?.clientId ?? null;
-  const clientIdSource: ClientIdSource = resolved?.source ?? 'default';
+  // BYOC puro: si no hay Client ID configurado, dejamos que el wizard
+  // funcione igual y solo bloqueamos al pulsar "Crear playlist" abriendo
+  // el modal BYOC para que el usuario configure el suyo.
+  const clientId = getSpotifyClientId();
   // Catalogo activo: el que viene del paso Musica (incluye uploads del
   // usuario). Si no hay (refresh de pestaña, callback OAuth), fallback a
   // los CSVs nativos para no quedarnos sin pool.
@@ -261,10 +256,10 @@ export function ResultStep({
     // depender del closure (que tendria el null del render previo).
     const effectiveClientId = overrideClientId ?? clientId;
     if (effectiveClientId === null) {
-      // Cascada agotada: ni Client ID custom ni VITE_SPOTIFY_CLIENT_ID. No
-      // arrancamos OAuth — abrimos el modal BYOC para que el usuario configure
-      // el suyo. Cuando guarde, su onSaved nos llamara de vuelta con el
-      // override y reintentaremos automaticamente.
+      // BYOC puro: no hay Client ID custom guardado. No arrancamos OAuth —
+      // abrimos el modal BYOC para que el usuario configure el suyo. Cuando
+      // guarde, su onSaved nos llamara de vuelta con el override y
+      // reintentaremos automaticamente.
       setByocOpen(true);
       return;
     }
@@ -624,8 +619,6 @@ export function ResultStep({
       <SpotifyAccessDeniedDialog
         open={accessDeniedOpen}
         onClose={() => setAccessDeniedOpen(false)}
-        source={clientIdSource}
-        onConfigureCustom={() => setByocOpen(true)}
       />
       <ByocTutorialDialog
         open={byocOpen}

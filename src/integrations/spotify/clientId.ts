@@ -1,22 +1,22 @@
 /**
- * Resolucion del Client ID activo de Spotify, con cascada de prioridad:
+ * Resolucion del Client ID de Spotify (modelo BYOC puro):
  *
- *   1. Client ID custom guardado por el usuario (BYOC, localStorage)
- *   2. VITE_SPOTIFY_CLIENT_ID del build (fallback para los testers conocidos)
- *   3. null  → la UI debe abrir el modal BYOC pidiendo configurarlo
+ *   1. Client ID custom guardado por el usuario en localStorage → lo usamos
+ *   2. Si no hay → null → la UI debe abrir el modal BYOC pidiendo configurarlo
  *
- * Por que existe el modelo BYOC:
+ * Por que solo BYOC (sin fallback compartido):
  * Spotify endurecio Extended Quota Mode el 15-mayo-2025 (>=250k MAU + empresa
  * registrada + revenue). Development Mode quedo limitado a 5 testers por
- * Client ID. Cadencia es un proyecto open source sin SL ni monetizacion, asi
- * que la unica via de uso publico es que cada usuario cree SU PROPIO Client
- * ID (3 minutos en developer.spotify.com) y lo pegue en la app. Cada usuario
- * es entonces dueno de su propia quota de Development Mode.
+ * Client ID. El modelo "1 Client ID compartido por todos los usuarios"
+ * obligaria al operador del repo a curar manualmente una lista de 5 cuentas.
+ * En BYOC puro cada usuario es dueno de su propia app de Spotify (3 min en
+ * developer.spotify.com) y de sus propios 5 huecos de testers — sin cuello
+ * de botella ni dependencia de un mantenedor central.
  *
- * El Client ID custom vive en localStorage (no sessionStorage): debe
- * persistir entre sesiones, el usuario solo lo configura una vez. NO se
- * sincroniza con Drive: es per-device, cada navegador puede tener su
- * propia app de Spotify registrada.
+ * El Client ID custom vive en localStorage (no sessionStorage): debe persistir
+ * entre sesiones, el usuario solo lo configura una vez. NO se sincroniza con
+ * Drive: es per-device, cada navegador puede tener su propia app de Spotify
+ * registrada.
  */
 
 const CUSTOM_CLIENT_ID_KEY = 'cadencia:spotify:custom-client-id:v1';
@@ -110,66 +110,20 @@ export function setStoredClientId(value: string): void {
 }
 
 /**
- * Borra el Client ID custom. La proxima resolucion volvera al fallback de
- * `VITE_SPOTIFY_CLIENT_ID` (si existe) o devolvera null.
+ * Borra el Client ID custom. La proxima resolucion devolvera null y la UI
+ * debe abrir el modal BYOC para reconfigurar.
  */
 export function clearStoredClientId(): void {
   safeLocalRemove(CUSTOM_CLIENT_ID_KEY);
 }
 
 /**
- * Lee VITE_SPOTIFY_CLIENT_ID del build. Es el fallback para los testers
- * conocidos del Development Mode de Elena: si no han configurado su propio
- * Client ID, usan el suyo y todo sigue funcionando como antes del pivote
- * a BYOC.
- *
- * Devuelve null si la variable de entorno no esta definida o esta vacia
- * (caso self-host BYOC puro: el operador del repo no quiere ofrecer ningun
- * fallback compartido).
- */
-function getBuildClientId(): string | null {
-  const env = import.meta.env as Record<string, string | undefined>;
-  const raw = env['VITE_SPOTIFY_CLIENT_ID'];
-  if (typeof raw !== 'string' || raw.trim() === '') return null;
-  return raw.trim();
-}
-
-/**
- * Origen del Client ID resuelto, util para que la UI ramifique mensajes:
- * - el modal de 403 dice cosas distintas si el problema viene del Client ID
- *   compartido ("no estas en mi lista de testers, configura el tuyo") o del
- *   custom del usuario ("anade tu cuenta a Users and Access en TU app").
- * - la seccion de preferencias muestra el estado actual.
- */
-export type ClientIdSource = 'custom' | 'default';
-
-export interface ResolvedClientId {
-  clientId: string;
-  source: ClientIdSource;
-}
-
-/**
- * Resuelve el Client ID activo aplicando la cascada custom > default > null.
- * Devuelve tanto el id como el origen para que la UI pueda discriminar.
- */
-export function resolveActiveClientId(): ResolvedClientId | null {
-  const stored = getStoredClientId();
-  if (stored !== null) {
-    return { clientId: stored, source: 'custom' };
-  }
-  const build = getBuildClientId();
-  if (build !== null) {
-    return { clientId: build, source: 'default' };
-  }
-  return null;
-}
-
-/**
- * Helper compatible con el call site historico de `getSpotifyClientId()`,
- * que solo necesita el string del id sin importarle el origen. Ahorra
- * destructuring en los call sites donde el origen no se usa (callback OAuth,
- * polling del Modo TV).
+ * Helper compatible con el call site historico de `getSpotifyClientId()`.
+ * En el modelo BYOC puro es equivalente a `getStoredClientId()`, pero
+ * mantenemos el nombre por consistencia con los call sites existentes
+ * (callback OAuth, polling del Modo TV) que solo necesitan el string sin
+ * importarles de donde viene.
  */
 export function getSpotifyClientId(): string | null {
-  return resolveActiveClientId()?.clientId ?? null;
+  return getStoredClientId();
 }

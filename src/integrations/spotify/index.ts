@@ -54,8 +54,6 @@ export {
   getSpotifyClientId,
   getStoredClientId,
   isValidClientIdFormat,
-  resolveActiveClientId,
   setStoredClientId,
 } from './clientId';
-export type { ClientIdSource, ResolvedClientId } from './clientId';
 export { getRedirectUri } from './redirectUri';
