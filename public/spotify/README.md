@@ -7,9 +7,14 @@ directamente del media kit oficial:
 
 Archivos:
 
+  Logo completo (icono + wordmark «Spotify»):
   - Spotify_Full_Logo_RGB_Green.png   (fondos claros — default)
   - Spotify_Full_Logo_RGB_White.png   (fondos oscuros — p. ej. Modo TV)
   - Spotify_Full_Logo_RGB_Black.png   (alternativa monocromo)
+
+  Logo primario (solo icono, en nomenclatura de Spotify «Primary Logo»):
+  - Spotify_Primary_Logo_RGB_Green.png   (icono cuadrado 512 px, fondo
+    transparente; el verde corporativo lo hace válido sobre cualquier fondo)
 
 ## Por qué PNG y no SVG
 
@@ -23,6 +28,7 @@ Los PNG aquí servidos están sin alteraciones desde la fuente oficial:
   https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Full_Logo_RGB_Green.png
   https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Full_Logo_RGB_White.png
   https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Full_Logo_RGB_Black.png
+  https://storage.googleapis.com/pr-newsroom-wp/1/2023/05/Spotify_Primary_Logo_RGB_Green.png
 
 ## Tamaños mínimos según Branding Guidelines
 

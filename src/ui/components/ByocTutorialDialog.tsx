@@ -363,14 +363,15 @@ function StepIntro(): JSX.Element {
   return (
     <div className="space-y-4 max-w-prose">
       <p className="text-base text-gris-700">
-        Cadencia es una herramienta open source que se conecta directamente con
-        tu cuenta de Spotify. Para que la conexión funcione necesitas un código
-        gratuito que Spotify llama <strong>Client ID</strong>.
+        Cadencia es una herramienta <strong>open source</strong> que se conecta a tu
+        Spotify usando un código gratuito que Spotify llama <strong>Client ID</strong>.
+        Crearlo te lleva unos <strong>3 minutos</strong> y solo lo haces una vez en la
+        vida.
       </p>
       <p className="text-base text-gris-700">
-        Crearlo te lleva unos <strong>3 minutos</strong> y solo lo haces una
-        vez en la vida. A partir de ahí, Cadencia funciona en tu dispositivo
-        sin más pasos ni esperas.
+        Tú creas tu propia conexión con Spotify desde su web oficial. No nos das tu
+        contraseña ni nos cedes acceso desde nuestra cuenta — Spotify se conecta
+        directamente con tu navegador.
       </p>
 
       <div className="bg-turquesa-50 border-2 border-turquesa-200 rounded-lg p-4 space-y-2">

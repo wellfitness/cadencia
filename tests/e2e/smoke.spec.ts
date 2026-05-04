@@ -26,9 +26,9 @@ function buildSyntheticGpx(): string {
  * Navega desde la landing al paso "Datos" del wizard, eligiendo deporte y
  * tipo de fuente en el paso "Tipo". Helper compartido por los tests.
  *
- * Flujo: landing -> click "Probar aplicación" -> modal -> click "Continuar"
- *        -> SourceTypeStep -> toggle deporte (si run) -> click card source
- *        -> DataStep.
+ * Flujo: landing -> click "Crear mi sesión" -> SourceTypeStep -> click
+ *        "Continuar" -> toggle deporte (si run) -> click card source ->
+ *        DataStep.
  */
 async function navigateToDataStep(
   page: Page,
@@ -37,7 +37,7 @@ async function navigateToDataStep(
 ): Promise<void> {
   await page.goto('/');
   // Landing -> abrir modal
-  await page.getByRole('button', { name: /probar aplicación/i }).first().click();
+  await page.getByRole('button', { name: /crear mi sesión/i }).first().click();
   // Modal -> continuar al wizard
   await page.getByRole('button', { name: /^continuar$/i }).click();
   // SourceTypeStep -> elegir deporte si es running
@@ -105,13 +105,13 @@ test.describe('Cadencia - landing y entrada al wizard', () => {
     expect(errors).toEqual([]);
   });
 
-  test('boton "Probar aplicación" abre el modal de acceso beta', async ({ page }) => {
-    await page.getByRole('button', { name: /probar aplicación/i }).first().click();
+  test('boton "Crear mi sesión" lleva al primer paso del wizard', async ({ page }) => {
+    await page.getByRole('button', { name: /crear mi sesión/i }).first().click();
     await expect(page.getByRole('button', { name: /^continuar$/i })).toBeVisible();
   });
 
-  test('continuar desde modal lleva al paso "Tipo" del wizard', async ({ page }) => {
-    await page.getByRole('button', { name: /probar aplicación/i }).first().click();
+  test('continuar desde el paso "Tipo" lleva al wizard', async ({ page }) => {
+    await page.getByRole('button', { name: /crear mi sesión/i }).first().click();
     await page.getByRole('button', { name: /^continuar$/i }).click();
     await expect(page.getByRole('heading', { name: /qué vas a hacer hoy/i })).toBeVisible();
   });
@@ -124,7 +124,7 @@ test.describe('Cadencia - landing y entrada al wizard', () => {
 test.describe('Cadencia - paso Tipo (multisport)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: /probar aplicación/i }).first().click();
+    await page.getByRole('button', { name: /crear mi sesión/i }).first().click();
     await page.getByRole('button', { name: /^continuar$/i }).click();
     await page
       .getByRole('heading', { name: /qué vas a hacer hoy/i })

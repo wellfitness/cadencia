@@ -19,7 +19,7 @@ async function gotoPlanStep(
   sport: 'bike' | 'run' = 'bike',
 ): Promise<void> {
   await page.goto('/');
-  await page.getByRole('button', { name: /probar aplicación/i }).first().click();
+  await page.getByRole('button', { name: /crear mi sesión/i }).first().click();
   await page.getByRole('button', { name: /^continuar$/i }).click();
   if (sport === 'run') {
     await page.getByRole('radio', { name: /carrera/i }).click();

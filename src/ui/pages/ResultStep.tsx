@@ -449,6 +449,24 @@ export function ResultStep({
       {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
       <Card title="Crear en Spotify" titleIcon="playlist_add">
         <div className="space-y-3">
+          {clientId === null && (
+            <div
+              role="note"
+              className="flex gap-3 rounded-2xl border-2 border-turquesa-200 bg-turquesa-50 p-4"
+            >
+              <MaterialIcon name="vpn_key" className="shrink-0 text-turquesa-600" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-gris-800">
+                  Primera vez con Spotify
+                </p>
+                <p className="text-sm text-gris-700">
+                  Para que Cadencia pueda crear listas en tu cuenta necesitas un código
+                  gratuito de Spotify (Client ID). Te guiamos paso a paso en{' '}
+                  <strong>3 minutos</strong> — solo se hace una vez.
+                </p>
+              </div>
+            </div>
+          )}
           <Input
             label="Nombre de la lista"
             type="text"

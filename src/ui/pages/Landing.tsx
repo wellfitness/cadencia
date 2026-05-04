@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@ui/components/Button';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { SiteFooter } from '@ui/components/SiteFooter';
@@ -14,18 +15,23 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
       <main className="flex-1">
         <HeroVisual onTry={onStart} />
         {/* Bloque post-hero móvil + tablet (<lg).
-            - Móvil (<md): CTA + microcopy + chips en blanco. La imagen 9:16
-              está saturada (logo, reproductor, corredor+ciclista, copy
-              pintado «Tu plan / Tu intensidad / Tu música») y no admite un
-              overlay de CTA sin pisarlos visualmente — el CTA vive aquí.
-            - Tablet (md..<lg): solo chips. El CTA sigue como overlay sobre
-              la imagen panorámica, donde la franja inferior está libre.
-            Los chips se mantienen en row para ambas anchuras. */}
+            - Móvil (<md): pastilla Premium ARRIBA + CTA debajo. La pastilla
+              encima del botón gestiona la expectativa antes de que el dedo
+              llegue al CTA — quien no tenga Premium se entera antes de
+              tocar. La imagen 9:16 está saturada y no admite un overlay de
+              CTA sin pisarlos visualmente, por eso el CTA vive aquí.
+            - Tablet (md..<lg): solo la pastilla Premium (el CTA va como
+              overlay sobre la imagen panorámica, donde la franja inferior
+              está libre). El div del CTA es `md:hidden`, así que en tablet
+              queda fuera del flex y solo se renderiza la pastilla.
+            La pastilla reemplaza a los chips de beneficios que vivían aquí
+            antes — los chips se mudaron sobre el H2 de "Cómo funciona",
+            donde encajan editorialmente como promesa de salida del proceso. */}
         <div className="lg:hidden bg-white px-4 pt-6 pb-2 flex flex-col items-center gap-5">
+          <PremiumNotice />
           <div className="md:hidden w-full flex justify-center">
-            <LandingCtaBlock onTry={onStart} microcopyTone="dark" />
+            <LandingCtaBlock onTry={onStart} />
           </div>
-          <BenefitChips orientation="row" />
         </div>
         <Intro />
         <HowItWorks />
@@ -43,47 +49,87 @@ export function Landing({ onStart }: LandingProps): JSX.Element {
 }
 
 /**
- * LandingCtaBlock: CTA primario «Probar aplicación» (variante gold size xl)
- * + microcopy debajo. Sin chips: los chips viven aparte como `BenefitChips`
- * para poder anclarlos a una posición independiente del botón en desktop.
+ * LandingCtaBlock: CTA primario «Crear mi sesión» (variante gold size xl).
+ * Sin microcopy ni chips — la promesa "Gratis / Sin registro / Sin servidor"
+ * vive ya en el footer permanente y en la sección Privacy, no necesita
+ * repetirse encima del botón. Los chips son `BenefitChips` aparte, anclables
+ * con su propio posicionamiento.
  *
- * La prop `microcopyTone`:
- *   - 'dark' (default): microcopy en gris-700 (overlay con degradado blanco
- *     en móvil/tablet — el degradado da contraste).
- *   - 'light': microcopy en blanco con drop-shadow (overlay desktop sin
- *     fondo opaco; el texto debe leer sobre cualquier zona de la imagen).
+ * Render visual en mayúsculas vía CSS `uppercase` con `tracking-wide` para
+ * compensar la pérdida de variabilidad ascendente/descendente — el source
+ * queda en case natural ("Crear mi sesión") para que screen readers y el
+ * aria-label se lean fluidos. "Sesión" cubre las cuatro combinaciones del
+ * wizard (bike/run × outdoor/indoor) y casa con la nomenclatura interna
+ * (`SavedSession`, `SessionBuilder`, `SessionTVMode`).
  *
  * No incluye márgenes externos: el contenedor padre decide el spacing.
  */
-function LandingCtaBlock({
-  onTry,
-  microcopyTone = 'dark',
-}: {
-  onTry: () => void;
-  microcopyTone?: 'dark' | 'light';
-}): JSX.Element {
+function LandingCtaBlock({ onTry }: { onTry: () => void }): JSX.Element {
   return (
     <div className="flex flex-col items-center gap-3">
       <Button
         variant="gold"
         size="xl"
         onClick={onTry}
-        iconRight="arrow_forward"
-        aria-label="Probar aplicación de Cadencia"
-        className="shadow-xl"
+        iconRight="auto_fix_high"
+        aria-label="Crear mi sesión en Cadencia"
+        className="shadow-xl uppercase tracking-wide"
       >
-        Probar aplicación
+        Crear mi sesión
       </Button>
-      <p
-        className={
-          microcopyTone === 'light'
-            ? 'text-sm font-semibold text-white bg-gris-900/55 backdrop-blur-sm rounded-full px-3 py-1 shadow-sm'
-            : 'text-sm font-semibold text-gris-700'
-        }
-      >
-        Gratis. Sin registro. Sin servidor.
-      </p>
     </div>
+  );
+}
+
+/**
+ * PremiumNotice: pastilla negra con borde y texto dorados — tratamiento
+ * visual clásico de "tier premium" (alta saturación, máximo contraste sobre
+ * blanco y sobre la foto del hero). Filtro suave: el que tiene Premium lee
+ * un guiño de valor; el que no, se entera antes de invertir tiempo en el
+ * wizard. "Rendimiento" tiene doble lectura (deportiva + ROI de la
+ * suscripción), por eso funciona aquí mejor que un "Requiere Spotify Premium"
+ * frío.
+ *
+ * `rounded-2xl` (no `rounded-full`): el copy es lo bastante largo para que
+ * en el anclaje right-bottom estrecho del hero desktop entre lg y xl el
+ * texto necesite envolver a 2 líneas; un pill totalmente redondo se
+ * deformaría en vertical. La esquina 2xl mantiene la familia visual con
+ * los chips de beneficios sin imponer single-line.
+ *
+ * Icono oficial de Spotify (Primary Logo, solo el círculo verde con ondas),
+ * descargado del media kit oficial. A 24 px supera el mínimo 21 px que las
+ * Branding Guidelines exigen para el icono solo. Preferimos el icono al
+ * logo completo aquí porque el texto ya dice «Spotify Premium» — meter el
+ * wordmark «Spotify» del logo completo crearía redundancia visual con la
+ * propia palabra del copy. El icono verde sobre el fondo negro de la
+ * pastilla destaca sin necesidad de versión White/Black (el verde es
+ * autocontrastante por su saturación).
+ *
+ * Fallback textual si el PNG no carga, para no romper la pastilla.
+ */
+function PremiumNotice(): JSX.Element {
+  const [logoOk, setLogoOk] = useState(true);
+  return (
+    <span className="inline-flex items-center gap-2 rounded-2xl bg-gris-900 border border-tulipTree-400 px-3 py-2 shadow-md">
+      {logoOk ? (
+        <img
+          src="/spotify/Spotify_Primary_Logo_RGB_Green.png"
+          alt="Spotify"
+          width={24}
+          height={24}
+          style={{ height: 24, width: 24 }}
+          onError={() => setLogoOk(false)}
+          loading="lazy"
+          decoding="async"
+          className="shrink-0"
+        />
+      ) : (
+        <span className="text-sm font-bold text-white shrink-0">Spotify</span>
+      )}
+      <span className="text-sm font-semibold text-tulipTree-400 leading-tight">
+        Sácale más rendimiento a tu Spotify Premium
+      </span>
+    </span>
   );
 }
 
@@ -210,30 +256,29 @@ function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
               el bloque blanco bajo el hero (ver `Landing` raíz).
             - En tablet la imagen panorámica 16:9 deja una franja inferior
               limpia donde sí cabe el overlay. `md:pb-6` da aire visual al
-              borde inferior; el microcopy usa tono `light` con pastilla
-              translúcida (gris-900/55 + backdrop-blur) para contraste WCAG. */}
+              borde inferior. */}
         <div className="hidden md:flex lg:hidden absolute inset-x-0 bottom-0 pt-16 pb-6 px-4 flex-col items-center">
-          <LandingCtaBlock onTry={onTry} microcopyTone="light" />
+          <LandingCtaBlock onTry={onTry} />
         </div>
 
         {/* Overlays CTA desktop (lg+): dos bloques transparentes, posicionados
             de forma independiente para cumplir la disposición pedida:
-              - Botón + microcopy CENTRADOS horizontalmente, anclados al borde
-                inferior. La zona central inferior está libre de copy pintado
-                (el copy «Tu plan / Tu intensidad / Tu música» vive a la
-                izquierda, debajo del corredor) y queda visualmente sobre el
-                asfalto/ruedas — ideal para un CTA llamativo.
-              - Chips de beneficios anclados al margen INFERIOR DERECHO en
-                columna, lejos del CTA y del copy pintado.
-            Sin fondo blanco / blur / card en ninguno de los dos: el botón
-            es variant=gold size=xl con sombra propia, y el microcopy usa
-            tono `light` (blanco con drop-shadow) para legibilidad sobre la
-            imagen. */}
+              - Botón CENTRADO horizontalmente, anclado al borde inferior. La
+                zona central inferior está libre de copy pintado (el copy «Tu
+                plan / Tu intensidad / Tu música» vive a la izquierda, debajo
+                del corredor) y queda visualmente sobre el asfalto/ruedas —
+                ideal para un CTA llamativo.
+              - Pastilla Premium anclada al margen INFERIOR DERECHO, lejos del
+                CTA y del copy pintado. `max-w-[260px]` permite envolver el
+                texto a 2 líneas en el rango lg (donde la zona derecha es
+                estrecha) sin colisionar con el CTA centrado.
+            Sin fondo blanco / blur / card: el botón es variant=gold size=xl
+            con sombra propia y la pastilla tiene su propio fondo dorado. */}
         <div className="hidden lg:flex absolute left-1/2 lg:bottom-10 -translate-x-1/2 px-4">
-          <LandingCtaBlock onTry={onTry} microcopyTone="light" />
+          <LandingCtaBlock onTry={onTry} />
         </div>
-        <div className="hidden lg:block absolute lg:right-6 xl:right-10 lg:bottom-10">
-          <BenefitChips orientation="col" />
+        <div className="hidden lg:block absolute lg:right-6 xl:right-10 lg:bottom-10 max-w-[260px]">
+          <PremiumNotice />
         </div>
       </div>
     </section>
@@ -247,12 +292,13 @@ function HeroVisual({ onTry }: { onTry: () => void }): JSX.Element {
  * "Instalar app" (PWA) condicional y el HeroMockup (card con altimetría y
  * tracks).
  *
- * El CTA primario "Probar aplicación" + microcopy + chips de beneficios
- * vive en TODOS los breakpoints como overlay sobre el hero (ver HeroVisual):
- * franja full-width inferior en móvil/tablet, y card flotante derecha en
- * desktop. Por eso este componente ya no necesita renderizarlo — arranca
- * directamente con la grid del copy + HeroMockup. El padding superior
- * `pt-8 md:pt-12` del contenedor da el aire visual entre el hero y el H2.
+ * El CTA primario "Crear mi sesión" + pastilla Premium vive en el hero
+ * (ver HeroVisual): franja full-width inferior en móvil/tablet, overlay
+ * separado en desktop (CTA centrado + pastilla anclada bottom-right). Los
+ * chips de beneficios viven sobre el H2 de "Cómo funciona" (más abajo en
+ * la página), no aquí. Por eso este componente arranca directamente con
+ * la grid del copy + HeroMockup. El padding superior `pt-8 md:pt-12` del
+ * contenedor da el aire visual entre el hero y el H2.
  *
  * El botón "Instalar app" (PWA) sigue siendo CTA secundario condicional,
  * dentro de la columna de copy.
@@ -520,6 +566,15 @@ function HowItWorks(): JSX.Element {
   return (
     <section aria-labelledby="how-it-works-title" className="bg-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-12 md:py-16">
+        {/* Chips de beneficios sobre el H2 de "Cómo funciona": cuadran aquí
+            porque adherencia/disfrute/rendimiento son el resultado de
+            ejecutar los tres pasos (datos → plan → música) que la sección
+            describe — actúan como promesa de salida del proceso justo antes
+            de que el lector lo entienda. En el hero los reemplaza ahora la
+            pastilla Premium, que filtra audiencia antes de gastar tiempo. */}
+        <div className="mb-6 flex justify-center">
+          <BenefitChips orientation="row" />
+        </div>
         <h2
           id="how-it-works-title"
           className="font-display text-gris-800 text-3xl md:text-4xl text-center mb-10"
@@ -1083,11 +1138,16 @@ function Privacy(): JSX.Element {
 }
 
 // Las preguntas top que mas peso tienen en la decision del usuario al llegar
-// a la landing: bici (modalidad fundadora), running (incorporacion reciente,
-// hay que afirmarla explicitamente), Zwift (interoperabilidad con la
-// herramienta que ya usan) y Premium (objecion comercial mas frecuente). El
-// resto del FAQ vive en /ayuda/spotify.
+// a la landing. Premium va primero porque es el unico filtro de salida duro:
+// quien no tenga Premium debe enterarse antes de invertir tiempo explorando
+// el resto. Despues: bici (modalidad fundadora), running (incorporacion
+// reciente, hay que afirmarla explicitamente) y Zwift (interoperabilidad con
+// la herramienta que ya usan). El resto del FAQ vive en /ayuda/spotify.
 const FAQ_ITEMS: readonly { q: string; a: string }[] = [
+  {
+    q: '¿Funciona sin Spotify Premium?',
+    a: 'No. Cadencia necesita Spotify Premium para poder conectarte a tu cuenta, crear la lista y reproducirla en el orden establecido para que se sincronice con tu ruta o sesión de entrenamiento.',
+  },
   {
     q: '¿Sirve para entrenar en interior (rodillo o bici estática)?',
     a: 'Sí. Además de procesar GPX al aire libre (rutas en bici o carreras a pie), Cadencia tiene un constructor de sesiones en sala: armas tu rutina por bloques (calentamiento, intervalos, recuperación, sprints) desde cero o partiendo de plantillas científicas — Noruego 4×4 y SIT en bici, Yasso 800 y Daniels en carrera, entre otras — y la app te genera la lista sincronizada con cada bloque. Hay un Modo TV pantalla completa para seguir la sesión desde una tablet sobre el manillar (bici en rodillo) o frente a la cinta.',
@@ -1099,10 +1159,6 @@ const FAQ_ITEMS: readonly { q: string; a: string }[] = [
   {
     q: '¿Es compatible con Zwift, TrainerRoad o TrainingPeaks?',
     a: 'Sí, en bici. Cadencia exporta tu sesión en formato .zwo (estándar abierto de sesiones) y también importa cualquier .zwo ajeno. Funciona con Zwift, TrainerRoad, Wahoo SYSTM, MyWhoosh y TrainingPeaks Virtual. Puedes construir aquí, exportar para entrenar en tu rodillo, o traerte una sesión ya hecha y darle música sincronizada.',
-  },
-  {
-    q: '¿Funciona sin Spotify Premium?',
-    a: 'Para crear la lista sirve cualquier cuenta de Spotify, gratuita o Premium. Pero solo Premium reproduce las canciones en el orden calculado durante la ruta o carrera: con cuenta gratuita Spotify las suena en modo aleatorio en el móvil, lo que rompe el ajuste entre cada tramo y su canción.',
   },
 ] as const;
 
@@ -1381,8 +1437,15 @@ function FinalCta({ onTry }: { onTry: () => void }): JSX.Element {
         <p className="text-gris-700 mb-6 text-lg">
           Tarda menos de un minuto en generarte la lista.
         </p>
-        <Button variant="primary" size="lg" onClick={onTry} iconRight="arrow_forward">
-          Probar aplicación
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={onTry}
+          iconRight="auto_fix_high"
+          aria-label="Crear mi sesión en Cadencia"
+          className="uppercase tracking-wide"
+        >
+          Crear mi sesión
         </Button>
       </div>
     </section>
