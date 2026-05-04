@@ -44,15 +44,15 @@
 <IfModule mod_headers.c>
   # Content-Security-Policy:
   #   - default-src 'self': solo recursos del propio dominio por defecto.
-  #   - script-src: GIS de Google para el flow OAuth de Drive (popup).
+  #   - script-src: GIS de Google (OAuth Drive) + IFrame API de Spotify (previews).
   #   - connect-src: endpoints de Spotify (auth + API), Google (OAuth + Drive).
-  #   - frame-src: GIS popup vive en accounts.google.com.
+  #   - frame-src: GIS popup (accounts.google.com) + embed de preview Spotify (open.spotify.com).
   #   - img-src: artwork de Spotify (i.scdn.co) ademas de self/data.
   #   - style-src 'unsafe-inline': obligado por Tailwind y por el JSON-LD inline.
   #   - font-src: Google Fonts (Righteous + ABeeZee declaradas en index.html).
   #   - frame-ancestors 'none': impide que cadencia.movimientofuncional.app sea
   #     embebida en un iframe hostil (anti-clickjacking).
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' https://accounts.spotify.com https://api.spotify.com https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; img-src 'self' data: https://i.scdn.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; manifest-src 'self'; base-uri 'self'; form-action 'self' https://accounts.spotify.com; frame-ancestors 'none'"
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://open.spotify.com; connect-src 'self' https://accounts.spotify.com https://api.spotify.com https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com https://open.spotify.com; img-src 'self' data: https://i.scdn.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; manifest-src 'self'; base-uri 'self'; form-action 'self' https://accounts.spotify.com; frame-ancestors 'none'"
 
   # HSTS: 1 anyo + subdominios + preload-ready. Solo aplica en HTTPS.
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
