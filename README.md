@@ -39,31 +39,36 @@ La app se publica como webapp + PWA (instalable desde el navegador con "Añadir 
 
 ## Modelo BYOC (Bring Your Own Client ID)
 
-Cadencia funciona con BYOC: cada usuario crea **su propia app de Spotify** (gratis, 3 minutos en [developer.spotify.com](https://developer.spotify.com/dashboard)) y pega su **Client ID** dentro de Cadencia (modal guiado al pulsar «Crear playlist»). El Client ID se guarda en `localStorage` y solo lo configuras una vez.
+Cadencia funciona con **BYOC puro**: cada persona que use la app crea **su propia app de Spotify** (gratis, 3 minutos en [developer.spotify.com](https://developer.spotify.com/dashboard)) y pega su **Client ID** dentro de Cadencia. El wizard guiado se abre solo al pulsar «Crear playlist» por primera vez. El Client ID queda guardado en `localStorage` del navegador del usuario.
 
-**¿Por qué?** Spotify endureció el acceso a Extended Quota Mode el 15-mayo-2025 (exige ≥250.000 MAU + empresa registrada + revenue verificable). Para apps indie como Cadencia ese camino está cerrado. La salida es BYOC: cada usuario es dueño de su propia cuota de Development Mode (5 testers por Client ID, suficiente para uso personal).
+### ¿Por qué BYOC y no un Client ID compartido?
 
-**¿Qué necesita el usuario?**
+Spotify endureció su política el **15 de mayo de 2025**:
+
+- **Extended Quota Mode** (acceso para apps con tracción real) ahora exige ser **organización legalmente registrada** + **≥ 250.000 MAU** + **revenue verificable** + servicio activo. Para una app indie sin SL ni monetización, este camino está cerrado de facto.
+- En paralelo, **Development Mode** quedó limitado a **5 cuentas autorizadas por Client ID** (antes eran 25).
+
+Esto crea un círculo vicioso: para llegar a 250k MAU necesitas mostrar la app a mucha gente, pero solo puedes mostrarla a 4 personas más. La salida es **BYOC**: cada usuario tiene su propia app de Spotify y sus propios 5 huecos de testers, sin pasar por una lista central que el operador del repo tendría que curar a mano.
+
+### Qué necesita el usuario
 
 1. Cuenta de Spotify **Premium**.
-2. Tres minutos para crear su Client ID (la app le guía paso a paso con capturas).
-3. Pegar el id en Cadencia. Listo.
+2. Tres minutos para crear su Client ID y añadir su email a «Users and Access» (la app le guía paso a paso con capturas reales).
+3. Pegar el Client ID en Cadencia. Listo.
+
+### Qué NO necesita el operador del repo
+
+Nada relacionado con Spotify. El código no lee `VITE_SPOTIFY_CLIENT_ID`, no hay fallback compartido, no hay lista de testers que mantener. Quien despliegue Cadencia (Hostinger, Netlify, Vercel, su propio nginx) se preocupa solo del build y el dominio; cada usuario hace su propia configuración del lado de Spotify.
 
 ## Self-hosting
 
-Cadencia es 100% client-side y MIT. Puedes hostearla donde quieras (Hostinger, Netlify, Vercel, GitHub Pages, tu propio nginx). Pasos:
+Cadencia es 100% client-side y MIT. Puedes hostearla donde quieras. Pasos:
 
 1. `git clone` este repo.
-2. `cp .env.example .env.local` y configura los valores que necesites:
-   - **`VITE_SPOTIFY_CLIENT_ID`**: opcional. Si lo dejas vacío, todos los usuarios irán por BYOC. Si lo pones, hasta 5 cuentas que tú autorices a mano en tu Developer Dashboard de Spotify podrán usar tu Client ID compartido.
-   - **`VITE_GOOGLE_CLIENT_ID`**: opcional. Activa la sincronización con Drive (carpeta `appdata` privada del usuario).
-3. **Si usas tu propio Client ID de Spotify**, registra en su dashboard (Settings → Redirect URIs) las URLs donde correrá Cadencia, por ejemplo:
-   - `http://127.0.0.1:5173/callback` (desarrollo)
-   - `https://tu-dominio.com/callback` (producción)
-4. **Si usas tu propio Client ID de Google Drive**, autoriza tu dominio en su Cloud Console.
-5. `pnpm install && pnpm build` y sube `dist/` a tu hosting.
+2. `cp .env.example .env.local` y, si quieres, configura `VITE_GOOGLE_CLIENT_ID` para activar la sincronización opcional con Drive (carpeta `appdata` privada del usuario). Para Spotify no hay variable que configurar.
+3. `pnpm install && pnpm build` y sube `dist/` a tu hosting.
 
-Si tus usuarios traen su propio Client ID (BYOC puro), en su app de Spotify deben registrar el mismo Redirect URI de la URL donde tú alojes Cadencia.
+**Importante para tus usuarios**: cuando creen su app de Spotify, deben registrar como Redirect URI la URL EXACTA del dominio donde tú alojas Cadencia (por ejemplo `https://tu-dominio.com/callback`). El wizard del modal BYOC ya muestra esa URL dinámicamente leyéndola de `window.location.origin`, así que el usuario solo tiene que copiarla del modal y pegarla en su dashboard de Spotify.
 
 ## Estructura
 

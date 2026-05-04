@@ -504,30 +504,26 @@ Scope: `playlist-modify-private`.
 
 > **Nota — rename feb-2026 de Spotify**: los endpoints antiguos `POST /v1/users/{user_id}/playlists` y `POST /v1/playlists/{id}/tracks` fueron retirados en febrero de 2026 y devuelven **403 silencioso** (sin razón, sin error legible). Los endpoints actuales son los listados arriba: `/me/playlists` para crear y `/items` para añadir tracks (renombrado para soportar episodios de podcast). Si en algún momento algo devuelve 403 en el OAuth flow después de autenticar correctamente, este es el primer sospechoso.
 
-### Modelo BYOC ("Bring Your Own Client ID")
+### Modelo BYOC ("Bring Your Own Client ID") — puro
 
 **Por qué este modelo y no Extended Quota Mode**: Spotify endureció Extended Quota Mode el **15-mayo-2025** y solo lo concede a **organizaciones legalmente registradas con ≥250.000 MAU + revenue verificable + servicio lanzado**. En paralelo, Development Mode quedó limitado a **5 testers por Client ID** (no 25 como decía la doc anterior). Esto crea un círculo vicioso imposible para apps indie: necesitas 250k MAU para crecer pero solo puedes mostrar la app a 4 personas más para conseguirlos. Cadencia es un proyecto open-source sin SL ni monetización, así que la única vía de uso público es **BYOC**: cada usuario crea SU PROPIO Client ID en `developer.spotify.com` (3 minutos, gratis) y lo pega en Cadencia. Cada usuario es entonces dueño de su propia cuota de Development Mode.
 
-Cascada de resolución del Client ID activo, en [src/integrations/spotify/clientId.ts](src/integrations/spotify/clientId.ts):
+Resolución del Client ID activo, en [src/integrations/spotify/clientId.ts](src/integrations/spotify/clientId.ts):
 
 ```
 1. Client ID custom guardado por el usuario (cadencia:spotify:custom-client-id:v1 en localStorage) → lo usamos
-2. VITE_SPOTIFY_CLIENT_ID del build (fallback, mantiene compat con los <=4 testers conocidos de Elena) → lo usamos
-3. → null → la UI abre el modal BYOC al pulsar "Crear playlist"
+2. → null → la UI abre el modal BYOC al pulsar "Crear playlist"
 ```
+
+**No hay fallback compartido**. La operadora del repo no mantiene un Client ID por defecto en producción: todo el mundo (incluida ella misma) configura su propio Client ID via el wizard. Esto evita el cuello de botella de tener que curar manualmente una lista de 5 testers cuando llegan visitantes nuevos.
 
 Tres superficies coordinadas:
 
-1. **`ByocTutorialDialog`** ([src/ui/components/ByocTutorialDialog.tsx](src/ui/components/ByocTutorialDialog.tsx)): modal con 3 capturas anotadas (`/byoc/step-N.webp`) + input validado (regex `/^[a-f0-9]{32}$/i`) + botón «Copiar Redirect URI» al portapapeles. Se dispara desde dos puntos: (a) `ResultStep` al pulsar «Crear playlist» si la cascada devuelve null, (b) `MyPreferencesPage` desde la sección «Client ID de Spotify». Tras `setStoredClientId`, invoca `onSaved(newId)` para que el caller reintente el flujo OAuth con el id fresco (override explícito, no del closure).
-2. **`SpotifyClientIdSection`** en [MyPreferencesPage](src/ui/pages/MyPreferencesPage.tsx): card permanente con el estado actual del Client ID. Tres variantes:
-   - **Custom configurado** → muestra preview del id (28 puntos + últimos 4 chars por privacidad visual en screen-sharing) + botones «Cambiar» / «Borrar» (con `ConfirmDialog`).
-   - **Solo fallback (Cliente ID compartido de Cadencia)** → CTA «Configurar el mío».
-   - **Sin nada** (self-host BYOC puro, `.env.local` vacío) → CTA «Configurar el mío».
-3. **`SpotifyAccessDeniedDialog`** ([src/ui/components/SpotifyAccessDeniedDialog.tsx](src/ui/components/SpotifyAccessDeniedDialog.tsx)): modal del 403 con dos variantes según `source: ClientIdSource`:
-   - **`source === 'default'`** → «No estás en mi lista de 5 testers, configura tu propio Client ID» con CTA que dispara `ByocTutorialDialog`.
-   - **`source === 'custom'`** → «Tu Client ID es válido pero tu cuenta no aparece en Users and Access en TU app», con instrucciones paso a paso y enlace a `developer.spotify.com/dashboard`.
-
-   El `ResultStep` captura `SpotifyAuthorizationError` (403) y abre este dialog con `source={clientIdSource}` derivado del `resolveActiveClientId().source`.
+1. **`ByocTutorialDialog`** ([src/ui/components/ByocTutorialDialog.tsx](src/ui/components/ByocTutorialDialog.tsx)): wizard de 5 pantallas (intro + 4 pasos: crear app, rellenar formulario, añadir tu cuenta como tester en User Management, copiar+pegar Client ID). Capturas reales del dashboard de Spotify (`/byoc/step-N.png`) ampliables a lightbox. Input con validación inline (regex `/^[a-f0-9]{32}$/i`) + read-after-write para detectar fallos silenciosos de localStorage. Se dispara desde dos puntos: (a) `ResultStep` al pulsar «Crear playlist» si `getSpotifyClientId()` es null, (b) `MyPreferencesPage` desde la sub-sección «Tu Client ID». Tras `setStoredClientId`, invoca `onSaved(newId)` para que el caller reintente el flujo OAuth con el id fresco (override explícito, no del closure).
+2. **`SpotifyAccessSection`** en [MyPreferencesPage](src/ui/pages/MyPreferencesPage.tsx): card unificado «Conexión con Spotify» con dos sub-secciones numeradas:
+   - **(1) Tu Client ID** — `ClientIdSubsection`. Dos estados: configurado (muestra preview del id con 28 puntos + últimos 4 chars por privacidad visual + botones «Cambiar» / «Borrar» con `ConfirmDialog`) o sin configurar (CTA «Configurar el mío» que abre el wizard).
+   - **(2) Tu sesión** — `SessionSubsection`. Estado de la sesión OAuth en este tab (sessionStorage). Botón «Desconectar» si hay sesión.
+3. **`SpotifyAccessDeniedDialog`** ([src/ui/components/SpotifyAccessDeniedDialog.tsx](src/ui/components/SpotifyAccessDeniedDialog.tsx)): modal del 403. En el modelo BYOC puro solo hay una causa para ese 403: el usuario olvidó añadir su cuenta a «Users and Access» en SU PROPIA app. Le mandamos al dashboard con instrucciones paso a paso. El `ResultStep` captura `SpotifyAuthorizationError` y abre este dialog en lugar del banner genérico de error.
 
 ### Manejo explícito de errores de Spotify (reportabilidad)
 
@@ -549,33 +545,13 @@ Catch silencioso aceptable: solo el guardado del historial de playlist (`createP
 
 ### Configuración del Client ID
 
-Hay dos rutas según quién corra Cadencia:
+El usuario abre Cadencia, llega al paso final y pulsa «Crear playlist». Si no tiene Client ID configurado, se abre `ByocTutorialDialog` con 5 pantallas que le guían a crear su propia app de Spotify y añadir su email a Users and Access. Tras pegar su id válido se persiste en `localStorage` (`cadencia:spotify:custom-client-id:v1`) y el flujo OAuth arranca automáticamente. Después puede gestionarlo desde `/preferencias` → «Conexión con Spotify» → sub-sección «Tu Client ID» (cambiar / borrar).
 
-**Ruta A — Usuario final (BYOC, vía la UI)**
+Cero configuración técnica del lado del operador del repo: el código no lee ningún `VITE_SPOTIFY_CLIENT_ID` ni necesita `.env.local` para Spotify. Cada usuario es 100% autónomo.
 
-El usuario abre Cadencia, llega al paso final y pulsa «Crear playlist». Si no tiene Client ID custom configurado y el deploy del operador no provee fallback en `.env`, se abre `ByocTutorialDialog` con 3 pasos. Tras pegar su id válido se persiste en `localStorage` (`cadencia:spotify:custom-client-id:v1`) y el flujo OAuth arranca automáticamente. El usuario también puede gestionarlo después desde `/preferencias` → «Client ID de Spotify». Cero configuración técnica, cero `.env.local`.
+**Nota sobre `127.0.0.1` vs `localhost`**: Spotify dejó de aceptar `http://localhost` a finales de 2024. En desarrollo abre la app en `http://127.0.0.1:5173/`, no en `localhost`. El usuario debe registrar como Redirect URI en su app de Spotify la URL EXACTA del deploy donde corre Cadencia (en producción `https://cadencia.movimientofuncional.app/callback`); el wizard la muestra dinámicamente vía `getRedirectUri()`.
 
-**Ruta B — Operador del repo (fallback opcional vía `.env.local`)**
-
-Si quien hace deploy de Cadencia (por ejemplo Elena, que mantiene como fallback el Client ID histórico para sus 4 testers conocidos) quiere ofrecer un Client ID por defecto compartido, lo configura en `.env.local`:
-
-```
-VITE_SPOTIFY_CLIENT_ID=tu-client-id-aqui
-```
-
-Pasos para obtenerlo (como operador):
-1. https://developer.spotify.com/dashboard → "Create an App".
-2. Añade Redirect URIs: `http://127.0.0.1:5173/callback` (dev), `https://cadencia.movimientofuncional.app/callback` (prod).
-3. Activa "Web API" en las APIs.
-4. Copia el Client ID al `.env.local` (gitignored).
-
-Ver [.env.example](.env.example) para la plantilla.
-
-El fallback es **opcional**: si está vacío, todos los usuarios irán por BYOC. Si está poblado, solo los **5 testers que el operador haya autorizado a mano en su Developer Dashboard** podrán crear playlists con él. Cualquier otro usuario verá `SpotifyAccessDeniedDialog` (variante `default`) que les ofrecerá configurar el suyo via BYOC.
-
-**Nota sobre `127.0.0.1` vs `localhost`**: Spotify dejó de aceptar `http://localhost` a finales de 2024. En desarrollo abre la app en `http://127.0.0.1:5173/`, no en `localhost`.
-
-**No usar Client Secret**: PKCE prescinde del secret a propósito. Aunque Spotify lo muestre en el dashboard, no debe meterse nunca en el `.env.local` con prefijo `VITE_*` — acabaría visible en el bundle JS público y permitiría suplantar la app.
+**No usar Client Secret**: PKCE prescinde del secret a propósito. Aunque Spotify lo muestre en el dashboard, el usuario no necesita copiarlo a ningún sitio.
 
 ### Limitaciones conocidas (otras plataformas musicales)
 

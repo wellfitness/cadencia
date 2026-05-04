@@ -8,34 +8,44 @@ interface FaqItem {
 
 const FAQS: readonly FaqItem[] = [
   {
+    q: '¿Por qué tengo que crear mi propia aplicación de Spotify para usar Cadencia?',
+    a:
+      'Spotify endureció su política el 15 de mayo de 2025: el acceso ampliado para aplicaciones grandes ahora exige ser una empresa legalmente registrada con más de 250.000 usuarios mensuales y facturación demostrable. Para una aplicación pequeña y de código abierto como Cadencia, ese camino está cerrado de hecho. La única vía realista (el llamado «modo desarrollo») limita cada aplicación de Spotify a 5 cuentas autorizadas. Si Cadencia compartiese una única aplicación entre todos los usuarios, solo 5 personas en todo el mundo podrían usarla. Por eso adoptamos el modelo BYOC («tu propia llave»): cada persona crea su propia aplicación de Spotify (gratis, 3 minutos) y tiene sus propios 5 huecos para autorizar cuentas, sin pasar por listas centralizadas. La aplicación te guía paso a paso con un asistente la primera vez que pulsas «Crear lista».',
+  },
+  {
+    q: '¿Cuánto tarda crear mi Client ID y para qué lo necesito exactamente?',
+    a:
+      'Tres minutos en developer.spotify.com → «Create app» → rellenar nombre, descripción, pegar la URL de retorno que te muestra Cadencia, marcar «Web API» y guardar. Después, en la pestaña «User Management», añades tu propio correo de Spotify Premium como cuenta autorizada. Por último copias el Client ID resultante (32 caracteres) y lo pegas en Cadencia. Solo lo haces una vez en la vida; queda guardado en el almacenamiento local de tu navegador. El asistente te enseña cada paso con capturas reales del panel de Spotify. Tu Client ID es lo que permite que TÚ autorices a Cadencia a crear listas en tu cuenta — sin él, Spotify no te deja.',
+  },
+  {
     q: '¿La voz del entrenador del Modo TV controla Spotify?',
     a:
-      'No. La voz que oyes en el Modo TV es síntesis de voz local (Web Speech API de tu navegador) y solo describe el bloque actual del entrenamiento (zona, sensación, cadencia, duración). No controla la reproducción de Spotify por voz: los botones de música del Modo TV (play/pause/anterior/siguiente) envían comandos directos a tu reproductor Spotify Premium activo a través de la API oficial. Voz y controles son dos canales independientes.',
+      'No. La voz que oyes en el Modo TV es síntesis de voz local de tu navegador y solo describe el bloque actual del entrenamiento (zona, sensación, cadencia, duración). No controla la reproducción de Spotify por voz: los botones de música del Modo TV (reproducir/pausa/anterior/siguiente) envían comandos directos a tu reproductor de Spotify Premium activo. Voz y controles son dos canales independientes.',
   },
   {
     q: '¿Necesito una cuenta Premium de Spotify?',
     a:
-      'Para crear la lista en tu biblioteca, sí — Spotify exige Premium para escribir listas desde aplicaciones de terceros. Para previsualizar el emparejamiento y exportar la sesión a .zwo (Zwift, TrainerRoad, etc.) no hace falta cuenta.',
+      'Sí. Spotify exige Premium para escribir listas desde aplicaciones de terceros y también para crear aplicaciones en el panel de desarrollador (paso obligatorio del flujo BYOC). Si solo quieres previsualizar el emparejamiento y exportar la sesión a .zwo (Zwift, TrainerRoad y similares) sin crear lista en Spotify, no hace falta ninguna cuenta.',
   },
   {
     q: '¿Por qué no aparece mi cuenta de Spotify al pulsar «Crear lista»?',
     a:
-      'Cadencia usa OAuth PKCE: abre la página oficial de acceso a Spotify en una pestaña separada. Si tienes bloqueador de ventanas emergentes o el navegador en modo estricto, puede impedirlo. Permite ventanas emergentes para cadencia.movimientofuncional.app y vuelve a intentarlo.',
+      'Cadencia abre la página oficial de acceso a Spotify en una pestaña separada para que autorices la conexión. Si tienes bloqueador de ventanas emergentes o el navegador en modo estricto, puede impedirlo. Permite ventanas emergentes para cadencia.movimientofuncional.app y vuelve a intentarlo. Si todavía no tienes tu Client ID configurado, en lugar de la pantalla de Spotify se te abrirá el asistente para que crees tu propia aplicación.',
   },
   {
     q: 'He visto un error 403 después de autenticar — ¿qué pasa?',
     a:
-      'Tu cuenta todavía no está autorizada para usar la integración de Cadencia con Spotify. Estamos en proceso de habilitar el acceso para todo el público; mientras tanto, la app abre una ventana con un enlace al formulario de alta para que te incluya manualmente — suele tardar menos de 24 h. Si ya estás autorizada y aun así te sale, puede ser que tengas en caché una versión antigua del service worker (Spotify renombró sus endpoints en febrero de 2026): recarga con Ctrl+Shift+R o cierra y reabre la PWA. Si persiste, copia los detalles del error desde la propia tarjeta y avísame por Telegram.',
+      'Lo más habitual: al crear tu aplicación de Spotify olvidaste añadir tu propio correo como cuenta autorizada en la pestaña «User Management» del panel. Spotify limita el modo desarrollo a 5 cuentas autorizadas explícitamente, y por defecto la lista está vacía — incluso para ti como creadora. La solución es entrar en developer.spotify.com → tu aplicación → User Management → Add user con tu correo de Premium, y reintentar. Si tu cuenta ya está añadida y aun así te sale 403, puede que tu navegador tenga una versión antigua de Cadencia en caché (Spotify renombró las rutas de su servicio en febrero de 2026): recarga con Ctrl+Shift+R o cierra y reabre la aplicación. Si persiste, copia los detalles del error desde la propia tarjeta y avísame por Telegram.',
+  },
+  {
+    q: '¿Puedo invitar a otra persona a usar mi Client ID?',
+    a:
+      'Sí. Hasta 5 cuentas en total (incluyéndote a ti). En el panel de developer.spotify.com → tu aplicación → User Management → Add user, añades el correo de Spotify Premium de la otra persona. Esa persona pondrá TU Client ID en SU navegador (Mis preferencias → Conexión con Spotify → Configurar el mío) y podrá usar Cadencia sin crearse su propia aplicación. Útil para parejas, familias o equipos pequeños que comparten una sola configuración.',
   },
   {
     q: 'Me sale otro error de Spotify (502, sin conexión, etc.). ¿Qué hago?',
     a:
-      'Cualquier fallo de la API muestra una tarjeta roja con el mensaje técnico completo (status, endpoint, detalle) y dos atajos: «Copiar detalles» (al portapapeles) y «Avisar por Telegram» (abre t.me/wellfitness_trainer en una pestaña nueva). Cópialo y pégamelo allí — con eso puedo localizar el problema sin pedirte que abras DevTools. En el Modo TV el botón se llama «Detalles» y abre la misma información en un cuadro de diálogo.',
-  },
-  {
-    q: '¿Por qué tengo que abrir la app en 127.0.0.1 en lugar de localhost (modo desarrollo)?',
-    a:
-      'A finales de 2024 Spotify dejó de aceptar http://localhost como dirección de redirección. La app de desarrollo se abre en http://127.0.0.1:5173/. En producción no afecta — usa la URL real con HTTPS.',
+      'Cualquier fallo del servicio de Spotify muestra una tarjeta roja con el mensaje técnico completo (código, ruta, detalle) y dos atajos: «Copiar detalles» (al portapapeles) y «Avisar por Telegram» (abre t.me/wellfitness_trainer en una pestaña nueva). Cópialo y pégamelo allí — con eso puedo localizar el problema sin pedirte que abras herramientas de desarrollador. En el Modo TV el botón se llama «Detalles» y abre la misma información en un cuadro de diálogo.',
   },
   {
     q: 'Algunas canciones del catálogo no aparecen en mi lista final',
@@ -45,12 +55,12 @@ const FAQS: readonly FaqItem[] = [
   {
     q: '¿Mis datos van a algún sitio?',
     a:
-      'No. Cadencia no tiene servidor ni base de datos. Tu plan de sesión, tu GPX y tu progreso del asistente viven en el almacenamiento de tu pestaña y se borran al cerrarla. Tus datos duraderos (peso, FC, FTP, géneros musicales, sesiones guardadas, listas propias y entradas del calendario) se guardan en este dispositivo solo si activas «Recordar mis datos» desde Mis preferencias, y se sincronizan entre dispositivos solo si conectas tu propio Google Drive — la carpeta `drive.appdata` es privada y exclusiva de Cadencia, nosotros no la vemos. El token de Spotify es siempre de sesión y expira en una hora.',
+      'No. Cadencia no tiene servidor ni base de datos. Tu plan de sesión, tu GPX y tu progreso del asistente viven solo en la memoria de la pestaña y se borran al cerrarla. Tus datos duraderos (peso, FC, FTP, géneros musicales, sesiones guardadas, listas propias y entradas del calendario) se guardan en este dispositivo solo si activas «Recordar mis datos» desde Mis preferencias, y se sincronizan entre dispositivos solo si conectas tu propio Google Drive — Cadencia escribe en una carpeta privada que solo nuestra aplicación ve, no en tu Drive normal. Tu Client ID de Spotify se guarda en el almacenamiento local de tu navegador y nunca sale de ahí. La llave de acceso temporal a Spotify caduca en una hora y se borra al cerrar la pestaña.',
   },
   {
     q: '¿Cómo subo mis propias listas de canciones?',
     a:
-      'En el paso «Música», elige fuente «Mías» o «Ambas» y arrastra el CSV de exportación de Spotify (con columnas Track URI, Tempo, Energy, Valence). La app deduplica por URI: las que coinciden con el catálogo nativo se cuentan una sola vez. Tus listas se guardan automáticamente en este dispositivo y, si tienes Drive conectado, se sincronizan al resto. Para gestionarlas: Mis preferencias → Catálogo de música → «Editar catálogo» → pestaña «Mis listas».',
+      'En el paso «Música», elige fuente «Mías» o «Ambas» y arrastra el CSV de exportación de Spotify (con columnas Track URI, Tempo, Energy, Valence). Cadencia descarta canciones repetidas por su URI: las que coinciden con el catálogo nativo se cuentan una sola vez. Tus listas se guardan automáticamente en este dispositivo y, si tienes Drive conectado, se sincronizan al resto. Para gestionarlas: Mis preferencias → Catálogo de música → «Editar catálogo» → pestaña «Mis listas».',
   },
   {
     q: '¿«Regenerar lista» cambia mucho la lista?',
@@ -68,15 +78,16 @@ export function SpotifyArticle(): JSX.Element {
   return (
     <ArticleShell
       slug="spotify"
-      lead="Cadencia se conecta a Spotify solo cuando pulsas 'Crear lista'. Aquí están las preguntas que más nos llegan sobre la integración y sobre la app en general."
+      lead="Cadencia se conecta a Spotify solo cuando pulsas 'Crear lista'. Aquí están las preguntas que más nos llegan sobre esa conexión y sobre la aplicación en general."
     >
       <Card variant="info" className="mb-6" title="Privacidad: nada va a ningún servidor" titleIcon="shield">
         <p className="text-sm text-gris-700 leading-relaxed">
-          Cadencia es 100% cliente. Tu GPX y el progreso del asistente viven en la
-          pestaña actual y se borran al cerrarla. Tus ajustes y sesiones guardadas
-          permanecen en este dispositivo solo si tú lo activas, y solo viajan a otros
-          dispositivos si conectas tu propio Google Drive. El token de Spotify es de
-          sesión y expira en una hora. Sin servidor, sin analítica de seguimiento.
+          Cadencia funciona entera en tu navegador. Tu GPX y el progreso del asistente
+          viven solo en la pestaña actual y se borran al cerrarla. Tus ajustes y
+          sesiones guardadas permanecen en este dispositivo solo si tú lo activas, y
+          solo viajan a otros dispositivos si conectas tu propio Google Drive. Tu
+          Client ID de Spotify se queda guardado en este navegador; la llave de acceso
+          temporal a Spotify caduca en una hora. Sin servidor, sin seguimiento.
         </p>
       </Card>
 

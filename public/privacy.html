@@ -86,7 +86,7 @@
     <div class="wrap">
       <a href="/" style="color: var(--turquesa-700); text-decoration: none">← Volver a la app</a>
       <h1>Política de privacidad</h1>
-      <p class="muted">Última actualización: 26 de abril de 2026</p>
+      <p class="muted">Última actualización: 4 de mayo de 2026</p>
 
       <h2>1. En una frase</h2>
       <p>
@@ -114,12 +114,29 @@
         </li>
       </ul>
 
-      <h2>3. Conexión con Spotify</h2>
+      <h2>3. Conexión con Spotify (modelo BYOC)</h2>
       <p>
-        Solo cuando pulsas el botón <strong>"Crear en Spotify"</strong>, la app inicia un flujo
-        OAuth 2.0 con PKCE para obtener tu autorización a crear listas privadas en tu cuenta.
+        Cadencia no opera bajo un Client ID propio compartido entre todos los usuarios. Cada
+        persona crea <strong>su propia app de Spotify</strong> en
+        <a
+          href="https://developer.spotify.com/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          >developer.spotify.com</a
+        >
+        (proceso gratuito, ~3 minutos, guiado por un asistente dentro de Cadencia) y obtiene un
+        <strong>Client ID</strong> personal de 32 caracteres. Solo cuando pulsas el botón
+        <strong>"Crear lista"</strong>, la app inicia un flujo OAuth 2.0 con PKCE usando TU Client
+        ID para obtener tu autorización a crear listas privadas en tu cuenta de Spotify.
       </p>
       <ul>
+        <li>
+          <strong>Tu Client ID</strong>: se guarda únicamente en
+          <code>localStorage</code> de tu navegador (clave
+          <code>cadencia:spotify:custom-client-id:v1</code>). No viaja a ningún servidor —
+          tampoco al nuestro, porque no tenemos. Puedes borrarlo en cualquier momento desde
+          «Mis preferencias» → «Conexión con Spotify».
+        </li>
         <li>
           <strong>Permiso solicitado</strong>: <code>playlist-modify-private</code>. Solo crear y
           modificar listas privadas. No leemos tu biblioteca, ni tus reproducciones, ni nada más.
@@ -136,10 +153,21 @@
           Spotify.
         </li>
         <li>
+          <strong>Tu app de Spotify es tuya</strong>: al crearla aceptas los
+          <a
+            href="https://developer.spotify.com/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            >términos de Spotify Developer</a
+          >. Cadencia es solo el cliente que utiliza tu Client ID en tu navegador; cualquier
+          uso indebido o suspensión del Client ID por parte de Spotify es responsabilidad de
+          la cuenta titular.
+        </li>
+        <li>
           Puedes revocar la autorización en cualquier momento desde
           <a href="https://www.spotify.com/account/apps/" target="_blank" rel="noopener noreferrer"
             >tu cuenta de Spotify → Apps</a
-          >.
+          >, o eliminar tu app entera desde el dashboard de developer.
         </li>
       </ul>
 
