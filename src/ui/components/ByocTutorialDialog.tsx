@@ -317,6 +317,7 @@ function ImageLightbox({ src, alt, onClose }: ImageLightboxProps): JSX.Element {
     >
       <button
         type="button"
+        autoFocus
         onClick={(e) => {
           e.stopPropagation();
           onClose();

@@ -75,6 +75,17 @@ export function scoreTrack(
   criteria: ZoneMusicCriteria,
   preferredGenres: readonly string[],
 ): number {
+  // Guard: campos numéricos críticos deben ser finitos para evitar NaN en
+  // cadenceScore/energyScore/valenceScore. Un track con datos rotos puntúa 0
+  // y queda al fondo del ranking sin contaminar el resto de cálculos.
+  if (
+    !Number.isFinite(track.tempoBpm) ||
+    !Number.isFinite(track.energy) ||
+    !Number.isFinite(track.valence)
+  ) {
+    return 0;
+  }
+
   // === CADENCE ===
   // Score por proximidad al midpoint del rango 1:1 O del rango alternativo
   // (2× en bike, 0.5× en run). Tomamos el max para no penalizar tracks que

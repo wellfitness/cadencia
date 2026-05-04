@@ -63,9 +63,16 @@ export function saveCadenciaData(data: SyncedData): void {
     if (typeof localStorage === 'undefined') return;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     window.dispatchEvent(new CustomEvent('cadencia-data-saved', { detail: { data } }));
-  } catch {
-    // Cuota excedida o modo privado: no rompe la app, solo se pierde la
-    // persistencia en este intento. El proximo save lo intentara de nuevo.
+  } catch (err) {
+    // Cuota excedida o modo privado: no rompe la app, pero sí es una pérdida
+    // de datos que el usuario no verá en la UI. Loguear para que sea visible
+    // en DevTools si alguien investiga por qué no se guardaron sus cambios.
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+      console.warn(
+        '[Cadencia] localStorage lleno: los últimos cambios no se han persistido.',
+        'Considera borrar entradas del historial, listas descartadas o datos de catálogo.',
+      );
+    }
   }
 }
 

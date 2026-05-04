@@ -30,7 +30,7 @@ export function coalesceContiguousBlocks(blocks: readonly SessionBlock[]): Sessi
     } else {
       const totalDuration = blocks
         .slice(i, j)
-        .reduce((acc, b) => acc + b.durationSec, 0);
+        .reduce((acc, b) => acc + Math.max(0, b.durationSec), 0);
       out.push({
         ...first,
         id: `${first.id}-coalesced`,

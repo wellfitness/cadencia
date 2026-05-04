@@ -1189,7 +1189,10 @@ function Faq(): JSX.Element {
         // de tiempo y abre vector XSS. Hoy el contenido es hardcoded y seguro,
         // pero es el patron estandar para JSON-LD inline.
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(faqJsonLd).replace(/</g, '\\u003c'),
+          __html: JSON.stringify(faqJsonLd)
+            .replace(/&/g, '\\u0026')
+            .replace(/</g, '\\u003c')
+            .replace(/>/g, '\\u003e'),
         }}
       />
       <div className="mx-auto w-full max-w-3xl px-4 py-12 md:py-16">

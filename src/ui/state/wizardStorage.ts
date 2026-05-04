@@ -93,9 +93,17 @@ export function loadWizardState(): WizardState | null {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (raw === null) return null;
     const parsed: unknown = JSON.parse(raw);
-    if (!isWizardState(parsed)) return null;
+    if (!isWizardState(parsed)) {
+      // Datos corruptos o de versión incompatible: limpiar para no dejar
+      // estado zombie que se reintente en cada carga sin éxito.
+      sessionStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
     return parsed;
   } catch {
+    // JSON inválido (ej. escritura incompleta por cierre abrupto):
+    // limpiar también para que el próximo arranque parta de cero limpio.
+    try { sessionStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     return null;
   }
 }

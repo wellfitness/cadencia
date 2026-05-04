@@ -1,5 +1,5 @@
 import { GDRIVE_CONFIG } from './config';
-import { emptySyncedData, isSyncedData } from '@core/sync/schema';
+import { isSyncedData } from '@core/sync/schema';
 import type { SyncedData } from '@core/sync/types';
 
 /**
@@ -81,18 +81,21 @@ export async function findFile(accessToken: string): Promise<DriveFileMeta | nul
  * Descarga el contenido completo del archivo como SyncedData.
  *
  * Si Drive devuelve un blob malformado (corrupcion, edicion manual del archivo
- * en appDataFolder, schema futuro), no lo aplicamos al store local: devolvemos
- * un blob vacio + log para que el motor de sync trate la situacion como
- * "remoto invalido" y conserve los datos locales intactos.
+ * en appDataFolder, schema futuro incompatible), lanza DriveApiError en lugar
+ * de devolver emptySyncedData(). La razon: un empty tiene updatedAt=1970 que
+ * pierde en el LWW → pull() lo interpreta como "remoto mas antiguo" y sube
+ * el local a Drive, SOBREESCRIBIENDO el archivo remoto con datos validos del
+ * cliente. Lanzar hace que pull() aborte limpiamente sin tocar nada.
  */
 export async function readFile(accessToken: string, fileId: string): Promise<SyncedData> {
   const res = await fetchWithAuth(`${API_FILES}/${fileId}?alt=media`, {}, accessToken);
   const json: unknown = await res.json();
   if (!isSyncedData(json)) {
-    if (typeof console !== 'undefined') {
-      console.warn('[gdrive] cadencia_data.json en Drive tiene formato invalido; se ignora.');
-    }
-    return emptySyncedData();
+    throw new DriveApiError(
+      'El archivo en Drive tiene un formato incompatible (schema futuro o corrupto). ' +
+        'Sincronización abortada para preservar los datos remotos.',
+      422,
+    );
   }
   return json;
 }

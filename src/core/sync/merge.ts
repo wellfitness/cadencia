@@ -8,6 +8,17 @@ import type {
 import { emptySyncedData } from './schema';
 
 /**
+ * Convierte una cadena ISO a timestamp numérico. Devuelve -Infinity si la
+ * cadena es inválida para que la lógica LWW la trate siempre como "más
+ * antigua", evitando que un timestamp corrupto invierta silenciosamente
+ * el resultado del merge.
+ */
+function safeTime(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : -Infinity;
+}
+
+/**
  * `Math.max` aceptable para arrays grandes. El spread `Math.max(...arr)` puede
  * dar stack overflow con cientos de miles de elementos y nunca es necesario
  * — reduce equivale y es estable. Asume `arr.length > 0`.
@@ -75,7 +86,7 @@ type AtomicSection = (typeof ATOMIC_SECTIONS)[number];
 function getMetaTime(data: SyncedData, section: AtomicSection): number {
   const meta = data._sectionMeta[section];
   if (!meta) return -Infinity;
-  return new Date(meta.updatedAt).getTime();
+  return safeTime(meta.updatedAt);
 }
 
 /**
@@ -128,8 +139,8 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
       sessionsById.set(remoteItem.id, remoteItem);
       continue;
     }
-    const localTime = new Date(localItem.updatedAt).getTime();
-    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    const localTime = safeTime(localItem.updatedAt);
+    const remoteTime = safeTime(remoteItem.updatedAt);
     sessionsById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
   }
   merged.savedSessions = Array.from(sessionsById.values());
@@ -152,8 +163,8 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
       csvsById.set(remoteItem.id, remoteItem);
       continue;
     }
-    const localTime = new Date(localItem.updatedAt).getTime();
-    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    const localTime = safeTime(localItem.updatedAt);
+    const remoteTime = safeTime(remoteItem.updatedAt);
     csvsById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
   }
   merged.uploadedCsvs = Array.from(csvsById.values());
@@ -176,8 +187,8 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
       eventsById.set(remoteItem.id, remoteItem);
       continue;
     }
-    const localTime = new Date(localItem.updatedAt).getTime();
-    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    const localTime = safeTime(localItem.updatedAt);
+    const remoteTime = safeTime(remoteItem.updatedAt);
     eventsById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
   }
   merged.plannedEvents = Array.from(eventsById.values());
@@ -200,8 +211,8 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
       historyById.set(remoteItem.id, remoteItem);
       continue;
     }
-    const localTime = new Date(localItem.updatedAt).getTime();
-    const remoteTime = new Date(remoteItem.updatedAt).getTime();
+    const localTime = safeTime(localItem.updatedAt);
+    const remoteTime = safeTime(remoteItem.updatedAt);
     historyById.set(remoteItem.id, remoteTime >= localTime ? remoteItem : localItem);
   }
   merged.playlistHistory = Array.from(historyById.values());

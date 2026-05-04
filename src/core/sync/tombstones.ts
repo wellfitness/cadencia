@@ -2,6 +2,11 @@ import type { SyncedData } from './types';
 
 const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+function safeTime(iso: string): number {
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : -Infinity;
+}
+
 /**
  * Elimina tombstones (`deletedAt` mas antiguos que TOMBSTONE_MAX_AGE_MS)
  * del array savedSessions y uploadedCsvs. Devuelve un nuevo objeto si
@@ -20,19 +25,19 @@ export function cleanExpiredTombstones(
   const cutoff = now - TOMBSTONE_MAX_AGE_MS;
   const filteredSessions = data.savedSessions.filter((s) => {
     if (!s.deletedAt) return true;
-    return new Date(s.deletedAt).getTime() > cutoff;
+    return safeTime(s.deletedAt) > cutoff;
   });
   const filteredCsvs = data.uploadedCsvs.filter((c) => {
     if (!c.deletedAt) return true;
-    return new Date(c.deletedAt).getTime() > cutoff;
+    return safeTime(c.deletedAt) > cutoff;
   });
   const filteredEvents = data.plannedEvents.filter((e) => {
     if (!e.deletedAt) return true;
-    return new Date(e.deletedAt).getTime() > cutoff;
+    return safeTime(e.deletedAt) > cutoff;
   });
   const filteredHistory = data.playlistHistory.filter((h) => {
     if (!h.deletedAt) return true;
-    return new Date(h.deletedAt).getTime() > cutoff;
+    return safeTime(h.deletedAt) > cutoff;
   });
   const sessionsChanged = filteredSessions.length !== data.savedSessions.length;
   const csvsChanged = filteredCsvs.length !== data.uploadedCsvs.length;

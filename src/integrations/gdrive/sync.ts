@@ -135,7 +135,19 @@ async function doInit(): Promise<void> {
 
   if (typeof document !== 'undefined' && _onVisibilityChange === null) {
     _onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible' && isConnected() && !_syncing) {
+      if (document.visibilityState === 'hidden') {
+        // Pausar el polling mientras la pestaña está oculta para no gastar
+        // batería/CPU. Se reanuda al volver visible.
+        stopPolling();
+        // Flushear el debounce pendiente antes de que el SO pueda congelar
+        // la pestaña: es más fiable que beforeunload para APIs async.
+        if (_debounceTimer !== null) {
+          clearTimeout(_debounceTimer);
+          _debounceTimer = null;
+          if (isConnected() && !_applyingRemote) void doPush();
+        }
+      } else if (document.visibilityState === 'visible' && isConnected() && !_syncing) {
+        startPolling();
         void checkRemote();
       }
     };
@@ -273,8 +285,9 @@ async function pull(token: string): Promise<void> {
     return;
   }
 
-  const localTime = new Date(local.updatedAt).getTime();
-  const remoteTime = new Date(remote.updatedAt).getTime();
+  const safeTime = (iso: string): number => { const t = new Date(iso).getTime(); return Number.isFinite(t) ? t : -Infinity; };
+  const localTime = safeTime(local.updatedAt);
+  const remoteTime = safeTime(remote.updatedAt);
 
   if (remoteTime > localTime) {
     // Anti-regresion suave: si local << remote en riqueza, aplica remote directo.
@@ -375,12 +388,18 @@ async function pullAndMerge(token: string, fileId: string): Promise<void> {
  */
 function applyRemote(data: SyncedData): void {
   _applyingRemote = true;
-  saveCadenciaData(data);
-  // Liberamos el flag tras un tick — listeners sincronos del evento se
-  // habran ejecutado ya. Cualquier escritura posterior si dispara push.
-  setTimeout(() => {
-    _applyingRemote = false;
-  }, 0);
+  try {
+    saveCadenciaData(data);
+  } finally {
+    // Liberamos el flag tras un tick — listeners sincronos del evento se
+    // habran ejecutado ya. Cualquier escritura posterior si dispara push.
+    // El finally garantiza que el flag se libera aunque saveCadenciaData
+    // lance excepcion (ej. localStorage lleno), evitando deadlock silencioso
+    // donde todos los cambios locales posteriores dejan de sincronizarse.
+    setTimeout(() => {
+      _applyingRemote = false;
+    }, 0);
+  }
 }
 
 /**

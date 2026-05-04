@@ -47,7 +47,15 @@ export function GoogleSyncCard(): JSX.Element {
     setBusy(true);
     setError(null);
     try {
-      const result = await connect();
+      const result = await Promise.race([
+        connect(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('La conexión tardó demasiado. Inténtalo de nuevo.')),
+            30_000,
+          ),
+        ),
+      ]);
       setConnected(true);
       setEmail(result.email);
     } catch (err) {
@@ -68,9 +76,19 @@ export function GoogleSyncCard(): JSX.Element {
     setBusy(true);
     setError(null);
     try {
-      await disconnect();
+      await Promise.race([
+        disconnect(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('La desconexión tardó demasiado. Inténtalo de nuevo.')),
+            15_000,
+          ),
+        ),
+      ]);
       setConnected(false);
       setEmail('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al desconectar');
     } finally {
       setBusy(false);
     }

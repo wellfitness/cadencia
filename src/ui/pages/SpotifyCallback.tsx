@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  clearAuthFlow,
   exchangeCodeForTokens,
   getCurrentUser,
   getRedirectUri,
@@ -69,6 +70,9 @@ export function SpotifyCallback(): JSX.Element {
     })
       .then(async (tokens) => {
         saveTokens(tokens);
+        // Limpiar el flow OAuth (codeVerifier + state) ahora que el
+        // intercambio ha sido exitoso — ya no son necesarios.
+        clearAuthFlow();
         // Detectar Premium en background. Lo necesitamos cacheado para que
         // el wizard pueda decidir si activa los controles integrados de
         // musica en el Modo TV. Si /me falla (red, scope ausente), seguimos

@@ -16,6 +16,7 @@ const ELEVATION_SMOOTHING_WINDOW_METERS = 50;
  * para ciclismo recreativo en bici de carretera/gravel.
  */
 function estimateSpeedMps(slopePercent: number): number {
+  if (!Number.isFinite(slopePercent)) return (25 * 1000) / 3600; // fallback llano
   const kmh =
     slopePercent < -1 ? 35 :
     slopePercent < 1 ? 25 :

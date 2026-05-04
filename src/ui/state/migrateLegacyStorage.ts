@@ -18,7 +18,13 @@ export function migrateLegacyStorageOnce(): void {
   if (cadencia.userInputs !== null) return;
 
   const legacy = loadUserInputsFromLocal();
-  if (legacy === null) return;
+  if (legacy === null) {
+    // Puede ser que no hubiera datos legacy (nuevo usuario) o que el JSON
+    // estuviera corrupto. En cualquier caso, limpiar la key para no dejar
+    // almacenamiento zombie que se reintente en cada arranque sin éxito.
+    clearUserInputsFromLocal();
+    return;
+  }
 
   updateSection('userInputs', legacy);
   clearUserInputsFromLocal();
