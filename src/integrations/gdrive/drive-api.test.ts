@@ -57,20 +57,46 @@ describe('drive-api', () => {
     expect(result.schemaVersion).toBe(1);
   });
 
-  it('readFile devuelve blob vacio si el JSON remoto esta corrupto (regresion A4)', async () => {
-    // Falta uploadedCsvs, dismissedTrackUris, plannedEvents — guard isSyncedData
-    // deberia rechazar y readFile devolver emptySyncedData en lugar de
-    // propagar el blob malformado al merge.
+  it('readFile normaliza blob legitimo de version antigua sin arrays nuevos', async () => {
+    // Caso real: blob escrito por una version de Cadencia anterior a la
+    // extension del schema (sin uploadedCsvs / dismissedTrackUris /
+    // plannedEvents / playlistHistory). Antes lanzaba DriveApiError 422 y
+    // abortaba el sync silenciosamente; ahora rellena con [] y preserva el
+    // updatedAt real del remoto para que el LWW funcione bien.
+    const remoteUpdatedAt = new Date('2026-04-01T10:00:00.000Z').toISOString();
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ schemaVersion: 1, savedSessions: [] }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({
+          schemaVersion: 1,
+          updatedAt: remoteUpdatedAt,
+          _sectionMeta: {},
+          userInputs: null,
+          musicPreferences: null,
+          savedSessions: [],
+        }),
+        { status: 200 },
+      ),
     );
     const result = await readFile('token', 'fileId');
     expect(result.savedSessions).toEqual([]);
     expect(result.uploadedCsvs).toEqual([]);
     expect(result.plannedEvents).toEqual([]);
     expect(result.dismissedTrackUris).toEqual([]);
+    expect(result.playlistHistory).toEqual([]);
+    expect(result.tvModePrefs).toBeNull();
+    // Critico: preservar el updatedAt real del remoto, no resetearlo a 1970,
+    // para que el LWW no marque el local como ganador y sobreescriba Drive.
+    expect(result.updatedAt).toBe(remoteUpdatedAt);
+  });
+
+  it('readFile lanza DriveApiError 422 si el blob es totalmente irreconocible', async () => {
+    // Sin schemaVersion ni savedSessions — no es un SyncedData. Lanzar
+    // protege el archivo remoto: si devolviera empty, el LWW perderia y el
+    // local sobrescribiria Drive con datos posiblemente inferiores.
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ random: 'object' }), { status: 200 }),
+    );
+    await expect(readFile('token', 'fileId')).rejects.toBeInstanceOf(DriveApiError);
   });
 
   it('retry automatico en 401 si hay token refresher', async () => {

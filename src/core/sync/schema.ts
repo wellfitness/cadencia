@@ -18,12 +18,18 @@ export function emptySyncedData(): SyncedData {
 }
 
 /**
- * Guard estricto para datos descargados (Drive) o cargados desde almacenamiento.
+ * Guard de estructura BASICA para datos descargados o cargados desde almacenamiento.
  *
- * Antes solo verificaba schemaVersion, updatedAt, _sectionMeta y savedSessions.
- * Si el blob tenia `uploadedCsvs: null` o `dismissedTrackUris: undefined`, el
- * guard pasaba y el merge crasheaba con `Cannot read properties of null`. Ahora
- * exige que TODOS los arrays sean Array.isArray.
+ * Valida solo los campos del schema original (schemaVersion, updatedAt, _sectionMeta,
+ * savedSessions). Los campos array añadidos en extensiones posteriores
+ * (uploadedCsvs, dismissedTrackUris, plannedEvents, playlistHistory) NO se exigen
+ * aqui — pueden faltar en blobs creados por versiones antiguas de Cadencia que
+ * sincronizaron antes de la extension del schema. `normalizeSyncedData()` los
+ * rellena con [] tras validacion para que el merge no crashee.
+ *
+ * Si este guard rechaza un blob, es porque la estructura es realmente irreconocible
+ * (no es un SyncedData en absoluto): proteger el blob remoto lanzando en lugar
+ * de aplicar un empty que sobreescribiria Drive via LWW.
  */
 export function isSyncedData(value: unknown): value is SyncedData {
   if (typeof value !== 'object' || value === null) return false;
@@ -33,11 +39,32 @@ export function isSyncedData(value: unknown): value is SyncedData {
     typeof v['updatedAt'] === 'string' &&
     typeof v['_sectionMeta'] === 'object' &&
     v['_sectionMeta'] !== null &&
-    Array.isArray(v['savedSessions']) &&
-    Array.isArray(v['uploadedCsvs']) &&
-    Array.isArray(v['dismissedTrackUris']) &&
-    Array.isArray(v['plannedEvents'])
-    // playlistHistory NO se valida aqui (back-compat con blobs antiguos
-    // que no la traen). normalize() en cadenciaStore la rellena con [].
+    Array.isArray(v['savedSessions'])
   );
+}
+
+/**
+ * Rellena campos faltantes de un SyncedData con sus defaults. Se aplica tras
+ * `isSyncedData` para hidratar blobs creados por versiones antiguas de Cadencia
+ * que no traian los campos array nuevos. Preserva los datos existentes y el
+ * `updatedAt` real del blob (critico: empty con updatedAt=1970 perderia LWW).
+ *
+ * Forward-compatible: cuando se añadan más campos al schema en el futuro,
+ * añadirlos aqui con su default y los blobs viejos seguiran cargandose.
+ */
+export function normalizeSyncedData(data: SyncedData): SyncedData {
+  const empty = emptySyncedData();
+  return {
+    ...empty,
+    ...data,
+    _sectionMeta: { ...empty._sectionMeta, ...data._sectionMeta },
+    uploadedCsvs: Array.isArray(data.uploadedCsvs) ? data.uploadedCsvs : [],
+    nativeCatalogPrefs: data.nativeCatalogPrefs ?? null,
+    dismissedTrackUris: Array.isArray(data.dismissedTrackUris)
+      ? data.dismissedTrackUris
+      : [],
+    plannedEvents: Array.isArray(data.plannedEvents) ? data.plannedEvents : [],
+    playlistHistory: Array.isArray(data.playlistHistory) ? data.playlistHistory : [],
+    tvModePrefs: data.tvModePrefs ?? null,
+  };
 }

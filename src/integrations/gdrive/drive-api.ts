@@ -1,5 +1,5 @@
 import { GDRIVE_CONFIG } from './config';
-import { isSyncedData } from '@core/sync/schema';
+import { isSyncedData, normalizeSyncedData } from '@core/sync/schema';
 import type { SyncedData } from '@core/sync/types';
 
 /**
@@ -80,12 +80,18 @@ export async function findFile(accessToken: string): Promise<DriveFileMeta | nul
 /**
  * Descarga el contenido completo del archivo como SyncedData.
  *
- * Si Drive devuelve un blob malformado (corrupcion, edicion manual del archivo
- * en appDataFolder, schema futuro incompatible), lanza DriveApiError en lugar
- * de devolver emptySyncedData(). La razon: un empty tiene updatedAt=1970 que
- * pierde en el LWW → pull() lo interpreta como "remoto mas antiguo" y sube
- * el local a Drive, SOBREESCRIBIENDO el archivo remoto con datos validos del
- * cliente. Lanzar hace que pull() aborte limpiamente sin tocar nada.
+ * Dos politicas segun la severidad del problema:
+ *
+ *  1. Blob con estructura reconocible pero campos arrays faltantes (ej. archivo
+ *     creado por una version antigua de Cadencia antes de añadir uploadedCsvs,
+ *     dismissedTrackUris, plannedEvents…): se normaliza rellenando con [] y se
+ *     devuelve. Preserva el updatedAt real del blob para que el LWW funcione.
+ *     Sin este path, blobs viejos legitimos hacian abortar todo el sync.
+ *
+ *  2. Blob realmente irreconocible (no es JSON SyncedData, schema futuro
+ *     incompatible, edicion manual rota): lanza DriveApiError 422. Sin esto,
+ *     un empty con updatedAt=1970 perderia el LWW y subiria el local
+ *     SOBREESCRIBIENDO el archivo remoto valido.
  */
 export async function readFile(accessToken: string, fileId: string): Promise<SyncedData> {
   const res = await fetchWithAuth(`${API_FILES}/${fileId}?alt=media`, {}, accessToken);
@@ -97,7 +103,7 @@ export async function readFile(accessToken: string, fileId: string): Promise<Syn
       422,
     );
   }
-  return json;
+  return normalizeSyncedData(json);
 }
 
 /**

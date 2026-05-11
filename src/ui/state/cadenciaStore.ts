@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { emptySyncedData, isSyncedData } from '@core/sync/schema';
+import { emptySyncedData, isSyncedData, normalizeSyncedData } from '@core/sync/schema';
 import type { PlaylistHistoryEntry, SyncedData } from '@core/sync/types';
 
 const STORAGE_KEY = 'cadencia:data:v1';
@@ -19,31 +19,6 @@ const STORAGE_KEY = 'cadencia:data:v1';
  * cambios sin acoplar la UI con el modulo de Drive.
  */
 
-/**
- * Normaliza datos persistidos hidratando campos que puedan faltar en
- * blobs antiguos (anteriores a una extension del schema). Mantiene el
- * principio backwards-compatible: cualquier blob valido en el pasado
- * sigue siendo cargable, simplemente con los campos nuevos a su valor
- * por defecto.
- */
-function normalize(data: SyncedData): SyncedData {
-  const empty = emptySyncedData();
-  return {
-    ...empty,
-    ...data,
-    _sectionMeta: { ...empty._sectionMeta, ...data._sectionMeta },
-    // Defaults para campos anadidos en extensiones posteriores al schema
-    // original. La validacion isSyncedData no comprueba estos campos
-    // (back-compat), asi que aqui los rellenamos.
-    uploadedCsvs: data.uploadedCsvs ?? [],
-    nativeCatalogPrefs: data.nativeCatalogPrefs ?? null,
-    dismissedTrackUris: data.dismissedTrackUris ?? [],
-    plannedEvents: data.plannedEvents ?? [],
-    playlistHistory: data.playlistHistory ?? [],
-    tvModePrefs: data.tvModePrefs ?? null,
-  };
-}
-
 export function loadCadenciaData(): SyncedData {
   try {
     if (typeof localStorage === 'undefined') return emptySyncedData();
@@ -51,7 +26,10 @@ export function loadCadenciaData(): SyncedData {
     if (raw === null) return emptySyncedData();
     const parsed: unknown = JSON.parse(raw);
     if (!isSyncedData(parsed)) return emptySyncedData();
-    return normalize(parsed);
+    // normalizeSyncedData rellena con defaults los campos nuevos (uploadedCsvs,
+    // dismissedTrackUris, plannedEvents, playlistHistory, tvModePrefs) que blobs
+    // antiguos pueden no traer. Mismo helper que usa drive-api al descargar.
+    return normalizeSyncedData(parsed);
   } catch {
     // JSON corrupto o storage deshabilitado: arrancamos con empty.
     return emptySyncedData();
