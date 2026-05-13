@@ -270,6 +270,7 @@ async function pull(token: string): Promise<void> {
   }
   if (!file) {
     // No hay archivo en Drive — push inicial.
+    console.warn('[Cadencia ↔ Drive] No hay archivo en Drive; subiendo el local como push inicial…');
     await push(token);
     return;
   }
@@ -278,8 +279,18 @@ async function pull(token: string): Promise<void> {
   const remote = await readFile(token, file.id);
   const local = loadCadenciaData();
 
+  const remoteRich = calculateDataRichness(remote);
+  const localRich = calculateDataRichness(local);
+  console.warn(
+    `[Cadencia ↔ Drive] PULL: archivo encontrado (id=${file.id.slice(0, 8)}…, version=${file.version}). ` +
+      `Riqueza remote=${remoteRich.toFixed(2)} (userInputs=${remote.userInputs !== null ? 'sí' : 'no'}, ` +
+      `savedSessions=${remote.savedSessions.length}, uploadedCsvs=${remote.uploadedCsvs.length}). ` +
+      `Riqueza local=${localRich.toFixed(2)} (userInputs=${local.userInputs !== null ? 'sí' : 'no'}).`,
+  );
+
   // Anti-regresion fuerte: local vacio + remote con datos => aplica remote.
   if (isEmptyData(local) && !isEmptyData(remote)) {
+    console.warn('[Cadencia ↔ Drive] Local vacío y remote con datos: aplicando remote directamente.');
     applyRemote(remote);
     setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
     return;
@@ -292,10 +303,12 @@ async function pull(token: string): Promise<void> {
   if (remoteTime > localTime) {
     // Anti-regresion suave: si local << remote en riqueza, aplica remote directo.
     if (calculateDataRichness(local) < calculateDataRichness(remote) * 0.3) {
+      console.warn('[Cadencia ↔ Drive] Remote bastante más rico que local: aplicando remote directo.');
       applyRemote(remote);
       setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
       return;
     }
+    console.warn('[Cadencia ↔ Drive] Remote más reciente que local: haciendo merge LWW.');
     const { merged } = mergeData(local, remote);
     const cleaned = cleanExpiredTombstones(merged);
     applyRemote(cleaned);
@@ -303,11 +316,13 @@ async function pull(token: string): Promise<void> {
       const result = await updateFile(token, file.id, cleaned);
       setSyncState({ fileVersion: result.version, lastSyncAt: new Date().toISOString() });
     } catch (err) {
-      console.warn('[gdrive sync] push tras merge fallo:', err);
+      console.warn('[Cadencia ↔ Drive] push tras merge falló:', err);
     }
   } else if (localTime > remoteTime) {
+    console.warn('[Cadencia ↔ Drive] Local más reciente que remote: subiendo local a Drive.');
     await push(token);
   } else {
+    console.warn('[Cadencia ↔ Drive] Local y remote ya están en el mismo timestamp: nada que hacer.');
     setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
   }
 }
@@ -320,6 +335,13 @@ async function pull(token: string): Promise<void> {
 async function push(token: string): Promise<void> {
   const local = loadCadenciaData();
   const state = getSyncState();
+
+  console.warn(
+    `[Cadencia ↔ Drive] PUSH: subiendo a Drive. ` +
+      `userInputs=${local.userInputs !== null ? 'sí' : 'no'}, ` +
+      `savedSessions=${local.savedSessions.length}, ` +
+      `uploadedCsvs=${local.uploadedCsvs.length}, riqueza=${calculateDataRichness(local).toFixed(2)}.`,
+  );
 
   if (state.fileId) {
     let meta: { id: string; version: string } | null = null;
@@ -396,6 +418,13 @@ async function pullAndMerge(token: string, fileId: string): Promise<void> {
 function applyRemote(data: SyncedData): void {
   _applyingRemote = true;
   try {
+    console.warn(
+      `[Cadencia ↔ Drive] APPLY-REMOTE: escribiendo en cadenciaStore. ` +
+        `userInputs=${data.userInputs !== null ? 'sí' : 'no'}, ` +
+        `musicPreferences=${data.musicPreferences !== null ? 'sí' : 'no'}, ` +
+        `savedSessions=${data.savedSessions.length}, uploadedCsvs=${data.uploadedCsvs.length}, ` +
+        `dismissedTracks=${data.dismissedTrackUris.length}, plannedEvents=${data.plannedEvents.length}.`,
+    );
     saveCadenciaData(data);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
