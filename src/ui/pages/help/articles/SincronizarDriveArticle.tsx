@@ -88,6 +88,10 @@ const FAQ_GROUPS: readonly FaqGroup[] = [
         a: 'En una carpeta privada y oculta de tu propio Google Drive llamada «datos de aplicaciones» (técnicamente, el espacio drive.appdata). NO aparece en la vista normal de Drive: solo Cadencia, con tu permiso explícito, puede leerla y escribirla en tu cuenta. Nosotros no tenemos servidor — los datos viajan directos entre tu navegador y Google.',
       },
       {
+        q: '¿Cómo compruebo que Cadencia ha guardado algo en mi Drive?',
+        a: 'Como la carpeta es invisible en la vista normal de Drive, hay que mirarla por otro sitio: entra en https://drive.google.com/drive/u/0/settings, pestaña «Administrar aplicaciones», busca «Cadencia» en la lista. Si tiene datos verás algo como «Datos de aplicación ocultos: 2 KB». Si pone «menos de 1 KB» o no aparece, significa que aún no has guardado nada (o el sync falló). Desde ahí también puedes desconectar Cadencia o borrar sus datos ocultos sin tocar el resto de tu Drive.',
+      },
+      {
         q: '¿Cuándo se sincroniza?',
         a: 'Cuando cambias algo en tus ajustes, sesiones o calendario, Cadencia espera 2 segundos y sube el cambio. Cuando vuelves a la pestaña tras tenerla en segundo plano, comprueba si hay cambios remotos y los descarga. Mientras la pestaña está activa, hace una comprobación ligera cada 30 segundos. Todo en segundo plano.',
       },
@@ -177,6 +181,48 @@ export function SincronizarDriveArticle(): JSX.Element {
             todo se sincroniza automáticamente en segundo plano.
           </li>
         </ol>
+      </Card>
+
+      <Card
+        title="Cómo comprobar si Cadencia tiene datos en tu Drive"
+        titleIcon="folder_open"
+        className="mt-4"
+      >
+        <p className="text-sm text-gris-700 leading-relaxed mb-2">
+          La carpeta donde Cadencia guarda tus datos es{' '}
+          <strong>invisible en la vista normal de Drive</strong> (es deliberado:
+          nadie puede curiosearla por accidente). Para verla:
+        </p>
+        <ol className="list-decimal list-inside space-y-1 text-sm text-gris-700 leading-relaxed">
+          <li>
+            Entra en{' '}
+            <a
+              href="https://drive.google.com/drive/u/0/settings"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-turquesa-600 hover:underline"
+            >
+              drive.google.com/drive/u/0/settings
+            </a>
+            .
+          </li>
+          <li>
+            Pestaña <strong>«Administrar aplicaciones»</strong> en el panel
+            izquierdo.
+          </li>
+          <li>
+            Busca <strong>«Cadencia»</strong> en la lista.
+          </li>
+          <li>
+            Si tiene datos verás algo como{' '}
+            <em>«Datos de aplicación ocultos: 2 KB»</em>. Si pone «menos de 1 KB»
+            o no aparece Cadencia, aún no se ha guardado nada útil.
+          </li>
+        </ol>
+        <p className="text-sm text-gris-600 leading-relaxed mt-2">
+          Ese espacio NO cuenta para tu cuota normal de los 15 GB de Drive —
+          va aparte.
+        </p>
       </Card>
 
       <Card title="Cómo desconectar o borrar" titleIcon="cloud_off" className="mt-4">
