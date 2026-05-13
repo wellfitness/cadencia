@@ -385,11 +385,23 @@ async function pullAndMerge(token: string, fileId: string): Promise<void> {
  * Aplica datos remotos al cadenciaStore. El flag _applyingRemote evita
  * que el evento 'cadencia-data-saved' que dispara saveCadenciaData
  * provoque un push automatico (ciclo infinito).
+ *
+ * Ademas del 'cadencia-data-saved' generico (que la UI reactiva ya escucha),
+ * emite 'cadencia-data-applied-from-remote' con el blob entero. Esto permite
+ * que estados aislados del cadenciaStore (useReducer/useState locales de
+ * componentes de pagina como App.tsx) se rehidraten con los valores del pull
+ * — sin esto, esos estados quedan congelados en el snapshot del montaje
+ * inicial y la UI no refleja los datos descargados de Drive hasta refrescar.
  */
 function applyRemote(data: SyncedData): void {
   _applyingRemote = true;
   try {
     saveCadenciaData(data);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('cadencia-data-applied-from-remote', { detail: { data } }),
+      );
+    }
   } finally {
     // Liberamos el flag tras un tick — listeners sincronos del evento se
     // habran ejecutado ya. Cualquier escritura posterior si dispara push.

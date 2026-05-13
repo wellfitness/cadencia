@@ -24,6 +24,7 @@ export type UserInputsAction =
   | { type: 'SET_BIKE_TYPE'; value: BikeType | null }
   | { type: 'SET_SEX'; value: BiologicalSex | null }
   | { type: 'SET_SPORT'; value: Sport }
+  | { type: 'HYDRATE'; value: UserInputsRaw }
   | { type: 'RESET' };
 
 export function userInputsReducer(
@@ -39,6 +40,12 @@ export function userInputsReducer(
       return { ...state, sex: action.value };
     case 'SET_SPORT':
       return { ...state, sport: action.value };
+    case 'HYDRATE':
+      // Reemplaza el state entero. Usado cuando el pull de Drive aplica
+      // datos remotos al cadenciaStore: el reducer (inicializado una sola
+      // vez al montar App.tsx) debe rehidratarse para que la UI refleje
+      // los inputs sincronizados desde otro dispositivo.
+      return action.value;
     case 'RESET':
       return EMPTY_USER_INPUTS;
   }

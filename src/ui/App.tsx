@@ -68,6 +68,7 @@ import {
 } from '@ui/state/wizardStorage';
 import { loadCadenciaData, updateSection, useCadenciaData } from '@ui/state/cadenciaStore';
 import { createUploadedCsv, deleteUploadedCsv } from '@core/csvs/uploadedCsvs';
+import type { SyncedData } from '@core/sync/types';
 
 const STEPS: readonly StepperStep[] = [
   { label: 'Tipo', icon: 'tune' },
@@ -316,6 +317,27 @@ function WizardApp(): JSX.Element {
   useEffect(() => {
     updateSection('musicPreferences', musicPreferences);
   }, [musicPreferences]);
+
+  // Rehidratacion tras un pull desde Drive. Sin este efecto, los estados
+  // locales `inputs` (useReducer) y `musicPreferences` (useState) quedan
+  // congelados en su snapshot inicial: la UI muestra los datos antiguos
+  // aunque el cadenciaStore ya tenga los nuevos descargados de Drive.
+  // El evento se emite SOLO desde sync.applyRemote, asi no se confunde
+  // con saves locales (que son la fuente del estado, no destino).
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent<{ data: SyncedData }>).detail;
+      if (!detail?.data) return;
+      if (detail.data.userInputs) {
+        dispatch({ type: 'HYDRATE', value: detail.data.userInputs });
+      }
+      if (detail.data.musicPreferences) {
+        setMusicPreferences(detail.data.musicPreferences);
+      }
+    };
+    window.addEventListener('cadencia-data-applied-from-remote', handler);
+    return () => window.removeEventListener('cadencia-data-applied-from-remote', handler);
+  }, []);
 
   const handleRegenerateSeed = useCallback((): void => {
     // Cambiar la semilla regenera la playlist completa con elecciones nuevas:
