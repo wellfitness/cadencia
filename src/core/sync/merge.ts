@@ -36,8 +36,14 @@ function maxOf(arr: readonly number[]): number {
  * Comparacion estructural recursiva. Sustituye al `JSON.stringify(a) !== JSON.stringify(b)`
  * que daba falsos positivos cuando dos blobs equivalentes tenian las claves
  * en distinto orden tras un round-trip por motores JS distintos.
+ *
+ * Exportado para que el cadenciaStore pueda usar la misma definicion al
+ * hacer `updateSection` idempotente (no-op si el valor entrante es
+ * estructuralmente igual al ya guardado), evitando bucles de sync donde
+ * un pull desde Drive disparaba push de los mismos datos via el useEffect
+ * de persistencia.
  */
-function deepEqual(a: unknown, b: unknown): boolean {
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
   if (a === null || b === null) return a === b;

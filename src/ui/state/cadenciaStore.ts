@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { emptySyncedData, isSyncedData, normalizeSyncedData } from '@core/sync/schema';
+import { deepEqual } from '@core/sync/merge';
 import type { PlaylistHistoryEntry, SyncedData } from '@core/sync/types';
 
 const STORAGE_KEY = 'cadencia:data:v1';
@@ -77,12 +78,26 @@ type AtomicSectionKey =
  * Actualiza una seccion atomica del store, bumpeando su `_sectionMeta.updatedAt`
  * a `now()`. Esto es la senal que `mergeData` usa para LWW: el lado con
  * timestamp mayor gana.
+ *
+ * IDEMPOTENTE: si el valor entrante es estructuralmente igual al ya guardado,
+ * la funcion es no-op (no toca timestamps ni dispara `cadencia-data-saved`).
+ * Sin esto, un pull desde Drive aplicaba datos al store, el useEffect de
+ * persistencia en App.tsx se disparaba con los inputs rehidratados y volvia
+ * a llamar a updateSection — bumpeando el timestamp aunque los datos fueran
+ * los mismos. Resultado: push de vuelta a Drive con los datos identicos.
+ * Si el otro dispositivo estaba conectado, ese cambio le llegaba, disparaba
+ * su HYDRATE y volvia a re-pushear. Bucle de sync silencioso.
+ *
+ * Con la guarda de deepEqual: si Drive trae los mismos datos que ya tenemos
+ * (o si el caller pasa por error el mismo valor), no se escribe nada y no
+ * se propagan eventos.
  */
 export function updateSection<K extends AtomicSectionKey>(
   section: K,
   value: SyncedData[K],
 ): void {
   const data = loadCadenciaData();
+  if (deepEqual(data[section], value)) return;
   const now = new Date().toISOString();
   data[section] = value;
   data._sectionMeta[section] = { updatedAt: now };
