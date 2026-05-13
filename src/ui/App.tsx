@@ -68,8 +68,6 @@ import {
 } from '@ui/state/wizardStorage';
 import { loadCadenciaData, updateSection, useCadenciaData } from '@ui/state/cadenciaStore';
 import { createUploadedCsv, deleteUploadedCsv } from '@core/csvs/uploadedCsvs';
-import { useDriveConnected } from '@ui/components/sync/useDriveConnected';
-import { isPersistentStorageEnabled } from '@core/user';
 import type { SyncedData } from '@core/sync/types';
 
 const STEPS: readonly StepperStep[] = [
@@ -235,41 +233,20 @@ function WizardApp(): JSX.Element {
   // currentYear cacheado en una sesion (no cambia significativamente durante el uso normal).
   const [currentYear] = useState(() => new Date().getFullYear());
 
-  // Persistencia derivada. Tres maneras de activarse, en OR:
-  //   (1) Hay userInputs ya guardados en cadenciaStore (el usuario activo
-  //       «Recordar mis datos» en /preferencias en algun momento).
-  //   (2) La key legacy de persistencia local existe (cobertura del paso de
-  //       migracion: usuarios que activaron persistencia en versiones viejas).
-  //   (3) Drive esta conectado. Reactiva via useDriveConnected: en cuanto el
-  //       usuario conecta su Drive, este flag pasa a true y el useEffect de
-  //       persistencia se vuelve a disparar con los inputs en memoria, los
-  //       persiste al cadenciaStore y de ahi suben a Drive automaticamente.
-  //
-  // Antes solo se usaba (1), creando un dead-loop UX: el primer guardado nunca
-  // ocurria a menos que el usuario activase manualmente el toggle escondido en
-  // /preferencias ANTES de rellenar nada. Como la mayoria de la gente rellena
-  // antes de explorar preferencias, los datos se tiraban en silencio aunque
-  // hubiesen conectado Drive — exactamente lo opuesto de lo que esperaban.
-  const driveConnected = useDriveConnected();
-  const cadenciaSnapshot = loadCadenciaData();
-  const persistentStorage =
-    cadenciaSnapshot.userInputs !== null ||
-    isPersistentStorageEnabled() ||
-    driveConnected;
-
-  // Persistencia debounceada. sessionStorage se actualiza siempre (necesario
-  // para sobrevivir al OAuth de Spotify); cadenciaStore (y localStorage
-  // legacy mientras dure la migracion) solo si la persistencia esta activa.
-  // cadenciaStore es el SoT que el motor de Drive sync observa.
+  // Persistencia debounceada. Por defecto siempre activa: sessionStorage,
+  // localStorage legacy y cadenciaStore (SoT del motor de sync con Drive)
+  // se mantienen sincronizados en cada cambio. Filosofia simplificada:
+  // localStorage es del navegador del usuario, no un servidor — la promesa
+  // de privacidad sigue intacta y el comportamiento default «recordar» es
+  // lo que cualquiera espera de una herramienta como esta. Para borrar
+  // todo, /preferencias ofrece «Borrar mis datos guardados».
   useEffect(() => {
     const id = setTimeout(() => {
-      saveUserInputs(inputs, persistentStorage);
-      if (persistentStorage) {
-        updateSection('userInputs', inputs);
-      }
+      saveUserInputs(inputs);
+      updateSection('userInputs', inputs);
     }, 300);
     return () => clearTimeout(id);
-  }, [inputs, persistentStorage]);
+  }, [inputs]);
 
   // Origen de la ruta y plan de sesion editable (rama indoor cycling).
   const [sourceType, setSourceType] = useState<RouteSourceType | null>(
@@ -996,7 +973,8 @@ function Footer(): JSX.Element {
             Sin registros, sin cookies, sin servidores. Todo corre en tu dispositivo.
           </p>
           <p className="text-xs text-gris-400 pl-5">
-            Tus datos se guardan en el navegador hasta que cierres la pestaña.
+            Tus datos se guardan en este navegador. Conecta Google Drive si
+            quieres copia entre dispositivos.
           </p>
         </div>
         <nav className="flex items-center gap-3">

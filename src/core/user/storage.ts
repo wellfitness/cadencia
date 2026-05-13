@@ -183,15 +183,22 @@ export function loadUserInputs(): UserInputsRaw | null {
 }
 
 /**
- * Persiste los datos. sessionStorage SIEMPRE se actualiza (necesario para
- * sobrevivir al OAuth redirect de Spotify dentro de la misma pestana).
- * localStorage solo se actualiza si `persistent === true`.
+ * Persiste los datos del usuario. Escribe a AMBOS backends:
+ *  - sessionStorage (necesario para sobrevivir al OAuth redirect de Spotify
+ *    dentro de la misma pestana).
+ *  - localStorage (para que los datos sigan ahi entre sesiones).
+ *
+ * Antes existia un segundo parametro `persistent` opt-in: si era false, solo
+ * se escribia session. Resultado: usuarios que rellenaban sus datos y cerraban
+ * la pestana los perdian, aunque hubieran conectado Drive. Ahora la persistencia
+ * local es ON por defecto; el usuario puede borrar sus datos cuando quiera
+ * desde /preferencias -> «Borrar mis datos guardados» o desde la zona de
+ * peligro. La privacidad sigue intacta: localStorage es del navegador del
+ * usuario, no de un servidor.
  */
-export function saveUserInputs(inputs: UserInputsRaw, persistent: boolean): void {
+export function saveUserInputs(inputs: UserInputsRaw): void {
   saveUserInputsToSession(inputs);
-  if (persistent) {
-    saveUserInputsToLocal(inputs);
-  }
+  saveUserInputsToLocal(inputs);
 }
 
 /**

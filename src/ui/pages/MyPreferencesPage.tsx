@@ -25,13 +25,7 @@ import { BIKE_TYPE_LABELS } from '@core/power';
 import { getTopMacroGenres, loadNativeTracks, migrateLegacyGenres } from '@core/tracks';
 import { EMPTY_PREFERENCES, type MatchPreferences } from '@core/matching';
 import { useGenreCoverage } from '@ui/hooks/useGenreCoverage';
-import {
-  isPersistentStorageEnabled,
-  loadUserInputsFromSession,
-  saveUserInputsToLocal,
-  clearUserInputsFromLocal,
-  EMPTY_USER_INPUTS,
-} from '@core/user';
+import { clearUserInputsFromLocal } from '@core/user';
 import { updateSection } from '@ui/state/cadenciaStore';
 
 export interface MyPreferencesPageProps {
@@ -149,34 +143,21 @@ interface SectionProps {
 }
 
 /**
- * Persistencia local de los datos del usuario en este dispositivo. Es el
- * antiguo «Recordar mis datos» del wizard, movido aqui porque es ajuste
- * de preferencias, no algo que el usuario tenga que tocar cada vez que
- * inicie una sesion.
+ * Persistencia local de los datos del usuario en este dispositivo.
  *
- * Estados:
- *  - Activado (data.userInputs !== null): los datos sobreviven al cierre
- *    de la pestana. El usuario puede pulsar «Olvidar mis datos» para
- *    borrarlos del almacenamiento.
- *  - Desactivado: los datos solo viven en sessionStorage durante la
- *    pestana actual. Si hay datos en session, ofrece «Recordar» que los
- *    copia al cadenciaStore.
- *  - Sin datos en absoluto: hint informativo, sin botones.
+ * Filosofia simplificada (revision de mayo 2026): la persistencia local es
+ * ON por defecto, no requiere opt-in. Es lo que cualquier usuario espera de
+ * una app de fitness — rellenar peso y FC y que sigan ahi la proxima sesion.
+ * La privacidad sigue intacta: localStorage es del navegador del usuario,
+ * no un servidor.
+ *
+ * Esta card es solo informativa + un boton de "Olvidar SOLO mis datos
+ * fisiologicos" para usuarios que quieren reset parcial sin tocar CSVs ni
+ * calendario. Para borrarlo todo, la zona de peligro de mas abajo.
  */
 function PersistenceSection({ data }: SectionProps): JSX.Element {
-  const enabled = isPersistentStorageEnabled() || data.userInputs !== null;
-  const sessionInputs = useMemo(() => loadUserInputsFromSession(), []);
-  const hasSessionData =
-    sessionInputs !== null &&
-    Object.values(sessionInputs).some((v) => v !== null);
-
+  const hasUserData = data.userInputs !== null;
   const [confirmForget, setConfirmForget] = useState<boolean>(false);
-
-  const handleEnable = (): void => {
-    const inputs = sessionInputs ?? EMPTY_USER_INPUTS;
-    saveUserInputsToLocal(inputs);
-    updateSection('userInputs', inputs);
-  };
 
   const handleForget = (): void => {
     clearUserInputsFromLocal();
@@ -186,84 +167,53 @@ function PersistenceSection({ data }: SectionProps): JSX.Element {
 
   return (
     <Card title="Datos en este dispositivo" titleIcon="save">
-      {enabled ? (
-        <>
-          <p className="text-sm text-gris-700 flex items-start gap-2">
-            <MaterialIcon
-              name="check_circle"
-              size="small"
-              className="text-turquesa-600 mt-0.5 shrink-0"
-            />
-            <span>
-              <strong>Tus datos se guardan en este navegador.</strong>{' '}
-              <span className="text-gris-500">
-                Sobreviven al cierre de la pestaña y al reinicio del dispositivo.
-                No salen de aquí salvo que actives la sincronización con Drive.
-              </span>
-            </span>
-          </p>
-          <p className="text-xs text-gris-500 mt-2">
-            ⚠ No actives esto si compartes el ordenador.
-          </p>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="critical"
-              size="sm"
-              iconLeft="delete_outline"
-              onClick={() => setConfirmForget(true)}
-            >
-              Olvidar mis datos
-            </Button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-sm text-gris-700 flex items-start gap-2">
-            <MaterialIcon
-              name="info"
-              size="small"
-              className="text-gris-500 mt-0.5 shrink-0"
-            />
-            <span>
-              <strong>Tus datos solo viven en esta pestaña.</strong>{' '}
-              <span className="text-gris-500">
-                Se borrarán al cerrar el navegador. Para recordarlos en este
-                dispositivo, pulsa el botón de abajo.
-              </span>
-            </span>
-          </p>
-          <div className="mt-3 flex justify-end">
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft="save"
-              onClick={handleEnable}
-              disabled={!hasSessionData}
-              title={
-                hasSessionData
-                  ? 'Guardar los datos actuales en este navegador'
-                  : 'Rellena tus datos en una sesión primero'
-              }
-            >
-              Recordar mis datos en este dispositivo
-            </Button>
-          </div>
-        </>
+      <p className="text-sm text-gris-700 flex items-start gap-2">
+        <MaterialIcon
+          name="check_circle"
+          size="small"
+          className="text-turquesa-600 mt-0.5 shrink-0"
+        />
+        <span>
+          <strong>Tus datos se guardan en este navegador.</strong>{' '}
+          <span className="text-gris-500">
+            Sobreviven al cierre de la pestaña y al reinicio del dispositivo.
+            No salen de aquí salvo que conectes la sincronización con Drive
+            (más abajo).
+          </span>
+        </span>
+      </p>
+      <p className="text-xs text-gris-500 mt-2">
+        ⚠ Si compartes el ordenador y no quieres dejar rastro, usa el modo
+        privado de tu navegador o bórralos al terminar con el botón de aquí
+        debajo.
+      </p>
+      {hasUserData && (
+        <div className="mt-3 flex justify-end">
+          <Button
+            variant="critical"
+            size="sm"
+            iconLeft="delete_outline"
+            onClick={() => setConfirmForget(true)}
+          >
+            Borrar solo mis datos fisiológicos
+          </Button>
+        </div>
       )}
       <ConfirmDialog
         open={confirmForget}
-        title="Olvidar mis datos guardados"
+        title="Borrar mis datos fisiológicos"
         icon="delete_outline"
-        confirmLabel="Sí, olvidar"
+        confirmLabel="Sí, borrar"
         confirmVariant="critical"
         cancelLabel="Cancelar"
         onConfirm={handleForget}
         onCancel={() => setConfirmForget(false)}
         message={
           <p>
-            Se borrarán tus datos guardados en este navegador (peso, FTP, FC,
-            etc.). Tu Drive no se ve afectado. Podrás volver a guardarlos en
-            cualquier momento.
+            Se borrarán tus datos físicos guardados (peso, FTP, FC, año de
+            nacimiento, etc.) en este navegador. Tus sesiones guardadas, CSVs
+            y calendario NO se ven afectados. Tu Drive tampoco. Podrás volver
+            a rellenarlos cuando quieras.
           </p>
         }
       />

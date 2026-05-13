@@ -159,14 +159,13 @@ describe('storage – API compuesta load/save/clear', () => {
     localStorage.clear();
   });
 
-  it('saveUserInputs(persistent=false) escribe solo session', () => {
-    saveUserInputs(SAMPLE, false);
-    expect(loadUserInputsFromSession()).toEqual(SAMPLE);
-    expect(loadUserInputsFromLocal()).toBeNull();
-  });
-
-  it('saveUserInputs(persistent=true) escribe ambos storages', () => {
-    saveUserInputs(SAMPLE, true);
+  it('saveUserInputs escribe ambos storages (session y local)', () => {
+    // Filosofia simplificada: la persistencia local es ON por defecto. El
+    // segundo parametro `persistent` de la API previa se elimino — siempre
+    // se persiste a localStorage. La privacidad sigue intacta (es el
+    // navegador del usuario, no un servidor); el usuario puede borrar
+    // explicitamente desde /preferencias.
+    saveUserInputs(SAMPLE);
     expect(loadUserInputsFromSession()).toEqual(SAMPLE);
     expect(loadUserInputsFromLocal()).toEqual(SAMPLE);
   });
@@ -192,7 +191,7 @@ describe('storage – API compuesta load/save/clear', () => {
   });
 
   it('clearAllUserInputs borra ambos storages', () => {
-    saveUserInputs(SAMPLE, true);
+    saveUserInputs(SAMPLE);
     clearAllUserInputs();
     expect(loadUserInputsFromSession()).toBeNull();
     expect(loadUserInputsFromLocal()).toBeNull();

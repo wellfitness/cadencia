@@ -29,15 +29,15 @@ const FAQ_GROUPS: readonly FaqGroup[] = [
     items: [
       {
         q: '¿Qué guarda Cadencia de mí?',
-        a: 'Siete cosas, todas tuyas y siempre opcionales: (1) tus datos fisiológicos (peso, FTP, FC máxima y reposo, año de nacimiento, sexo, tipo y peso de bici); (2) tus preferencias musicales (géneros favoritos, semilla de aleatorización, «Todo con energía»); (3) tus sesiones indoor guardadas con nombre desde el constructor; (4) tus listas CSV de Spotify (Exportify); (5) las personalizaciones del catálogo nativo (canciones desmarcadas); (6) las canciones descartadas globalmente; (7) las entradas del calendario de planificación. Por defecto solo viven en la pestaña actual; permanecen entre sesiones si activas «Recordar mis datos» en Mis preferencias y se sincronizan entre dispositivos si conectas tu Google Drive.',
+        a: 'Siete cosas, todas tuyas: (1) tus datos fisiológicos (peso, FTP, FC máxima y reposo, año de nacimiento, sexo, tipo y peso de bici); (2) tus preferencias musicales (géneros favoritos, semilla de aleatorización, «Todo con energía»); (3) tus sesiones indoor guardadas con nombre desde el constructor; (4) tus listas CSV de Spotify (Exportify); (5) las personalizaciones del catálogo nativo (canciones desmarcadas); (6) las canciones descartadas globalmente; (7) las entradas del calendario de planificación. Por defecto se guardan en este navegador y siguen ahí entre sesiones — no hace falta activar nada. Se sincronizan entre dispositivos si conectas tu Google Drive (opcional).',
       },
       {
         q: '¿Dónde edito mis preferencias musicales y mi catálogo?',
         a: 'En la página «Mis preferencias» (icono de la cabecera del asistente o desde el pie). Allí se editan los géneros preferidos, el toggle «Todo con energía» y se accede al editor del catálogo (botón «Editar catálogo»). El editor tiene tres pestañas: «Catálogo nativo» (desmarcar canciones del fondo predefinido), «Mis listas» (subir CSVs propios de Exportify) y «Descartadas» (revisar y recuperar canciones que rechazaste con «No la quiero»).',
       },
       {
-        q: '¿Para qué sirve «Recordar mis datos»?',
-        a: 'Por defecto Cadencia es estrictamente de sesión: tus datos viven solo en la pestaña actual y se borran al cerrarla. Si activas «Recordar mis datos» (en Mis preferencias → «Datos en este dispositivo»), tus ajustes y sesiones se guardan en este navegador y siguen ahí la próxima vez que abras la app. Recomendado en tu móvil personal y tu portátil; desactivar si compartes el ordenador. Puedes apagarlo en cualquier momento; eso borra los datos persistentes pero no afecta a los que estén en tu Drive (si lo tienes conectado).',
+        q: '¿Mis datos se guardan automáticamente?',
+        a: 'Sí. Desde que rellenas el primer campo, Cadencia los guarda en este navegador y siguen ahí la próxima vez que abras la app. No hace falta activar nada. Si compartes el ordenador y no quieres dejar rastro, usa una pestaña privada/incógnito o pulsa «Borrar solo mis datos fisiológicos» en Mis preferencias cuando termines. Para borrarlo todo (datos, sesiones, listas, calendario): Mis preferencias → Zona de peligro → «Borrar todos mis datos».',
       },
       {
         q: '¿Cómo descarto una canción que no me gusta?',
