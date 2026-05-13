@@ -60,6 +60,27 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
+        // Screenshots para el «Richer PWA Install UI» de Chrome 99+. Se necesita
+        // al menos uno con form_factor='wide' (desktop) y otro sin form_factor
+        // (móvil) o el navegador avisa con warning en DevTools y cae al install
+        // prompt minimal. Reutilizamos los heroes para no inflar el bundle con
+        // capturas dedicadas — son las imágenes de la landing, perfectamente
+        // representativas de cómo se ve la app.
+        screenshots: [
+          {
+            src: 'hero_cadencia.webp',
+            sizes: '2560x1429',
+            type: 'image/webp',
+            form_factor: 'wide',
+            label: 'Cadencia en pantalla amplia',
+          },
+          {
+            src: 'hero_cadencia_movil.webp',
+            sizes: '804x1440',
+            type: 'image/webp',
+            label: 'Cadencia en móvil',
+          },
+        ],
       },
     }),
   ],
