@@ -240,7 +240,21 @@ function WizardApp(): JSX.Element {
   // de privacidad sigue intacta y el comportamiento default «recordar» es
   // lo que cualquiera espera de una herramienta como esta. Para borrar
   // todo, /preferencias ofrece «Borrar mis datos guardados».
+  //
+  // CRITICO: el primer render se salta. La inicializacion del reducer con
+  // EMPTY_USER_INPUTS (cuando cadenciaStore esta vacio en un dispositivo
+  // nuevo) no es un cambio del usuario y NO debe escribir en cadenciaStore.
+  // Si lo hiciera, `updateSection` bumpearia `_sectionMeta.userInputs.updatedAt`
+  // al instante presente — y eso luego ganaria en el merge LWW frente a
+  // los datos buenos del Drive (que tienen meta anterior), aplastando la
+  // sincronizacion. Solo persistimos cuando el usuario dispatch a un cambio
+  // real desde el form, o cuando llega un HYDRATE tras pull.
+  const skipFirstInputsEffect = useRef(true);
   useEffect(() => {
+    if (skipFirstInputsEffect.current) {
+      skipFirstInputsEffect.current = false;
+      return;
+    }
     const id = setTimeout(() => {
       saveUserInputs(inputs);
       updateSection('userInputs', inputs);
@@ -306,8 +320,16 @@ function WizardApp(): JSX.Element {
 
   // Sync musicPreferences -> cadenciaStore en cada cambio. cadenciaStore
   // es el SoT que el motor de Drive sync observa para propagar entre
-  // dispositivos.
+  // dispositivos. Mismo motivo que con userInputs: el primer render se
+  // salta para no bumpear `_sectionMeta.musicPreferences.updatedAt` con
+  // el valor inicial (que puede ser EMPTY_PREFERENCES + seed random si
+  // cadenciaStore estaba vacio).
+  const skipFirstMusicEffect = useRef(true);
   useEffect(() => {
+    if (skipFirstMusicEffect.current) {
+      skipFirstMusicEffect.current = false;
+      return;
+    }
     updateSection('musicPreferences', musicPreferences);
   }, [musicPreferences]);
 
