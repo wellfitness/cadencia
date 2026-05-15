@@ -78,3 +78,18 @@ export function calculateDataRichness(data: SyncedData): number {
 export function isEmptyData(data: SyncedData): boolean {
   return calculateDataRichness(data) < 1e-9;
 }
+
+/**
+ * "El usuario nunca ha tocado nada en este dispositivo": no hay ninguna
+ * entrada en `_sectionMeta`. Distinto de `isEmptyData`, que tambien da true
+ * cuando el usuario borro intencionadamente todos los items (en ese caso
+ * los tombstones existen y la seccion correspondiente tiene meta).
+ *
+ * Es el unico criterio seguro para saltarse el merge y aplicar `remote`
+ * directamente en `pull()`: si hay cualquier meta local, hay cambios
+ * propios (creaciones, ediciones o tombstones) que deben sobrevivir al
+ * merge LWW en lugar de ser aplastados por el remoto.
+ */
+export function hasNoLocalMeta(data: SyncedData): boolean {
+  return Object.keys(data._sectionMeta).length === 0;
+}

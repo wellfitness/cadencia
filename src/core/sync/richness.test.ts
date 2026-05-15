@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateDataRichness, isEmptyData } from './richness';
+import { calculateDataRichness, isEmptyData, hasNoLocalMeta } from './richness';
 import { emptySyncedData } from './schema';
 import type { SavedSession } from './types';
 import { EMPTY_USER_INPUTS } from '../user/userInputs';
@@ -40,6 +40,42 @@ describe('isEmptyData', () => {
     };
     d.savedSessions = [s];
     expect(isEmptyData(d)).toBe(true);
+  });
+});
+
+describe('hasNoLocalMeta', () => {
+  it('true para emptySyncedData (instalacion fresh)', () => {
+    expect(hasNoLocalMeta(emptySyncedData())).toBe(true);
+  });
+
+  it('false si hay meta en alguna seccion (usuario ha tocado algo)', () => {
+    const d = emptySyncedData();
+    d._sectionMeta.userInputs = { updatedAt: '2026-05-15T00:00:00Z' };
+    expect(hasNoLocalMeta(d)).toBe(false);
+  });
+
+  it('false si el usuario borro todo (solo tombstones con meta de seccion)', () => {
+    // Caso clave: distingue "borre todo" (con meta) de "instalacion fresh" (sin meta).
+    // isEmptyData seguiria devolviendo true aqui — hasNoLocalMeta NO debe.
+    const d = emptySyncedData();
+    const s: SavedSession = {
+      id: 'a',
+      name: 'A',
+      plan: { name: 'A', items: [] },
+      createdAt: '2026-04-29T00:00:00Z',
+      updatedAt: '2026-04-29T00:00:00Z',
+      deletedAt: '2026-04-29T00:00:00Z',
+    };
+    d.savedSessions = [s];
+    d._sectionMeta.savedSessions = { updatedAt: '2026-04-29T00:00:00Z' };
+    expect(isEmptyData(d)).toBe(true);
+    expect(hasNoLocalMeta(d)).toBe(false);
+  });
+
+  it('false si hay meta en plannedEvents aunque otras secciones esten vacias', () => {
+    const d = emptySyncedData();
+    d._sectionMeta.plannedEvents = { updatedAt: '2026-05-15T00:00:00Z' };
+    expect(hasNoLocalMeta(d)).toBe(false);
   });
 });
 

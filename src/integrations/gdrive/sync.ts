@@ -9,8 +9,8 @@ import {
   getFileMetadata,
   DriveApiError,
 } from './drive-api';
-import { mergeData } from '@core/sync/merge';
-import { isEmptyData, calculateDataRichness } from '@core/sync/richness';
+import { mergeData, deepEqual } from '@core/sync/merge';
+import { calculateDataRichness, hasNoLocalMeta } from '@core/sync/richness';
 import { cleanExpiredTombstones } from '@core/sync/tombstones';
 import type { SyncStatus, SyncedData } from '@core/sync/types';
 import { loadCadenciaData, saveCadenciaData } from '@ui/state/cadenciaStore';
@@ -23,8 +23,14 @@ import { loadCadenciaData, saveCadenciaData } from '@ui/state/cadenciaStore';
  * - Pull periodico: cada 30s consulta solo metadata (~200B); si la
  *   version remota difiere, descarga y mergea.
  * - Pull en visibilitychange: al volver a la tab, comprueba inmediato.
- * - Anti-regresion: si local esta vacio o es 30% menos rico que remote
- *   (instalacion nueva), aplica remote sin merge.
+ * - Anti-regresion fuerte: si el blob local no tiene ninguna entrada en
+ *   _sectionMeta (instalacion literalmente nueva, sin haber tocado nada),
+ *   aplica remote sin merge.
+ * - Toda otra divergencia pasa por `mergeData` (LWW por seccion/item con
+ *   tombstones): nunca se hace push directo del local "ciego". Esto evita
+ *   aplastar Drive cuando local._sectionMeta.userInputs (o cualquier
+ *   seccion) es mas reciente que remote pero remote tiene datos que local
+ *   nunca llego a tener.
  * - Anti-ciclo: flag `_applyingRemote` evita que pull dispare push tras
  *   actualizar localStorage con datos descargados.
  */
@@ -288,41 +294,41 @@ async function pull(token: string): Promise<void> {
       `Riqueza local=${localRich.toFixed(2)} (userInputs=${local.userInputs !== null ? 'sí' : 'no'}).`,
   );
 
-  // Anti-regresion fuerte: local vacio + remote con datos => aplica remote.
-  if (isEmptyData(local) && !isEmptyData(remote)) {
-    console.warn('[Cadencia ↔ Drive] Local vacío y remote con datos: aplicando remote directamente.');
+  // Anti-regresion fuerte: solo aplica remote sin merge si el blob local no
+  // tiene ninguna meta (instalacion literalmente nueva, jamas modificada).
+  // No usar isEmptyData: ese criterio dispara tambien cuando el usuario
+  // borro todo intencionadamente (los tombstones tienen meta de seccion);
+  // en ese caso debemos pasar por mergeData para que los borrados sobrevivan.
+  if (hasNoLocalMeta(local)) {
+    console.warn('[Cadencia ↔ Drive] Local sin meta (fresh install): aplicando remote directamente.');
     applyRemote(remote);
     setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
     return;
   }
 
-  const safeTime = (iso: string): number => { const t = new Date(iso).getTime(); return Number.isFinite(t) ? t : -Infinity; };
-  const localTime = safeTime(local.updatedAt);
-  const remoteTime = safeTime(remote.updatedAt);
+  // En cualquier otra divergencia (local mas nuevo, remote mas nuevo, mismo
+  // timestamp con cambios concurrentes), confiar siempre en mergeData. El
+  // LWW por seccion + tombstones nunca destruye datos. Antes habia un push
+  // ciego cuando localTime > remoteTime y una "anti-regresion suave" basada
+  // en riqueza porcentual; ambos aplastaban datos en escenarios reales (perfil
+  // local recien puesto vs Drive rico; borrado masivo local vs remote vivo).
+  console.warn('[Cadencia ↔ Drive] Fusionando local y remote via LWW.');
+  const { merged } = mergeData(local, remote);
+  const cleaned = cleanExpiredTombstones(merged);
+  applyRemote(cleaned);
 
-  if (remoteTime > localTime) {
-    // Anti-regresion suave: si local << remote en riqueza, aplica remote directo.
-    if (calculateDataRichness(local) < calculateDataRichness(remote) * 0.3) {
-      console.warn('[Cadencia ↔ Drive] Remote bastante más rico que local: aplicando remote directo.');
-      applyRemote(remote);
-      setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
-      return;
-    }
-    console.warn('[Cadencia ↔ Drive] Remote más reciente que local: haciendo merge LWW.');
-    const { merged } = mergeData(local, remote);
-    const cleaned = cleanExpiredTombstones(merged);
-    applyRemote(cleaned);
+  // Solo subir a Drive si el merge cambia respecto al remote actual: si local
+  // ya estaba alineado con remote (o el merge no aporta nada nuevo), evitamos
+  // un updateFile innecesario que ademas dispararia un version bump remoto y
+  // un re-pull en otros dispositivos.
+  if (!deepEqual(cleaned, remote)) {
     try {
       const result = await updateFile(token, file.id, cleaned);
       setSyncState({ fileVersion: result.version, lastSyncAt: new Date().toISOString() });
     } catch (err) {
       console.warn('[Cadencia ↔ Drive] push tras merge falló:', err);
     }
-  } else if (localTime > remoteTime) {
-    console.warn('[Cadencia ↔ Drive] Local más reciente que remote: subiendo local a Drive.');
-    await push(token);
   } else {
-    console.warn('[Cadencia ↔ Drive] Local y remote ya están en el mismo timestamp: nada que hacer.');
     setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
   }
 }
