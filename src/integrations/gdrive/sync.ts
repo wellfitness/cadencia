@@ -9,6 +9,7 @@ import {
   getFileMetadata,
   DriveApiError,
 } from './drive-api';
+import type { MergeConflict } from '@core/sync/merge';
 import { mergeData, deepEqual } from '@core/sync/merge';
 import { calculateDataRichness, hasNoLocalMeta } from '@core/sync/richness';
 import { cleanExpiredTombstones } from '@core/sync/tombstones';
@@ -18,24 +19,40 @@ import { loadCadenciaData, saveCadenciaData } from '@ui/state/cadenciaStore';
 /**
  * Orquestador de sincronizacion bidireccional cadenciaStore <-> Drive.
  *
- * Estrategia:
- * - Push debounced: tras 'cadencia-data-saved', espera 2s y sube.
- * - Pull periodico: cada 30s consulta solo metadata (~200B); si la
- *   version remota difiere, descarga y mergea.
- * - Pull en visibilitychange: al volver a la tab, comprueba inmediato.
- * - Anti-regresion fuerte: si el blob local no tiene ninguna entrada en
- *   _sectionMeta (instalacion literalmente nueva, sin haber tocado nada),
- *   aplica remote sin merge.
- * - Toda otra divergencia pasa por `mergeData` (LWW por seccion/item con
- *   tombstones): nunca se hace push directo del local "ciego". Esto evita
- *   aplastar Drive cuando local._sectionMeta.userInputs (o cualquier
- *   seccion) es mas reciente que remote pero remote tiene datos que local
- *   nunca llego a tener.
- * - Anti-ciclo: flag `_applyingRemote` evita que pull dispare push tras
- *   actualizar localStorage con datos descargados.
+ * Replica el modelo probado del Oraculo, con tres capas de proteccion:
+ *
+ *  1. Version check: antes de cualquier push verificamos que `file.version`
+ *     en Drive coincide con la cacheada localmente. Si difiere, otro
+ *     dispositivo escribio entre medias y disparamos pullAndMerge en lugar
+ *     de sobrescribir.
+ *  2. Merge inteligente: cualquier divergencia (excepto instalacion literal-
+ *     mente nueva, detectada por `hasNoLocalMeta`) pasa por `mergeData`
+ *     (LWW por seccion/item + tombstones). Nunca push ciego.
+ *  3. Conflict log + backup: cada merge guarda los conflictos en
+ *     `cadencia:gdrive:conflicts` (cap 50) y antes de aplicar remote/merge
+ *     hacemos snapshot del local en `cadencia:gdrive:preSyncBackup` para
+ *     recuperacion manual en caso de bug.
+ *
+ * Sync bidireccional:
+ *  - Push debounced (2s) tras `cadencia-data-saved`.
+ *  - Pull periodico cada 30s (metadata-only ~200B; descarga solo si version
+ *    remota difiere).
+ *  - Pull en visibilitychange visible.
+ *
+ * Salud del sync (`syncHealth`):
+ *  - 'healthy' en operacion normal.
+ *  - 'token_expired' cuando getTokenSilent devuelve null (requiere re-auth).
+ *  - 'error' tras 3 fallos consecutivos no-401. Permite que la UI muestre
+ *    "sync degradado" sin alarmar por un fallo puntual.
+ *
+ * Anti-ciclo: flag `_applyingRemote` evita que pull dispare push tras
+ * escribir localStorage con datos descargados.
  */
 
 const SYNC_STATE_KEY = 'cadencia:gdrive:syncState';
+const BACKUP_KEY = 'cadencia:gdrive:preSyncBackup';
+const CONFLICT_LOG_KEY = 'cadencia:gdrive:conflicts';
+const MAX_CONFLICTS = 50;
 
 interface SyncState {
   connected?: boolean;
@@ -47,11 +64,16 @@ interface SyncState {
   syncHealth?: 'healthy' | 'token_expired' | 'error';
 }
 
+interface ConflictLog {
+  entries: MergeConflict[];
+}
+
 let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let _pollTimer: ReturnType<typeof setInterval> | null = null;
 let _syncing = false;
 let _applyingRemote = false;
 let _lastSyncAt = 0;
+let _consecutiveFailures = 0;
 /**
  * Promise cacheada de init: garantiza idempotencia incluso bajo doble llamada
  * concurrente (HMR de Vite, futuro StrictMode). Antes existia una flag boolean
@@ -63,6 +85,10 @@ let _initPromise: Promise<void> | null = null;
 /** Handlers nombrados para poder removerlos en disconnect (evita leaks). */
 let _onDataSaved: (() => void) | null = null;
 let _onVisibilityChange: (() => void) | null = null;
+
+// ───────────────────────────────────────────────
+// Estado de sync persistente
+// ───────────────────────────────────────────────
 
 function getSyncState(): SyncState {
   try {
@@ -84,6 +110,22 @@ function setSyncState(updates: Partial<SyncState>): SyncState {
   return next;
 }
 
+/**
+ * Borra claves de fileId/fileVersion (no soportado por setSyncState con
+ * `undefined` en TS estricto). Se usa en fallback doble fallo de pullAndMerge:
+ * descartamos el cache para que el proximo push haga findFile de nuevo.
+ */
+function clearSyncFileCache(): void {
+  const state = getSyncState();
+  delete state.fileId;
+  delete state.fileVersion;
+  try {
+    localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore
+  }
+}
+
 export function isConnected(): boolean {
   return getSyncState().connected === true;
 }
@@ -92,10 +134,131 @@ export function getSyncInfo(): SyncState {
   return getSyncState();
 }
 
+// ───────────────────────────────────────────────
+// Conflict log persistente (Capa 3)
+// ───────────────────────────────────────────────
+
+function loadConflictLog(): ConflictLog {
+  try {
+    const raw = localStorage.getItem(CONFLICT_LOG_KEY);
+    if (!raw) return { entries: [] };
+    const parsed = JSON.parse(raw) as Partial<ConflictLog>;
+    return { entries: Array.isArray(parsed.entries) ? parsed.entries : [] };
+  } catch {
+    return { entries: [] };
+  }
+}
+
+/**
+ * Guarda conflictos detectados durante `mergeData` en localStorage. Capa
+ * sin gravedad: si el log no se puede escribir, el sync sigue.
+ *
+ * Cap a MAX_CONFLICTS para no consumir cuota indefinidamente: si llegamos
+ * a 50, descartamos los mas antiguos.
+ */
+function saveConflicts(conflicts: MergeConflict[]): void {
+  if (conflicts.length === 0) return;
+  const log = loadConflictLog();
+  log.entries.push(...conflicts);
+  if (log.entries.length > MAX_CONFLICTS) {
+    log.entries = log.entries.slice(-MAX_CONFLICTS);
+  }
+  try {
+    localStorage.setItem(CONFLICT_LOG_KEY, JSON.stringify(log));
+    console.warn(`[Cadencia ↔ Drive] ${conflicts.length} conflicto(s) guardado(s) en log.`);
+  } catch {
+    // ignore
+  }
+}
+
+/** Devuelve los conflictos persistidos. Util para una futura UI de revision. */
+export function getConflicts(): MergeConflict[] {
+  return loadConflictLog().entries;
+}
+
+/** Limpia el log de conflictos. */
+export function clearConflicts(): void {
+  try {
+    localStorage.removeItem(CONFLICT_LOG_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// ───────────────────────────────────────────────
+// Backup pre-sync (Capa 3)
+// ───────────────────────────────────────────────
+
+/**
+ * Guarda el SyncedData local antes de aplicar remote o merge. Permite
+ * recuperacion manual si un merge inesperado deja datos en peor estado.
+ * Ocupa una sola entrada: cada sync sobreescribe el anterior.
+ */
+function saveBackup(data: SyncedData): void {
+  try {
+    localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
+  } catch {
+    // No critico: el sync funciona sin backup. Si localStorage esta lleno
+    // priorizamos los datos en vivo sobre la red de seguridad.
+  }
+}
+
+/** Devuelve el snapshot pre-sync mas reciente. null si nunca hubo o se borro. */
+export function getBackup(): SyncedData | null {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SyncedData;
+  } catch {
+    return null;
+  }
+}
+
+/** Limpia el snapshot. La UI puede ofrecer un boton "olvidar backup". */
+export function clearBackup(): void {
+  try {
+    localStorage.removeItem(BACKUP_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+// ───────────────────────────────────────────────
+// Salud del sync
+// ───────────────────────────────────────────────
+
+function markHealthy(): void {
+  _consecutiveFailures = 0;
+  setSyncState({ syncHealth: 'healthy' });
+}
+
+function markTokenExpired(): void {
+  setSyncState({ syncHealth: 'token_expired' });
+  stopPolling();
+  notify('token_expired');
+}
+
+/**
+ * Marca un fallo no-401. Solo notifica 'error' tras 3 fallos consecutivos
+ * para no alarmar por un cuelgue de red puntual. Cualquier sync exitoso
+ * posterior llama a `markHealthy()` y resetea el contador.
+ */
+function markError(): void {
+  _consecutiveFailures++;
+  if (_consecutiveFailures >= 3) {
+    setSyncState({ syncHealth: 'error' });
+    notify('error');
+  }
+}
+
 function notify(status: SyncStatus): void {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('gdrive-sync-status', { detail: { status } }));
 }
+
+// ───────────────────────────────────────────────
+// Inicializacion
+// ───────────────────────────────────────────────
 
 /**
  * Inicializa el motor de sync. Debe llamarse al arrancar la app. Si el
@@ -116,15 +279,16 @@ async function doInit(): Promise<void> {
       const token = await getTokenSilent();
       if (token) {
         await pull(token);
+        markHealthy();
         startPolling();
         notify('synced');
+        _lastSyncAt = Date.now();
       } else {
-        setSyncState({ syncHealth: 'token_expired' });
-        notify('token_expired');
+        markTokenExpired();
       }
     } catch (err) {
       console.warn('[gdrive sync] init error:', err);
-      notify('error');
+      markError();
     }
   }
 
@@ -161,6 +325,10 @@ async function doInit(): Promise<void> {
   }
 }
 
+// ───────────────────────────────────────────────
+// Connect / Disconnect
+// ───────────────────────────────────────────────
+
 /**
  * Inicia el flow de conexion (popup OAuth). Tras consentimiento, hace
  * un sync inicial completo (pull + posible push) para alinear los dos
@@ -177,8 +345,10 @@ export async function connect(): Promise<{ email: string }> {
     syncHealth: 'healthy',
   });
   await pull(result.token);
+  markHealthy();
   startPolling();
   notify('synced');
+  _lastSyncAt = Date.now();
   return { email: result.email };
 }
 
@@ -198,6 +368,7 @@ export async function disconnect(): Promise<void> {
   }
   // Permitir que el siguiente connect llame a init() de nuevo.
   _initPromise = null;
+  _consecutiveFailures = 0;
   await signOut();
   try {
     localStorage.removeItem(SYNC_STATE_KEY);
@@ -206,6 +377,49 @@ export async function disconnect(): Promise<void> {
   }
   notify('disconnected');
 }
+
+// ───────────────────────────────────────────────
+// Sync manual (publico)
+// ───────────────────────────────────────────────
+
+/**
+ * Fuerza un ciclo de sincronizacion completo (pull + posible push tras merge).
+ * Util para un boton "Sincronizar ahora" en la UI o tras un evento puntual
+ * (ej. el usuario importa un fichero y quiere que viaje a sus otros dispositivos
+ * inmediatamente sin esperar al debounce).
+ *
+ * Idempotente: si ya hay un sync en curso, sale en silencio. Tras un sync
+ * exitoso, marca el motor como `healthy` y reinicia el contador de fallos.
+ */
+export async function syncNow(): Promise<void> {
+  if (_syncing) return;
+  if (!isConnected()) return;
+  _syncing = true;
+  try {
+    const token = await getTokenSilent();
+    if (!token) {
+      markTokenExpired();
+      return;
+    }
+    await pull(token);
+    markHealthy();
+    notify('synced');
+    _lastSyncAt = Date.now();
+  } catch (err) {
+    if (err instanceof DriveApiError && err.status === 401) {
+      markTokenExpired();
+    } else {
+      console.warn('[gdrive sync] syncNow error:', err);
+      markError();
+    }
+  } finally {
+    _syncing = false;
+  }
+}
+
+// ───────────────────────────────────────────────
+// Polling periodico
+// ───────────────────────────────────────────────
 
 function startPolling(): void {
   stopPolling();
@@ -234,31 +448,44 @@ async function checkRemote(): Promise<void> {
   try {
     const token = await getTokenSilent();
     if (!token) {
-      setSyncState({ syncHealth: 'token_expired' });
-      notify('token_expired');
+      markTokenExpired();
       return;
     }
     const meta = await getFileMetadata(token, state.fileId);
     if (meta.version !== state.fileVersion) {
+      console.warn(
+        `[Cadencia ↔ Drive] Cambio remoto detectado (local: ${state.fileVersion ?? '∅'}, ` +
+          `remote: ${meta.version}). Descargando...`,
+      );
       await pull(token);
+      markHealthy();
       notify('synced');
     }
     _lastSyncAt = Date.now();
   } catch (err) {
     if (err instanceof DriveApiError && err.status === 401) {
-      setSyncState({ syncHealth: 'token_expired' });
-      notify('token_expired');
+      markTokenExpired();
     } else {
       console.warn('[gdrive sync] poll error:', err);
+      markError();
     }
   } finally {
     _syncing = false;
   }
 }
 
+// ───────────────────────────────────────────────
+// Pull: Drive → cadenciaStore (con merge)
+// ───────────────────────────────────────────────
+
 /**
  * Pull: lee Drive, mergea con local y aplica el resultado. Si los dos
  * tenian cambios, sube el merged a Drive para que ambos converjan.
+ *
+ * El driveVersionChanged se captura ANTES de actualizar el cache
+ * (replicando Oraculo): si setSyncState bumpea fileVersion antes de la
+ * comparacion, el flag siempre saldria false aunque otro dispositivo
+ * hubiera escrito entre medias.
  */
 async function pull(token: string): Promise<void> {
   const state = getSyncState();
@@ -281,6 +508,12 @@ async function pull(token: string): Promise<void> {
     return;
   }
 
+  // Capturar driveVersionChanged ANTES de actualizar el cache (paridad con
+  // Oraculo). No se usa para forzar logica distinta —siempre pasamos por
+  // mergeData— pero queda registrado en el log diagnostico.
+  const driveVersionChanged =
+    state.fileVersion !== undefined && file.version !== state.fileVersion;
+
   setSyncState({ fileId: file.id, fileVersion: file.version });
   const remote = await readFile(token, file.id);
   const local = loadCadenciaData();
@@ -288,7 +521,8 @@ async function pull(token: string): Promise<void> {
   const remoteRich = calculateDataRichness(remote);
   const localRich = calculateDataRichness(local);
   console.warn(
-    `[Cadencia ↔ Drive] PULL: archivo encontrado (id=${file.id.slice(0, 8)}…, version=${file.version}). ` +
+    `[Cadencia ↔ Drive] PULL: archivo encontrado (id=${file.id.slice(0, 8)}…, version=${file.version}` +
+      `${driveVersionChanged ? ', CAMBIO REMOTO' : ''}). ` +
       `Riqueza remote=${remoteRich.toFixed(2)} (userInputs=${remote.userInputs !== null ? 'sí' : 'no'}, ` +
       `savedSessions=${remote.savedSessions.length}, uploadedCsvs=${remote.uploadedCsvs.length}). ` +
       `Riqueza local=${localRich.toFixed(2)} (userInputs=${local.userInputs !== null ? 'sí' : 'no'}).`,
@@ -301,6 +535,7 @@ async function pull(token: string): Promise<void> {
   // en ese caso debemos pasar por mergeData para que los borrados sobrevivan.
   if (hasNoLocalMeta(local)) {
     console.warn('[Cadencia ↔ Drive] Local sin meta (fresh install): aplicando remote directamente.');
+    saveBackup(local);
     applyRemote(remote);
     setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
     return;
@@ -308,13 +543,16 @@ async function pull(token: string): Promise<void> {
 
   // En cualquier otra divergencia (local mas nuevo, remote mas nuevo, mismo
   // timestamp con cambios concurrentes), confiar siempre en mergeData. El
-  // LWW por seccion + tombstones nunca destruye datos. Antes habia un push
-  // ciego cuando localTime > remoteTime y una "anti-regresion suave" basada
-  // en riqueza porcentual; ambos aplastaban datos en escenarios reales (perfil
-  // local recien puesto vs Drive rico; borrado masivo local vs remote vivo).
+  // LWW por seccion + tombstones nunca destruye datos.
   console.warn('[Cadencia ↔ Drive] Fusionando local y remote via LWW.');
-  const { merged } = mergeData(local, remote);
+  saveBackup(local);
+  const { merged, conflicts } = mergeData(local, remote);
   const cleaned = cleanExpiredTombstones(merged);
+
+  if (conflicts.length > 0) {
+    saveConflicts(conflicts);
+  }
+
   applyRemote(cleaned);
 
   // Solo subir a Drive si el merge cambia respecto al remote actual: si local
@@ -332,6 +570,10 @@ async function pull(token: string): Promise<void> {
     setSyncState({ lastSyncAt: new Date().toISOString(), fileVersion: file.version });
   }
 }
+
+// ───────────────────────────────────────────────
+// Push: cadenciaStore → Drive (con version check)
+// ───────────────────────────────────────────────
 
 /**
  * Push: sube cadenciaStore actual a Drive. Si la version remota cambio
@@ -357,6 +599,11 @@ async function push(token: string): Promise<void> {
       meta = null;
     }
     if (meta && state.fileVersion && meta.version !== state.fileVersion) {
+      // CAPA 1: version mismatch → otro dispositivo escribio entre medias
+      console.warn(
+        `[Cadencia ↔ Drive] Version mismatch en push (local=${state.fileVersion}, remote=${meta.version}). ` +
+          'Disparando pullAndMerge para no perder cambios remotos.',
+      );
       await pullAndMerge(token, state.fileId);
       return;
     }
@@ -371,8 +618,10 @@ async function push(token: string): Promise<void> {
   const existing = await findFile(token);
   if (existing) {
     const remote = await readFile(token, existing.id);
-    const { merged } = mergeData(local, remote);
+    saveBackup(local);
+    const { merged, conflicts } = mergeData(local, remote);
     const cleaned = cleanExpiredTombstones(merged);
+    if (conflicts.length > 0) saveConflicts(conflicts);
     const result = await updateFile(token, existing.id, cleaned);
     applyRemote(cleaned);
     setSyncState({
@@ -393,21 +642,71 @@ async function push(token: string): Promise<void> {
 /**
  * pullAndMerge se invoca cuando push detecta colision (otro dispositivo
  * escribio entre medias). Lee remoto fresco, mergea y sube el resultado.
+ *
+ * Fallback estilo Oraculo: si el updateFile post-merge tambien falla
+ * (doble colision, extremadamente raro), releemos Drive y aplicamos como
+ * estado fresco. Si el segundo intento tambien falla, limpiamos el cache
+ * de fileId para que el proximo push reidentifique el archivo via findFile.
  */
 async function pullAndMerge(token: string, fileId: string): Promise<void> {
+  console.warn('[Cadencia ↔ Drive] pullAndMerge: leyendo remote fresco…');
   const remote = await readFile(token, fileId);
   const meta = await getFileMetadata(token, fileId);
   const local = loadCadenciaData();
-  const { merged } = mergeData(local, remote);
+
+  // Señal diagnostica (no cambia el flujo): en Oraculo, una disparidad fuerte
+  // de riqueza disparaba un aplicar-remote-directo. En Cadencia no podemos
+  // hacerlo porque los tombstones viven inline en cada item (deletedAt) y un
+  // bypass del merge resucitaria borrados intencionados. Pero loguear la
+  // disparidad ayuda a diagnosticar bugs de sync donde un dispositivo tiene
+  // datos stale.
+  const remoteRich = calculateDataRichness(remote);
+  const localRich = calculateDataRichness(local);
+  if (remoteRich > 0 && localRich < remoteRich * 0.3) {
+    console.warn(
+      `[Cadencia ↔ Drive] Disparidad de riqueza notable en pullAndMerge ` +
+        `(local=${localRich.toFixed(2)}, remote=${remoteRich.toFixed(2)}). ` +
+        'Confiando en mergeData para preservar tombstones; backup disponible si revertir.',
+    );
+  }
+
+  saveBackup(local);
+  const { merged, conflicts } = mergeData(local, remote);
   const cleaned = cleanExpiredTombstones(merged);
+  if (conflicts.length > 0) saveConflicts(conflicts);
   applyRemote(cleaned);
+
   try {
     const result = await updateFile(token, fileId, cleaned);
     setSyncState({ fileVersion: result.version, lastSyncAt: new Date().toISOString() });
-  } catch {
-    setSyncState({ fileVersion: meta.version, lastSyncAt: new Date().toISOString() });
+    console.warn('[Cadencia ↔ Drive] pullAndMerge completado.');
+  } catch (err) {
+    // Fallback: doble colision. Releer Drive y aplicar como estado fresco
+    // — sacrifica los cambios locales no sincronizados de este ciclo para
+    // garantizar consistencia con Drive.
+    console.error('[Cadencia ↔ Drive] Doble colision tras pullAndMerge, releyendo Drive:', err);
+    try {
+      const freshRemote = await readFile(token, fileId);
+      const freshMeta = await getFileMetadata(token, fileId);
+      applyRemote(freshRemote);
+      setSyncState({
+        fileVersion: freshMeta.version,
+        lastSyncAt: new Date().toISOString(),
+      });
+    } catch (innerErr) {
+      console.error('[Cadencia ↔ Drive] Fallback tambien fallo, limpiando fileId:', innerErr);
+      clearSyncFileCache();
+      setSyncState({
+        fileVersion: meta.version,
+        lastSyncAt: new Date().toISOString(),
+      });
+    }
   }
 }
+
+// ───────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────
 
 /**
  * Aplica datos remotos al cadenciaStore. El flag _applyingRemote evita
@@ -468,20 +767,19 @@ async function doPush(): Promise<void> {
   try {
     const token = await getTokenSilent();
     if (!token) {
-      setSyncState({ syncHealth: 'token_expired' });
-      notify('token_expired');
+      markTokenExpired();
       return;
     }
     await push(token);
     _lastSyncAt = Date.now();
+    markHealthy();
     notify('synced');
   } catch (err) {
     if (err instanceof DriveApiError && err.status === 401) {
-      setSyncState({ syncHealth: 'token_expired' });
-      notify('token_expired');
+      markTokenExpired();
     } else {
       console.warn('[gdrive sync] push error:', err);
-      notify('error');
+      markError();
     }
   } finally {
     _syncing = false;

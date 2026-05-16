@@ -42,7 +42,15 @@ vi.mock('@ui/state/cadenciaStore', () => ({
 
 import * as driveApi from './drive-api';
 import * as cadenciaStore from '@ui/state/cadenciaStore';
-import { connect, disconnect } from './sync';
+import {
+  connect,
+  disconnect,
+  syncNow,
+  getConflicts,
+  clearConflicts,
+  getBackup,
+  clearBackup,
+} from './sync';
 
 const mockedFindFile = vi.mocked(driveApi.findFile);
 const mockedReadFile = vi.mocked(driveApi.readFile);
@@ -249,5 +257,121 @@ describe('pull() via connect()', () => {
 
     // No hay cambios entre local y remote → no se debe disparar updateFile.
     expect(mockedUpdateFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('syncNow() (sync manual)', () => {
+  it('no-op si no esta conectado', async () => {
+    mockedLoadCadenciaData.mockReturnValue(emptySyncedData());
+    await syncNow();
+    expect(mockedFindFile).not.toHaveBeenCalled();
+    expect(mockedReadFile).not.toHaveBeenCalled();
+  });
+
+  it('tras connect, dispara pull y actualiza lastSyncAt', async () => {
+    const local = emptySyncedData();
+    local.userInputs = {
+      sport: 'bike',
+      weightKg: 70,
+      ftpWatts: null,
+      maxHeartRate: null,
+      restingHeartRate: null,
+      birthYear: null,
+      sex: null,
+      bikeWeightKg: null,
+      bikeType: null,
+    };
+    local._sectionMeta.userInputs = { updatedAt: '2026-05-15T12:00:00Z' };
+    local.updatedAt = '2026-05-15T12:00:00Z';
+    mockedLoadCadenciaData.mockReturnValue(local);
+    mockedFindFile.mockResolvedValue({ id: 'f1', version: '1' });
+    mockedGetFileMetadata.mockResolvedValue({ id: 'f1', version: '1' });
+    // Devolver una copia para evitar mutacion cruzada del mismo objeto.
+    mockedReadFile.mockResolvedValue(JSON.parse(JSON.stringify(local)) as SyncedData);
+    mockedUpdateFile.mockResolvedValue({ id: 'f1', version: '2' });
+
+    await connect();
+    const callsBefore = mockedReadFile.mock.calls.length;
+
+    await syncNow();
+
+    // syncNow re-ejecuto el pull → readFile se llamo una vez mas.
+    expect(mockedReadFile.mock.calls.length).toBeGreaterThan(callsBefore);
+  });
+});
+
+describe('Conflict log y backup persistentes', () => {
+  it('getConflicts() devuelve array vacio cuando no hay log', () => {
+    localStorage.clear();
+    expect(getConflicts()).toEqual([]);
+  });
+
+  it('clearConflicts() borra el log', () => {
+    localStorage.setItem(
+      'cadencia:gdrive:conflicts',
+      JSON.stringify({
+        entries: [
+          {
+            section: 'userInputs',
+            loserValue: null,
+            loserTimestamp: '2026-05-15T00:00:00Z',
+            winnerTimestamp: '2026-05-15T00:00:00Z',
+            resolvedAt: '2026-05-15T00:00:00Z',
+          },
+        ],
+      }),
+    );
+    expect(getConflicts()).toHaveLength(1);
+    clearConflicts();
+    expect(getConflicts()).toEqual([]);
+  });
+
+  it('getBackup() y clearBackup() funcionan sobre el snapshot persistido', () => {
+    localStorage.clear();
+    expect(getBackup()).toBeNull();
+    localStorage.setItem(
+      'cadencia:gdrive:preSyncBackup',
+      JSON.stringify(emptySyncedData()),
+    );
+    expect(getBackup()).not.toBeNull();
+    clearBackup();
+    expect(getBackup()).toBeNull();
+  });
+
+  it('un merge con conflictos persiste entradas en el log', async () => {
+    // Caso: local y remote con userInputs distintos pero mismo timestamp →
+    // mergeData detecta conflicto (winner remote por idempotencia, loser
+    // local registrado).
+    const t = '2026-05-15T00:00:00.000Z';
+    const local = emptySyncedData();
+    local.userInputs = {
+      sport: 'bike',
+      weightKg: 70,
+      ftpWatts: null,
+      maxHeartRate: null,
+      restingHeartRate: null,
+      birthYear: null,
+      sex: null,
+      bikeWeightKg: null,
+      bikeType: null,
+    };
+    local._sectionMeta.userInputs = { updatedAt: t };
+    local.updatedAt = t;
+
+    const remote = JSON.parse(JSON.stringify(local)) as SyncedData;
+    if (remote.userInputs) remote.userInputs.weightKg = 80;
+
+    mockedLoadCadenciaData.mockReturnValue(local);
+    mockedFindFile.mockResolvedValue({ id: 'f1', version: '1' });
+    mockedGetFileMetadata.mockResolvedValue({ id: 'f1', version: '1' });
+    mockedReadFile.mockResolvedValue(remote);
+    mockedUpdateFile.mockResolvedValue({ id: 'f1', version: '2' });
+
+    localStorage.removeItem('cadencia:gdrive:conflicts');
+    await connect();
+
+    const log = getConflicts();
+    expect(log.length).toBeGreaterThan(0);
+    expect(log[0]?.section).toBe('userInputs');
   });
 });
