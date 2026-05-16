@@ -472,18 +472,57 @@ export interface SyncedData {
 
 - **Atomic LWW por sección** (`userInputs`, `musicPreferences`, `nativeCatalogPrefs`, `dismissedTrackUris`, `tvModePrefs`): el lado con `_sectionMeta[section].updatedAt` mayor gana. En empate exacto wins remote (idempotencia tras pull-merge-push) y se anota conflicto.
 - **Array merge por id con tombstones** (`savedSessions`, `uploadedCsvs`, `plannedEvents`, `playlistHistory`): unión item-level por `id`. LWW por `updatedAt` de cada item. Borrado lógico vía `deletedAt` (tombstone) que se propaga via sync antes de purgarse a los 30 días (`cleanExpiredTombstones`).
-- **Anti-regresión**: si local está vacío y remote tiene datos, aplica remote sin merge. Si local tiene <30% de la riqueza de remote (instalación nueva), también aplica remote directo.
+- **Anti-regresión por `hasNoLocalMeta`**: solo cuando `_sectionMeta` está literalmente vacío (instalación nueva, jamás modificada) aplicamos remote sin merge. No usamos `isEmptyData` para esto porque dispararía también cuando el usuario borró todo intencionadamente (los tombstones tienen `_sectionMeta`); en ese caso pasamos por `mergeData` para que los borrados sobrevivan.
 - **Anti-ciclo**: flag `_applyingRemote` evita que `pull` dispare `push` tras actualizar `cadenciaStore` con datos descargados.
+- **Validación tolerante de schema** (`isSyncedData`): solo exige `updatedAt` (string) + `_sectionMeta` (objeto). No exige `schemaVersion` exacto: blobs antiguos (sin `schemaVersion`) o futuros (`schemaVersion > 1`) pasan y se normalizan con defaults. Solo se rechaza con `DriveApiError 422` cuando el blob es realmente irreconocible.
+
+### Tres capas de protección (paridad con el motor del Oráculo)
+
+El motor del Oráculo (`movimientofuncional.app/oraculo`) lleva año y pico estable en producción con miles de usuarios. En mayo 2026 portamos su modelo de protección a Cadencia tras detectar que la versión inicial (un único merge ciego) era frágil ante schemas distintos o fallos transitorios. Tres capas encadenadas:
+
+1. **Version check pre-push**: antes de cualquier `updateFile` verificamos que `file.version` en Drive coincide con la cacheada localmente. Si difiere, otro dispositivo escribió entre medias → disparamos `pullAndMerge` en lugar de sobrescribir.
+2. **Merge inteligente**: cualquier divergencia (excepto `hasNoLocalMeta`) pasa por `mergeData`. Nunca push ciego: el LWW por sección + tombstones nunca destruye datos.
+3. **Backup pre-sync + conflict log persistente**:
+   - `cadencia:gdrive:preSyncBackup`: snapshot del local antes de cada `applyRemote`/merge. Recuperable manualmente desde el panel de la UI o vía `getBackup()` / `clearBackup()`.
+   - `cadencia:gdrive:conflicts`: array de `MergeConflict` cap a 50 entradas. Cada conflicto registra `section`, `loserValue`, `loserTimestamp`, `winnerTimestamp`, `resolvedAt`. Exposición pública: `getConflicts()` / `clearConflicts()`.
+
+**Salud del sync** (`syncHealth` en `cadencia:gdrive:syncState`):
+
+- `'healthy'`: operación normal.
+- `'token_expired'`: `getTokenSilent` devolvió `null`. UI ofrece reconectar; polling pausado hasta entonces.
+- `'error'`: solo se notifica tras **3 fallos consecutivos no-401** (`_consecutiveFailures ≥ 3`). Cualquier sync exitoso resetea el contador vía `markHealthy()`. Esto evita alarmar por un cuelgue puntual de red.
+
+**Fallback en `pullAndMerge`**: si el `updateFile` post-merge falla (doble colisión, extremadamente raro), releemos Drive y aplicamos como estado fresco. Si el segundo intento también falla, `clearSyncFileCache()` borra el `fileId` cacheado para que el siguiente `push` reidentifique el archivo via `findFile`.
+
+**Disparidad de richness como señal diagnóstica**: cuando `pullAndMerge` detecta que `localRichness < remoteRichness * 0.3`, loguea un warning pero NO cambia el flujo. En Oráculo este caso disparaba un applyRemote directo; en Cadencia no podemos porque los tombstones viven inline (`deletedAt` en cada item) y un bypass del merge resucitaría borrados intencionados.
 
 `src/integrations/gdrive/` (auth + REST, depende de `core/sync`):
 
 - `auth.ts`: GIS popup, tokens en `localStorage` con buffer 5min antes del expiry real.
 - `drive-api.ts`: REST puro contra Drive v3, retry automático en 401 vía `setTokenRefresher`.
-- `sync.ts`: orquestador. Push debounceado (2s), pull periódico (30s) ligero (solo metadata), pull en `visibilitychange`. `init()` registra los listeners y hace silent sync inicial si el usuario ya estaba conectado.
+- `sync.ts`: orquestador. Push debounceado (2s), pull periódico (30s) ligero (solo metadata), pull en `visibilitychange`. `init()` registra los listeners (idempotente vía `_initPromise` cacheada) y hace silent sync inicial si el usuario ya estaba conectado. Polling se **pausa al ocultar la tab** (ahorro de batería) y se **reanuda al volverla visible**; al ocultar también se flushea cualquier `debouncedPush` pendiente para resistir congelaciones del SO.
+
+API pública del módulo:
+
+```typescript
+init(): Promise<void>                      // arranca el motor (idempotente)
+connect(): Promise<{ email: string }>      // abre popup OAuth + sync inicial
+disconnect(): Promise<void>                // revoca token, limpia listeners
+syncNow(): Promise<void>                   // fuerza pull manual (sin esperar al debounce)
+isConnected(): boolean
+getSyncInfo(): SyncState                   // incluye email, fileId, lastSyncAt, syncHealth
+getConflicts(): MergeConflict[]            // log persistido
+clearConflicts(): void
+getBackup(): SyncedData | null             // snapshot pre-sync
+clearBackup(): void
+```
 
 `src/ui/state/cadenciaStore.ts`: single source of truth en `localStorage` con la key `cadencia:data:v1`. Cada `updateSection` bumpea el meta de la sección y dispara el evento `cadencia-data-saved` que el motor de sync observa.
 
-`src/ui/components/sync/`: `GoogleSyncCard` (botón conectar/desconectar) y `SyncStatusBadge` (indicador de salud).
+`src/ui/components/sync/`:
+- `GoogleSyncCard`: conectar/desconectar + cuando hay conexión: botón **«Sincronizar ahora»** (`syncNow`), última sincronización en formato relativo, panel amarillo si hay conflictos (detalles colapsables con últimos 20 + limpiar log), panel gris si hay backup local (descartar).
+- `SyncStatusBadge`: chip de color reactivo a `gdrive-sync-status`.
+- `useDriveConnected`: hook reactivo al estado de conexión.
 
 ### Endpoints Drive API usados
 
