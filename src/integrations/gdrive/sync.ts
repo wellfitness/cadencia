@@ -1,5 +1,5 @@
 import { GDRIVE_CONFIG } from './config';
-import { signIn, signOut, getTokenSilent, refreshToken } from './auth';
+import { signIn, signOut, getTokenSilent, getCachedToken, refreshToken } from './auth';
 import {
   setTokenRefresher,
   findFile,
@@ -276,7 +276,13 @@ async function doInit(): Promise<void> {
 
   if (isConnected()) {
     try {
-      const token = await getTokenSilent();
+      // En el arranque usamos SOLO el token cacheado (sincrono, sin posible
+      // popup). Si caduco, marcamos token_expired y esperamos a una accion
+      // del usuario (un cambio dispara doPush, que renueva via el refresher)
+      // o a que reconecte desde preferencias. Antes aqui se llamaba a
+      // getTokenSilent(), que al expirar el token disparaba silentRefresh y
+      // podia abrir el modal de Google sin que el usuario lo hubiese pedido.
+      const token = getCachedToken();
       if (token) {
         await pull(token);
         markHealthy();

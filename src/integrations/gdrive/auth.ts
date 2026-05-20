@@ -106,11 +106,13 @@ export function signIn(): Promise<SignInResult> {
 }
 
 /**
- * Recupera token cacheado si sigue valido. Si expiro, intenta refresh
- * silencioso (sin popup). Si falla, devuelve null para que el caller
- * sepa que necesita reauth interactiva.
+ * Devuelve el token cacheado SOLO si sigue vigente (con el buffer de
+ * seguridad). Nunca intenta refrescar, asi que es imposible que abra UI
+ * de Google: por eso es sincrona. Pensada para el arranque, donde un
+ * popup que el usuario no ha pedido es pura friccion. Devuelve null si
+ * no hay token o ya expiro — el caller decide si pide reauth interactiva.
  */
-export async function getTokenSilent(): Promise<string | null> {
+export function getCachedToken(): string | null {
   try {
     const token = localStorage.getItem(TOKEN_KEY);
     const expiry = parseInt(localStorage.getItem(TOKEN_EXPIRY_KEY) ?? '0', 10);
@@ -118,6 +120,22 @@ export async function getTokenSilent(): Promise<string | null> {
   } catch {
     // ignore
   }
+  return null;
+}
+
+/**
+ * Recupera token cacheado si sigue valido. Si expiro, intenta refresh
+ * silencioso (sin popup en el caso feliz). Si falla, devuelve null para
+ * que el caller sepa que necesita reauth interactiva.
+ *
+ * OJO: `silentRefresh` solo es silencioso si Google puede renovar sin
+ * interaccion (sesion activa + scope concedido). En caso contrario puede
+ * mostrar UI, por lo que NO debe llamarse en el arranque sin intencion
+ * del usuario — para ese caso usa `getCachedToken`.
+ */
+export async function getTokenSilent(): Promise<string | null> {
+  const cached = getCachedToken();
+  if (cached) return cached;
   try {
     return await silentRefresh();
   } catch {
