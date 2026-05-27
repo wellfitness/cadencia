@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AndroidBetaButton } from '@ui/components/AndroidBetaButton';
 import { Button } from '@ui/components/Button';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { SiteFooter } from '@ui/components/SiteFooter';
@@ -383,13 +384,17 @@ function Intro(): JSX.Element {
               <MaterialIcon name="arrow_forward" size="small" decorative />
             </a>
 
-            {/* CTA secundario: Instalar app (PWA). Solo aparece si el
-                navegador expone el prompt de instalación. Vive bajo el
-                bloque informativo, después del CTA primario "Probar
-                aplicación" del inicio de la sección, para no canibalizar
-                conversión. */}
-            {canInstall ? (
-              <div className="flex justify-center lg:justify-start">
+            {/* CTAs secundarios de instalación:
+                - «Instalar app» (PWA): condicional al evento beforeinstallprompt
+                  (Chrome/Edge cuando se cumple engagement). En Safari/Firefox
+                  no aparece.
+                - «Instalar en Android»: siempre visible. Abre modal explicando
+                  la beta cerrada en Play Store y enlaza al Google Form para
+                  apuntarse como tester. Captura signups incluso desde desktop.
+                Conviven en línea (flex-wrap) para no canibalizar el CTA
+                primario «Crear mi sesión» del hero. */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+              {canInstall ? (
                 <Button
                   variant="secondary"
                   size="lg"
@@ -401,8 +406,9 @@ function Intro(): JSX.Element {
                 >
                   Instalar app
                 </Button>
-              </div>
-            ) : null}
+              ) : null}
+              <AndroidBetaButton />
+            </div>
           </div>
 
           {/* HeroMockup: en mobile/tablet bajo el texto, en desktop columna

@@ -24,6 +24,7 @@ import {
 } from '@core/matching';
 import { dedupeByUri, loadNativeTracks, type Track } from '@core/tracks';
 import { Stepper, type StepperStep } from '@ui/components/Stepper';
+import { AndroidBetaButton } from '@ui/components/AndroidBetaButton';
 import { Card } from '@ui/components/Card';
 import { Logo } from '@ui/components/Logo';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -988,7 +989,12 @@ function Header(): JSX.Element {
 function Footer(): JSX.Element {
   return (
     <footer className="border-t border-gris-200 bg-gris-50">
-      <div className="mx-auto w-full max-w-4xl px-4 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-2 text-xs md:text-sm text-gris-500">
+      {/* 3 columnas en desktop (info / CTA beta Android / nav legal), apiladas
+          en mobile. El CTA verde de la beta vive aqui para tener exposicion
+          en todas las paginas internas del wizard (catalogo, preferencias,
+          calendario...) — sin esto solo se veria en la Landing. Variante
+          `compact` para no romper la densidad visual del footer. */}
+      <div className="mx-auto w-full max-w-4xl px-4 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs md:text-sm text-gris-500">
         <div className="flex flex-col gap-0.5">
           <p className="flex items-center gap-1.5">
             <MaterialIcon name="lock" size="small" className="text-gris-400" />
@@ -999,6 +1005,7 @@ function Footer(): JSX.Element {
             quieres copia entre dispositivos.
           </p>
         </div>
+        <AndroidBetaButton compact />
         <nav className="flex items-center gap-3">
           <a
             href="/ayuda"
