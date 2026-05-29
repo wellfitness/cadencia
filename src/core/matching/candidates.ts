@@ -1,6 +1,6 @@
 import type { Track } from '../tracks/types';
 import type { MatchQuality, ZoneMusicCriteria } from './types';
-import { getAlternativeBpmRange } from './zoneCriteria';
+import { getAlternativeBpmRange, getPrimaryCadenceMax } from './zoneCriteria';
 
 export interface CandidateBag {
   candidates: Track[];
@@ -22,7 +22,9 @@ export function passesCadenceFilter(
   tempoBpm: number,
   criteria: ZoneMusicCriteria,
 ): boolean {
-  if (tempoBpm >= criteria.cadenceMin && tempoBpm <= criteria.cadenceMax) {
+  // 1:1: el techo es cadenceMaxPrimary cuando existe (Z1/Z2 recuperacion → 110),
+  // si no cadenceMax. El floor (cadenceMin) no cambia.
+  if (tempoBpm >= criteria.cadenceMin && tempoBpm <= getPrimaryCadenceMax(criteria)) {
     return true;
   }
   const alt = getAlternativeBpmRange(criteria);

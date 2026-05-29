@@ -61,6 +61,18 @@ export interface ZoneMusicCriteria {
   cadenceMin: number;
   /** Cadencia objetivo maxima (rpm en bike, spm en run). Filtro excluyente. */
   cadenceMax: number;
+  /**
+   * Techo de cadencia para el match 1:1 cuando difiere de cadenceMax. Solo lo
+   * fija getZoneCriteria en zonas de recuperacion (bici Z1/Z2): a baja carga la
+   * cadencia se desacopla de la resistencia y se admite spin suave mas alto
+   * (hasta 110 rpm en llano/bajada). El 2:1 sigue derivando de cadenceMin/Max
+   * (cadencia comoda), asi que el rango half-time NO se ensancha.
+   *
+   * undefined = usar cadenceMax (comportamiento del resto de zonas). Su sola
+   * presencia es la senal de "banda ancha de recuperacion": activa el score de
+   * cadencia en meseta (cualquier cadencia dentro de la banda 1:1 puntua full).
+   */
+  cadenceMaxPrimary?: number;
   /** Energy [0..1] ideal para esta zona. Score por distancia, no excluye. */
   energyIdeal: number;
   /** Valencia [0..1] ideal (positividad emocional). Score por distancia. */

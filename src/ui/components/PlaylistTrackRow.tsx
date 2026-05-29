@@ -1,4 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from 'react';
 import { createPortal } from 'react-dom';
 import type { AlternativeCandidate, MatchedSegment } from '@core/matching';
 import { Button } from './Button';
@@ -243,21 +251,23 @@ interface RandomPickButtonProps {
 }
 
 /**
- * Sustituye el track actual por una alternativa elegida al azar entre las
- * disponibles para este slot. Aleatoriedad iniciada por el usuario (click
- * explicito), no por el motor — el matching del nucleo sigue siendo
- * determinista.
+ * Sustituye el track actual por una alternativa elegida al azar. Solo sortea
+ * entre las alternativas LIBRES (`usedAtIndex === null`): nunca elige una ya
+ * usada en la lista, para no duplicar. Mover una usada es una accion deliberada
+ * del dropdown "Otro tema", no del azar. Aleatoriedad iniciada por el usuario
+ * (click explicito); el matching del nucleo sigue siendo determinista.
  */
 function RandomPickButton({
   alternatives,
   onSelect,
   rowIndex,
 }: RandomPickButtonProps): JSX.Element {
-  const isEmpty = alternatives.length === 0;
+  const fresh = alternatives.filter((a) => a.usedAtIndex === null);
+  const isEmpty = fresh.length === 0;
   const handleClick = (): void => {
     if (isEmpty) return;
-    const idx = Math.floor(Math.random() * alternatives.length);
-    const pick = alternatives[idx];
+    const idx = Math.floor(Math.random() * fresh.length);
+    const pick = fresh[idx];
     if (pick) onSelect(pick.track.uri);
   };
   return (
@@ -267,8 +277,8 @@ function RandomPickButton({
       iconLeft="shuffle"
       onClick={handleClick}
       disabled={isEmpty}
-      aria-label={`Elegir un tema al azar para el tramo ${rowIndex}`}
-      title="Sustituir por un tema aleatorio de las alternativas"
+      aria-label={`Elegir un tema libre al azar para el tramo ${rowIndex}`}
+      title="Sustituir por un tema aleatorio de las alternativas libres (sin repetir)"
     >
       <span className="hidden sm:inline">Aleatorio</span>
     </Button>
@@ -493,32 +503,57 @@ function AlternativesPicker({
                   </div>
                 ) : (
                   <ul className="py-1">
-                    {filtered.map((alt) => (
-                      <li key={alt.track.uri}>
-                        <div className="flex items-center gap-2 px-2">
-                          <TrackPreviewButton uri={alt.track.uri} />
-                          <button
-                            type="button"
-                            role="option"
-                            aria-selected={false}
-                            onClick={() => handleSelect(alt.track.uri)}
-                            className="flex-1 text-left px-1 py-2 min-h-[44px] flex items-center gap-3 rounded hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gris-800 truncate">
-                                {alt.track.name}
-                              </p>
-                              <p className="text-xs text-gris-500 truncate">
-                                {alt.track.artists.join(', ')}
-                              </p>
+                    {filtered.map((alt, i) => {
+                      const usedAt = alt.usedAtIndex;
+                      const prevUsed = i > 0 && (filtered[i - 1]?.usedAtIndex ?? null) !== null;
+                      // Separador "Ya en tu lista" antes de la primera usada.
+                      const showUsedHeader = usedAt !== null && !prevUsed;
+                      return (
+                        <Fragment key={alt.track.uri}>
+                          {showUsedHeader && (
+                            <li aria-hidden className="px-3 pt-3 pb-1 mt-1 border-t border-gris-100">
+                              <span className="text-xs font-semibold text-gris-500 flex items-center gap-1">
+                                <MaterialIcon
+                                  name="playlist_add_check"
+                                  size="small"
+                                  className="text-gris-400"
+                                />
+                                Ya en tu lista (mover aquí)
+                              </span>
+                            </li>
+                          )}
+                          <li>
+                            <div className="flex items-center gap-2 px-2">
+                              <TrackPreviewButton uri={alt.track.uri} />
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={false}
+                                onClick={() => handleSelect(alt.track.uri)}
+                                className="flex-1 text-left px-1 py-2 min-h-[44px] flex items-center gap-3 rounded hover:bg-turquesa-50 focus:bg-turquesa-50 focus:outline-none transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gris-800 truncate">
+                                    {alt.track.name}
+                                  </p>
+                                  <p className="text-xs text-gris-500 truncate">
+                                    {alt.track.artists.join(', ')}
+                                  </p>
+                                </div>
+                                {usedAt !== null && (
+                                  <span className="shrink-0 inline-flex items-center rounded-full bg-turquesa-50 px-2 py-0.5 text-[11px] font-semibold text-turquesa-700">
+                                    en tu lista · tramo {usedAt + 1}
+                                  </span>
+                                )}
+                                <span className="text-xs text-gris-500 tabular-nums shrink-0">
+                                  {Math.round(alt.track.tempoBpm)} bpm
+                                </span>
+                              </button>
                             </div>
-                            <span className="text-xs text-gris-500 tabular-nums shrink-0">
-                              {Math.round(alt.track.tempoBpm)} bpm
-                            </span>
-                          </button>
-                        </div>
-                      </li>
-                    ))}
+                          </li>
+                        </Fragment>
+                      );
+                    })}
                   </ul>
                 )}
               </>

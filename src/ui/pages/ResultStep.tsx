@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   getAlternativesForSegment,
+  moveTrackToSegment,
   replaceTrackInSegment,
   type CrossZoneMode,
   type MatchPreferences,
@@ -202,8 +203,39 @@ export function ResultStep({
   // Contador local de descartes en esta sesion del wizard. Util para el
   // toast informativo "Has descartado N · Ver descartes en Mis preferencias".
   const [sessionDismissCount, setSessionDismissCount] = useState<number>(0);
+  // Aviso transitorio tras mover una cancion de posicion: la cascada (el tramo
+  // origen se rellena con otra) es visible para el usuario, no silenciosa.
+  const [moveNotice, setMoveNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (moveNotice === null) return;
+    const handle = window.setTimeout(() => setMoveNotice(null), 5000);
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [moveNotice]);
 
   const handleReplaceWith = (index: number, uri: string): void => {
+    // ¿La cancion elegida ya esta en OTRO tramo? Entonces el usuario la esta
+    // MOVIENDO aqui (mover + rellenar el hueco). Si esta libre, sustitucion
+    // normal. El propio track del tramo nunca llega aqui (se excluye del
+    // dropdown), asi que `sourceIndex` apunta siempre a otro slot.
+    const sourceIndex = matched.findIndex((m, j) => j !== index && m.track?.uri === uri);
+    if (sourceIndex !== -1) {
+      const result = moveTrackToSegment(matched, index, uri, tracks, preferences);
+      if (!result.moved) return;
+      onMatchedChange(result.matched);
+      const next = new Set(replacedIndices);
+      result.changedIndices.forEach((ci) => next.add(ci));
+      onReplacedIndicesChange(next);
+      const movedName = matched[sourceIndex]?.track?.name ?? 'la canción';
+      const filledName = result.matched[sourceIndex]?.track?.name;
+      setMoveNotice(
+        filledName !== undefined
+          ? `Movida «${movedName}» aquí · el tramo ${sourceIndex + 1} ahora suena «${filledName}»`
+          : `Movida «${movedName}» aquí · el tramo ${sourceIndex + 1} se quedó sin tema (sube más listas)`,
+      );
+      return;
+    }
     const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
     if (!result.replaced) return;
     onMatchedChange(result.matched);
@@ -611,6 +643,16 @@ export function ResultStep({
           </>
         }
       />
+
+      {moveNotice !== null && (
+        <div
+          role="status"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 max-w-md w-[calc(100%-2rem)] rounded-lg border border-turquesa-300 bg-turquesa-50 px-4 py-2.5 shadow-md flex items-center gap-2"
+        >
+          <MaterialIcon name="low_priority" size="small" className="text-turquesa-700 shrink-0" />
+          <p className="text-xs text-turquesa-900 flex-1 min-w-0">{moveNotice}</p>
+        </div>
+      )}
 
       {sessionDismissCount > 0 && (
         <div

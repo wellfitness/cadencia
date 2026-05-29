@@ -138,6 +138,9 @@ cadenceMaxPrimary?: number;
 - `src/core/matching/match.ts` — `bpmDistanceToCriteria` usa el mismo techo 1:1.
 - `src/core/matching/poolCoverage.ts` — sin cambios de código (recalcula vía
   `findCandidates`); sus tests reflejan el nuevo recuento Z1/Z2.
+- `src/core/tracks/genreCoverage.ts` — sin cambios de código (usa
+  `passesCadenceFilter`); recalcula la cobertura por género×zona y sus tests
+  reflejan que Z1/Z2 ahora cubren la banda 90-110 BPM.
 
 ---
 

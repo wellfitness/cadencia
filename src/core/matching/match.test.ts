@@ -505,4 +505,37 @@ describe('matchTracksToSegments', () => {
       expect(matched[0]?.track?.uri).toBe(trackSprintRun.uri);
     });
   });
+
+  describe('recuperacion bici: techo 1:1 ampliado a 110 rpm (Z1/Z2)', () => {
+    it('bici Z1 acepta 100 BPM como strict (antes caia a best-effort)', () => {
+      const t = track({ tempoBpm: 100, energy: 0.4, valence: 0.5, durationMs: 60_000 });
+      const matched = matchTracksToSegments([segment(1)], [t], EMPTY_PREFERENCES);
+      expect(matched[0]?.track?.uri).toBe(t.uri);
+      expect(matched[0]?.matchQuality).toBe('strict');
+    });
+
+    it('bici Z1 acepta 110 BPM (el techo) como strict', () => {
+      const t = track({ tempoBpm: 110, energy: 0.4, valence: 0.5, durationMs: 60_000 });
+      const matched = matchTracksToSegments([segment(1)], [t], EMPTY_PREFERENCES);
+      expect(matched[0]?.matchQuality).toBe('strict');
+    });
+
+    it('bici Z2 acepta 105 BPM como strict', () => {
+      const t = track({ tempoBpm: 105, energy: 0.55, valence: 0.5, durationMs: 60_000 });
+      const matched = matchTracksToSegments([segment(2)], [t], EMPTY_PREFERENCES);
+      expect(matched[0]?.matchQuality).toBe('strict');
+    });
+
+    it('bici Z1 NO acepta 130 BPM como strict (fuera de 1:1 [70-110] y 2:1 [140-180])', () => {
+      const t = track({ tempoBpm: 130, energy: 0.4, valence: 0.5, durationMs: 60_000 });
+      const matched = matchTracksToSegments([segment(1)], [t], EMPTY_PREFERENCES);
+      expect(matched[0]?.matchQuality).toBe('best-effort');
+    });
+
+    it('bici Z3 (sin ensanche) sigue rechazando 100 BPM como strict', () => {
+      const t = track({ tempoBpm: 100, energy: 0.7, valence: 0.55, durationMs: 60_000 });
+      const matched = matchTracksToSegments([segment(3)], [t], EMPTY_PREFERENCES);
+      expect(matched[0]?.matchQuality).toBe('best-effort');
+    });
+  });
 });

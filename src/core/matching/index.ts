@@ -6,7 +6,9 @@ export { matchTracksToSegments, type CrossZoneMode, type MatchOptions } from './
 export {
   getAlternativesForSegment,
   replaceTrackInSegment,
+  moveTrackToSegment,
   type AlternativeCandidate,
   type ReplaceResult,
+  type MoveResult,
 } from './replaceTrack';
 export { analyzePoolCoverage, type PoolCoverage, type ZoneCoverage } from './poolCoverage';

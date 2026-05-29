@@ -79,8 +79,16 @@ describe('computeGenreCoverage', () => {
     expect(result[0]?.cells[0]?.candidateCount).toBe(1);
   });
 
-  it('track 100 BPM NO cubre Z2 flat (fuera de 70-90 y 140-180)', () => {
+  it('track 100 BPM cubre Z2 flat tras ampliar el 1:1 de recuperacion a 110 rpm', () => {
+    // Z1/Z2 admiten spin suave hasta 110 rpm: un track de 100 BPM entra al
+    // ritmo del track (1:1), sin dividir. Antes (techo 90) quedaba fuera.
     const t = track({ uri: 'spotify:track:1', genres: ['rock'], tempoBpm: 100 });
+    const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');
+    expect(result[0]?.cells[0]?.candidateCount).toBe(1);
+  });
+
+  it('track 130 BPM NO cubre Z2 flat (fuera de 70-110 y 140-180)', () => {
+    const t = track({ uri: 'spotify:track:1', genres: ['rock'], tempoBpm: 130 });
     const result = computeGenreCoverage([t], [{ zone: 2, cadenceProfile: 'flat' }], 'bike');
     expect(result[0]?.cells[0]?.candidateCount).toBe(0);
   });

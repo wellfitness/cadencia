@@ -1,7 +1,7 @@
 import { expandMacroToTags, isValidMacroId } from '../tracks/genreCategories';
 import type { Track } from '../tracks/types';
 import type { ZoneMusicCriteria } from './types';
-import { getAlternativeBpmRange } from './zoneCriteria';
+import { getAlternativeBpmRange, getPrimaryCadenceMax } from './zoneCriteria';
 
 /**
  * Pesos del score. Todos suman 1.00 en cada juego. Hay dos juegos:
@@ -90,15 +90,27 @@ export function scoreTrack(
   // Score por proximidad al midpoint del rango 1:1 O del rango alternativo
   // (2× en bike, 0.5× en run). Tomamos el max para no penalizar tracks que
   // matchean por la via half-time/half-cadence.
-  const midpoint11 = (criteria.cadenceMin + criteria.cadenceMax) / 2;
-  const halfRange11 = (criteria.cadenceMax - criteria.cadenceMin) / 2;
+  //
+  // Excepcion: zonas de recuperacion con banda ancha (cadenceMaxPrimary
+  // definido, bici Z1/Z2). Ahi el 1:1 abarca [70,110] y un triangulo hundiria
+  // los extremos (un track chill de 70 BPM puntuaria 0). Usamos MESETA: girar
+  // a 75 o a 105 rpm es igual de valido en recuperacion → ambos puntuan 1.0.
+  const primaryMax = getPrimaryCadenceMax(criteria);
+  let score11: number;
+  if (criteria.cadenceMaxPrimary !== undefined) {
+    score11 =
+      track.tempoBpm >= criteria.cadenceMin && track.tempoBpm <= primaryMax ? 1 : 0;
+  } else {
+    const midpoint11 = (criteria.cadenceMin + criteria.cadenceMax) / 2;
+    const halfRange11 = (criteria.cadenceMax - criteria.cadenceMin) / 2;
+    score11 =
+      halfRange11 > 0
+        ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpoint11) / halfRange11)
+        : 0;
+  }
   const alt = getAlternativeBpmRange(criteria);
   const midpointAlt = (alt.min + alt.max) / 2;
   const halfRangeAlt = (alt.max - alt.min) / 2;
-  const score11 =
-    halfRange11 > 0
-      ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpoint11) / halfRange11)
-      : 0;
   const scoreAlt =
     halfRangeAlt > 0
       ? Math.max(0, 1 - Math.abs(track.tempoBpm - midpointAlt) / halfRangeAlt)

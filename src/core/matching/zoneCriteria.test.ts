@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { ZONE_MUSIC_CRITERIA, applyAllEnergetic, getZoneCriteria } from './zoneCriteria';
+import {
+  ZONE_MUSIC_CRITERIA,
+  applyAllEnergetic,
+  getAlternativeBpmRange,
+  getPrimaryCadenceMax,
+  getZoneCriteria,
+} from './zoneCriteria';
 
 describe('getZoneCriteria — bike: cadencia (excluyente) + ideales energy/valence (inclusivos)', () => {
   it('Z1 flat: cadencia 70-90 (rango profile flat), energy ideal 0.30', () => {
@@ -67,6 +73,42 @@ describe('getZoneCriteria — bike: cadencia (excluyente) + ideales energy/valen
   it('combinacion invalida (Z6 + flat) cae al default sprint', () => {
     const c = getZoneCriteria(6, 'flat', 'bike');
     expect(c.cadenceProfile).toBe('sprint');
+  });
+});
+
+describe('getZoneCriteria — recuperacion bici: techo 1:1 ampliado (cadenceMaxPrimary)', () => {
+  it('Z1 bici: cadenceMaxPrimary = 110 (spin suave alto), cadenceMin/Max comodos sin cambio', () => {
+    const c = getZoneCriteria(1, 'flat', 'bike');
+    expect(c.cadenceMin).toBe(70);
+    expect(c.cadenceMax).toBe(90);
+    expect(c.cadenceMaxPrimary).toBe(110);
+  });
+
+  it('Z2 bici: tambien lleva cadenceMaxPrimary = 110', () => {
+    expect(getZoneCriteria(2, 'flat', 'bike').cadenceMaxPrimary).toBe(110);
+  });
+
+  it('Z3-Z6 bici: SIN cadenceMaxPrimary (no se ensanchan)', () => {
+    expect(getZoneCriteria(3, 'flat', 'bike').cadenceMaxPrimary).toBeUndefined();
+    expect(getZoneCriteria(4, 'flat', 'bike').cadenceMaxPrimary).toBeUndefined();
+    expect(getZoneCriteria(5, 'climb', 'bike').cadenceMaxPrimary).toBeUndefined();
+    expect(getZoneCriteria(6, 'sprint', 'bike').cadenceMaxPrimary).toBeUndefined();
+  });
+
+  it('running NO se ensancha: Z1/Z2 run sin cadenceMaxPrimary', () => {
+    expect(getZoneCriteria(1, 'flat', 'run').cadenceMaxPrimary).toBeUndefined();
+    expect(getZoneCriteria(2, 'flat', 'run').cadenceMaxPrimary).toBeUndefined();
+  });
+
+  it('el 2:1 NO se ensancha: Z1 bici sigue en [140,180] (deriva de [70,90], no de 110)', () => {
+    const alt = getAlternativeBpmRange(getZoneCriteria(1, 'flat', 'bike'));
+    expect(alt.min).toBe(140);
+    expect(alt.max).toBe(180);
+  });
+
+  it('getPrimaryCadenceMax: 110 en Z1 bici, cadenceMax en zonas sin ensanche', () => {
+    expect(getPrimaryCadenceMax(getZoneCriteria(1, 'flat', 'bike'))).toBe(110);
+    expect(getPrimaryCadenceMax(getZoneCriteria(3, 'flat', 'bike'))).toBe(90);
   });
 });
 

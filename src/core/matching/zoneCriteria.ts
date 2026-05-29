@@ -40,6 +40,19 @@ const CADENCE_BY_PROFILE: Record<CadenceProfile, { min: number; max: number }> =
 };
 
 /**
+ * Techo de cadencia del match 1:1 para las zonas de recuperacion en bici (Z1,
+ * Z2). El perfil flat tiene un techo "comodo" de 90 rpm, pero a baja intensidad
+ * la cadencia se desacopla de la resistencia: en llano o bajada se puede
+ * pedalear suave hasta ~110 rpm. Ampliamos SOLO el 1:1 (no el 2:1, que sigue
+ * derivando de [70,90] → [140,180]) para que la banda media de tempo entre como
+ * candidata "al ritmo del track", sin dividir.
+ *
+ * 110 rpm es el limite realista de spinning suave de recuperacion; subirlo mas
+ * (120-130 rpm) capturaria mas catalogo pero dejaria de ser spin "suave".
+ */
+const RECOVERY_PRIMARY_CADENCE_MAX = 110;
+
+/**
  * Cadencia objetivo (spm — pasos por minuto) por zona en RUNNING.
  *
  * A diferencia del ciclismo (donde la cadencia depende del terreno y por eso
@@ -130,7 +143,7 @@ export function getZoneCriteria(
   }
   const reconciledProfile = reconcileCadenceProfile(zone, profile);
   const cadence = CADENCE_BY_PROFILE[reconciledProfile];
-  return {
+  const base: ZoneMusicCriteria = {
     zone,
     sport: 'bike',
     cadenceProfile: reconciledProfile,
@@ -140,6 +153,22 @@ export function getZoneCriteria(
     valenceIdeal: ideal.valenceIdeal,
     description: ideal.description,
   };
+  // Zonas de recuperacion (Z1/Z2, siempre flat): ensanchamos el techo del 1:1
+  // a 110 rpm. Construccion condicional para respetar exactOptionalPropertyTypes
+  // (no asignar cadenceMaxPrimary: undefined en el resto de zonas).
+  if (zone === 1 || zone === 2) {
+    return { ...base, cadenceMaxPrimary: RECOVERY_PRIMARY_CADENCE_MAX };
+  }
+  return base;
+}
+
+/**
+ * Techo efectivo del match 1:1: el ensanche de recuperacion si existe, o el
+ * cadenceMax estandar. Helper unico para que passesCadenceFilter, scoreTrack y
+ * el calculo de distancia best-effort no dupliquen el `?? cadenceMax`.
+ */
+export function getPrimaryCadenceMax(criteria: ZoneMusicCriteria): number {
+  return criteria.cadenceMaxPrimary ?? criteria.cadenceMax;
 }
 
 /**

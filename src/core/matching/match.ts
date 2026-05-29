@@ -4,7 +4,12 @@ import { findCandidates } from './candidates';
 import { hashSeed, mulberry32, pickWeightedFromTopK } from './random';
 import { scoreTrack } from './score';
 import type { MatchPreferences, MatchedSegment, ZoneMusicCriteria } from './types';
-import { applyAllEnergetic, getZoneCriteria, getAlternativeBpmRange } from './zoneCriteria';
+import {
+  applyAllEnergetic,
+  getZoneCriteria,
+  getAlternativeBpmRange,
+  getPrimaryCadenceMax,
+} from './zoneCriteria';
 
 /** Tamaño del top-K para el sampling ponderado cuando hay seed. */
 const RANDOM_TOP_K = 5;
@@ -24,14 +29,16 @@ const BEST_EFFORT_BPM_TOLERANCE = 30;
  * los BPM que faltan para alcanzar el rango mas cercano.
  */
 function bpmDistanceToCriteria(tempoBpm: number, criteria: ZoneMusicCriteria): number {
-  const inOne = tempoBpm >= criteria.cadenceMin && tempoBpm <= criteria.cadenceMax;
+  // El techo del 1:1 usa el ensanche de recuperacion (Z1/Z2 → 110) si existe.
+  const primaryMax = getPrimaryCadenceMax(criteria);
+  const inOne = tempoBpm >= criteria.cadenceMin && tempoBpm <= primaryMax;
   if (inOne) return 0;
   const alt = getAlternativeBpmRange(criteria);
   const inAlt = tempoBpm >= alt.min && tempoBpm <= alt.max;
   if (inAlt) return 0;
   const distOne = tempoBpm < criteria.cadenceMin
     ? criteria.cadenceMin - tempoBpm
-    : tempoBpm - criteria.cadenceMax;
+    : tempoBpm - primaryMax;
   const distAlt = tempoBpm < alt.min ? alt.min - tempoBpm : tempoBpm - alt.max;
   return Math.min(distOne, distAlt);
 }

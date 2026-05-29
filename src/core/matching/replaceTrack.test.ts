@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { getAlternativesForSegment, replaceTrackInSegment } from './replaceTrack';
+import {
+  getAlternativesForSegment,
+  moveTrackToSegment,
+  replaceTrackInSegment,
+} from './replaceTrack';
 import { matchTracksToSegments } from './match';
 import { defaultCadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
@@ -214,7 +218,7 @@ describe('replaceTrackInSegment', () => {
 });
 
 describe('getAlternativesForSegment', () => {
-  it('devuelve todos los candidatos validos excluyendo los URIs en uso', () => {
+  it('incluye las usadas marcadas con usedAtIndex (frescas primero, usadas despues)', () => {
     const tracks = [
       track({ tempoBpm: 75, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
       track({ tempoBpm: 78, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
@@ -224,14 +228,21 @@ describe('getAlternativesForSegment', () => {
     ];
     const segments = [segment(3), segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
-    const usedUris = new Set(matched.map((m) => m.track!.uri));
 
     const alts = getAlternativesForSegment(matched, 0, tracks, EMPTY_PREFERENCES);
-    // 5 tracks - 3 en uso = 2 alternativas posibles
-    expect(alts.length).toBe(2);
-    for (const alt of alts) {
-      expect(usedUris.has(alt.track.uri)).toBe(false);
+    // 5 tracks - 1 (el del propio tramo 0) = 4 candidatas: 2 frescas + 2 usadas.
+    expect(alts.length).toBe(4);
+    const fresh = alts.filter((a) => a.usedAtIndex === null);
+    const used = alts.filter((a) => a.usedAtIndex !== null);
+    expect(fresh.length).toBe(2);
+    expect(used.length).toBe(2);
+    // Las usadas apuntan a OTROS tramos (1 o 2), nunca al propio (0).
+    for (const u of used) {
+      expect(u.usedAtIndex === 1 || u.usedAtIndex === 2).toBe(true);
     }
+    // Frescas primero, usadas despues.
+    expect(alts.slice(0, 2).every((a) => a.usedAtIndex === null)).toBe(true);
+    expect(alts.slice(2).every((a) => a.usedAtIndex !== null)).toBe(true);
   });
 
   it('excluye explicitamente el track actual del segmento que se reemplaza', () => {
@@ -261,15 +272,19 @@ describe('getAlternativesForSegment', () => {
     }
   });
 
-  it('todas las alternativas en uso: lista vacia', () => {
+  it('todas en uso pero encajan aqui: ofrece las usadas marcadas (para mover)', () => {
+    // Ambas canciones pasan cadencia Z3 (80, 85). El otro tramo usa la otra:
+    // se ofrece marcada con su usedAtIndex para poder moverla a este slot.
     const tracks = [
-      track({ tempoBpm: 87, energy: 0.75, valence: 0.6, durationMs: 60_000 }),
-      track({ tempoBpm: 91, energy: 0.78, valence: 0.65, durationMs: 60_000 }),
+      track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
     ];
     const segments = [segment(3), segment(3)];
     const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
     const alts = getAlternativesForSegment(matched, 0, tracks, EMPTY_PREFERENCES);
-    expect(alts).toEqual([]);
+    expect(alts.length).toBe(1);
+    expect(alts[0]!.usedAtIndex).not.toBeNull();
+    expect(alts[0]!.passesCadence).toBe(true);
   });
 
   it('catalogo vacio: lista vacia', () => {
@@ -366,5 +381,133 @@ describe('getAlternativesForSegment', () => {
     );
     expect(result.replaced).toBe(true);
     expect(result.matched[0]!.matchQuality).toBe('best-effort');
+  });
+});
+
+describe('moveTrackToSegment', () => {
+  it('mueve la cancion al target y rellena el origen; cero repeticiones', () => {
+    // 5 tracks (todos Z3), 4 segmentos -> 4 usados + 1 libre.
+    const tracks = [
+      track({ tempoBpm: 75, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 78, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 82, energy: 0.74, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.76, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 88, energy: 0.78, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const segments = [segment(3), segment(3), segment(3), segment(3)];
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    const sourceUri = matched[2]!.track!.uri;
+
+    const result = moveTrackToSegment(matched, 0, sourceUri, tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(true);
+    expect(result.changedIndices).toEqual([0, 2]);
+    // El target recibe la cancion movida.
+    expect(result.matched[0]!.track!.uri).toBe(sourceUri);
+    // El origen ya no tiene la cancion movida (se relleno con otra).
+    expect(result.matched[2]!.track!.uri).not.toBe(sourceUri);
+    // Cero repeticiones en toda la lista.
+    const uris = result.matched.map((m) => m.track?.uri).filter((u): u is string => !!u);
+    expect(new Set(uris).size).toBe(uris.length);
+    // La longitud no cambia.
+    expect(result.matched.length).toBe(matched.length);
+  });
+
+  it('reutiliza la cancion desplazada del target como relleno cuando es la unica libre (swap)', () => {
+    // 4 tracks, 4 segmentos -> pool agotado, ninguna libre. Al mover la del
+    // tramo 3 al tramo 0, la desplazada del tramo 0 queda libre y rellena el 3.
+    const tracks = [
+      track({ tempoBpm: 75, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 80, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.74, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 88, energy: 0.76, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const segments = [segment(3), segment(3), segment(3), segment(3)];
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    const origSlot0 = matched[0]!.track!.uri;
+    const origSlot3 = matched[3]!.track!.uri;
+
+    const result = moveTrackToSegment(matched, 0, origSlot3, tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(true);
+    // Swap: target recibe la del 3; el 3 recibe la desplazada del 0.
+    expect(result.matched[0]!.track!.uri).toBe(origSlot3);
+    expect(result.matched[3]!.track!.uri).toBe(origSlot0);
+    const uris = result.matched.map((m) => m.track!.uri);
+    expect(new Set(uris).size).toBe(uris.length);
+  });
+
+  it('recomputa matchQuality del target: best-effort si la movida no encaja en su zona', () => {
+    // Track Z3 (80 BPM) y track Z6-only (100 BPM, sprint). En una sesion con
+    // un tramo Z3 y un tramo Z6, mover el de 80 (Z3) al tramo Z6 lo marca
+    // best-effort (80 no encaja en sprint 90-115).
+    const z3Track = track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 });
+    const z6Track = track({ tempoBpm: 100, energy: 0.95, valence: 0.7, durationMs: 60_000 });
+    const segments = [segment(3), segment(6)];
+    const matched = matchTracksToSegments(segments, [z3Track, z6Track], EMPTY_PREFERENCES);
+    // Mover el track de 80 (en el tramo Z3) al tramo Z6 (index 1).
+    const result = moveTrackToSegment(matched, 1, z3Track.uri, [z3Track, z6Track], EMPTY_PREFERENCES);
+    expect(result.moved).toBe(true);
+    expect(result.matched[1]!.track!.uri).toBe(z3Track.uri);
+    expect(result.matched[1]!.matchQuality).toBe('best-effort');
+  });
+
+  it('origen sin relleno posible -> queda sin cancion (insufficient)', () => {
+    // 1 track, 2 segmentos -> el motor lo repite (strict + repeated). Mover
+    // a su otra copia deja el origen sin candidata libre.
+    const t = track({ tempoBpm: 80, energy: 0.7, valence: 0.6, durationMs: 60_000 });
+    const segments = [segment(3), segment(3)];
+    const matched = matchTracksToSegments(segments, [t], EMPTY_PREFERENCES);
+    const result = moveTrackToSegment(matched, 1, t.uri, [t], EMPTY_PREFERENCES);
+    expect(result.moved).toBe(true);
+    expect(result.matched[1]!.track!.uri).toBe(t.uri);
+    expect(result.matched[0]!.track).toBeNull();
+    expect(result.matched[0]!.matchQuality).toBe('insufficient');
+  });
+
+  it('no-op: sourceUri no esta en la lista', () => {
+    const tracks = [
+      track({ tempoBpm: 80, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments([segment(3), segment(3)], tracks, EMPTY_PREFERENCES);
+    const result = moveTrackToSegment(matched, 0, 'spotify:track:no-existe', tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(false);
+    expect(result.changedIndices).toEqual([]);
+    expect(result.matched.map((m) => m.track?.uri)).toEqual(matched.map((m) => m.track?.uri));
+  });
+
+  it('no-op: origen == destino (mover sobre si mismo)', () => {
+    const tracks = [
+      track({ tempoBpm: 80, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments([segment(3), segment(3)], tracks, EMPTY_PREFERENCES);
+    const ownUri = matched[0]!.track!.uri;
+    const result = moveTrackToSegment(matched, 0, ownUri, tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(false);
+  });
+
+  it('no-op: targetIndex fuera de rango', () => {
+    const tracks = [track({ tempoBpm: 80, energy: 0.7, valence: 0.6, durationMs: 60_000 })];
+    const matched = matchTracksToSegments([segment(3)], tracks, EMPTY_PREFERENCES);
+    const result = moveTrackToSegment(matched, 99, matched[0]!.track!.uri, tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(false);
+  });
+
+  it('determinista: misma entrada -> mismo resultado', () => {
+    const tracks = [
+      track({ tempoBpm: 75, energy: 0.7, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 80, energy: 0.72, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.74, valence: 0.6, durationMs: 60_000 }),
+      track({ tempoBpm: 88, energy: 0.76, valence: 0.6, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments(
+      [segment(3), segment(3), segment(3)],
+      tracks,
+      EMPTY_PREFERENCES,
+    );
+    const sourceUri = matched[2]!.track!.uri;
+    const a = moveTrackToSegment(matched, 0, sourceUri, tracks, EMPTY_PREFERENCES);
+    const b = moveTrackToSegment(matched, 0, sourceUri, tracks, EMPTY_PREFERENCES);
+    expect(a.matched.map((m) => m.track?.uri)).toEqual(b.matched.map((m) => m.track?.uri));
   });
 });

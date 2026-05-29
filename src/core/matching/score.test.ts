@@ -169,3 +169,34 @@ describe('scoreTrack', () => {
     expect(scoreTrack(a, z3, [])).toBe(scoreTrack(b, z3, []));
   });
 });
+
+describe('scoreTrack — meseta de cadencia en recuperacion (bici Z1/Z2)', () => {
+  // Z1 bici: 1:1 ampliado a [70,110], energy ideal 0.30, valence ideal 0.40.
+  const z1 = getZoneCriteria(1, 'flat', 'bike');
+
+  it('cualquier cadencia dentro de [70,110] puntua full: 70 y 110 BPM igual', () => {
+    const lo = track({ tempoBpm: 70, energy: 0.3, valence: 0.4 });
+    const hi = track({ tempoBpm: 110, energy: 0.3, valence: 0.4 });
+    expect(scoreTrack(lo, z1, [])).toBeCloseTo(scoreTrack(hi, z1, []), 5);
+  });
+
+  it('un track lento (70 BPM) NO se hunde en cadencia: meseta = 1.0', () => {
+    // energy/valence en el ideal de Z1 para aislar el componente cadencia.
+    // cadencia=1, energy=1, valence=1, genre neutro 0.5
+    // = 0.30*1 + 0.30*1 + 0.20*1 + 0.20*0.5 = 0.90
+    const t = track({ tempoBpm: 70, energy: 0.3, valence: 0.4 });
+    expect(scoreTrack(t, z1, [])).toBeCloseTo(0.9, 2);
+  });
+
+  it('un track de spin alto (105 BPM) tambien puntua full en cadencia', () => {
+    const t = track({ tempoBpm: 105, energy: 0.3, valence: 0.4 });
+    expect(scoreTrack(t, z1, [])).toBeCloseTo(0.9, 2);
+  });
+
+  it('fuera de la banda 1:1 (130 BPM, sin via 2:1) → cadencia 0', () => {
+    // 130 no cae en [70,110] (1:1) ni en [140,180] (2:1). energy/valence ideales
+    // → solo cae el componente cadencia: 0.30*0 + 0.30*1 + 0.20*1 + 0.10 = 0.60.
+    const t = track({ tempoBpm: 130, energy: 0.3, valence: 0.4 });
+    expect(scoreTrack(t, z1, [])).toBeCloseTo(0.6, 2);
+  });
+});
