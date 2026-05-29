@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
-  analyzePoolCoverage,
+  summarizeRepetitions,
   type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
-  type PoolCoverage,
 } from '@core/matching';
 import type { ClassifiedSegment, RouteMeta } from '@core/segmentation';
 import { getTopMacroGenres, parseTrackCsv, type Track } from '@core/tracks';
@@ -84,11 +83,13 @@ export function MusicStep({
   // Todo lo demas viene controlado desde App.
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Pre-check de cobertura: cuantos tracks unicos hace falta por zona
-  // para cumplir la regla "cero repeticiones" sin huecos.
-  const coverage = useMemo(
-    () => analyzePoolCoverage(segments, tracks, preferences),
-    [segments, tracks, preferences],
+  // Canciones únicas en el catálogo activo: contexto para el aviso de
+  // repeticiones («de cuánto partes»). Es un simple recuento de URIs
+  // distintos; lo derivamos directo en vez de via analyzePoolCoverage, cuyo
+  // desglose por zona ya no usa este paso (el aviso sale del matched real).
+  const availableTotal = useMemo(
+    () => new Set(tracks.map((t) => t.uri)).size,
+    [tracks],
   );
 
   // Sport derivado de los segmentos (todos los segments comparten sport).
@@ -137,7 +138,12 @@ export function MusicStep({
   };
 
   const totalMinutes = Math.round(meta.totalDurationSec / 60);
-  const bestEffortCount = list.filter((m) => m.matchQuality === 'best-effort').length;
+  // Resumen FIEL de la lista real (el mismo helper que consume ResultStep): el
+  // aviso de este paso refleja EXACTAMENTE lo que vera el usuario en el
+  // resultado, sin «sorpresa después». Se deriva de `matched` (que App ya
+  // calcula), no de la estimacion global de cobertura — que con listas de
+  // canciones cortas subestimaba los slots reales y se callaba.
+  const { repeatedSlots, repeatedDistinct, bestEffortSlots } = summarizeRepetitions(list);
 
   const validUploads = uploadedCsvs.filter((c) => c.error === undefined);
   const hasUserTracks = validUploads.length > 0;
@@ -317,15 +323,16 @@ export function MusicStep({
         </Card>
       )}
 
-      {!coverage.ok && (
+      {repeatedSlots > 0 && (
         <PoolCoverageWarning
-          coverage={coverage}
+          repeatedDistinct={repeatedDistinct}
+          availableTotal={availableTotal}
           sourceMode={sourceMode}
           onSwitchToBoth={() => onSourceModeChange('both')}
         />
       )}
 
-      {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
+      {bestEffortSlots > 0 && <BestEffortBanner count={bestEffortSlots} />}
 
       <Card title="Tu lista" titleIcon="queue_music">
         <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 mb-3">
@@ -415,13 +422,20 @@ function SourceRadio({
 }
 
 interface PoolCoverageWarningProps {
-  coverage: PoolCoverage;
+  /**
+   * Canciones DISTINTAS que se repetiran en la lista. Cifra honesta derivada
+   * de la salida real del motor (summarizeRepetitions), no de una estimacion.
+   */
+  repeatedDistinct: number;
+  /** Canciones unicas en el catalogo activo (contexto «de cuanto partes»). */
+  availableTotal: number;
   sourceMode: MusicSourceMode;
   onSwitchToBoth: () => void;
 }
 
 function PoolCoverageWarning({
-  coverage,
+  repeatedDistinct,
+  availableTotal,
   sourceMode,
   onSwitchToBoth,
 }: PoolCoverageWarningProps): JSX.Element {
@@ -438,14 +452,15 @@ function PoolCoverageWarning({
         />
         <div className="min-w-0">
           <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
-            Algunas canciones se van a repetir
+            {repeatedDistinct === 1
+              ? 'Una canción se repetirá en tu lista'
+              : `${repeatedDistinct} canciones se repetirán en tu lista`}
           </h2>
           <p className="text-sm text-gris-700 mt-1">
-            Para una sesión sin repetir nada necesitarías{' '}
-            <strong className="tabular-nums">{coverage.neededTotal}</strong>{' '}
-            canciones únicas, y tu catálogo tiene{' '}
-            <strong className="tabular-nums">{coverage.availableTotal}</strong>.
-            La lista se generará igualmente; subiendo más listas
+            Tu catálogo activo ({availableTotal}{' '}
+            {availableTotal === 1 ? 'canción' : 'canciones'}) no llega para cubrir
+            toda la sesión sin repetir. La lista se generará igualmente, pero este
+            es el momento de ampliarla: sube más listas
             {sourceMode !== 'both' && (
               <>
                 {' '}o{' '}
@@ -454,11 +469,11 @@ function PoolCoverageWarning({
                   onClick={onSwitchToBoth}
                   className="text-turquesa-700 font-semibold underline-offset-2 hover:underline"
                 >
-                  combinando con la biblioteca predefinida
+                  combina con la biblioteca predefinida
                 </button>
               </>
             )}{' '}
-            tendrás más variedad y mejor encaje por zona.
+            para que suene más variedad.
           </p>
         </div>
       </div>

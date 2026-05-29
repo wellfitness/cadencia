@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchTracksToSegments } from './match';
+import { matchTracksToSegments, summarizeRepetitions } from './match';
 import { defaultCadenceProfile } from '../segmentation/sessionPlan';
 import type { ClassifiedSegment } from '../segmentation/types';
 import type { Track } from '../tracks/types';
@@ -536,6 +536,98 @@ describe('matchTracksToSegments', () => {
       const t = track({ tempoBpm: 100, energy: 0.7, valence: 0.55, durationMs: 60_000 });
       const matched = matchTracksToSegments([segment(3)], [t], EMPTY_PREFERENCES);
       expect(matched[0]?.matchQuality).toBe('best-effort');
+    });
+  });
+
+  // === REGRESION: las repeticiones inevitables se REPARTEN (no se concentran) ===
+  // Antes del fix, la regla 3 'repeated' devolvia siempre scoredCadenceCandidates[0]
+  // (la cancion de mayor score), asi que UNA sola cancion absorbia TODAS las
+  // repeticiones de la zona (sintoma reportado: «Listen To Your Heart - Roxette
+  // sale un monton de veces»). Ahora reparte por uso (least-used), determinista.
+  describe('regla 3 «repeated»: reparte las repeticiones inevitables (least-used)', () => {
+    function uriCounts(matched: ReturnType<typeof matchTracksToSegments>): number[] {
+      const counts = new Map<string, number>();
+      for (const m of matched) {
+        if (m.track) counts.set(m.track.uri, (counts.get(m.track.uri) ?? 0) + 1);
+      }
+      return [...counts.values()].sort((a, b) => b - a);
+    }
+
+    it('2 tracks Z3 + 4 slots -> reparto [2,2], NO [3,1]', () => {
+      const tracks = [
+        track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+        track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      ];
+      const segments = Array.from({ length: 4 }, () => segment(3));
+      const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+      expect(matched).toHaveLength(4);
+      expect(uriCounts(matched)).toEqual([2, 2]);
+    });
+
+    it('3 tracks Z3 + 5 slots -> reparto [2,2,1], NO [3,1,1]', () => {
+      const tracks = [
+        track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+        track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+        track({ tempoBpm: 88, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      ];
+      const segments = Array.from({ length: 5 }, () => segment(3));
+      const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+      expect(matched).toHaveLength(5);
+      expect(uriCounts(matched)).toEqual([2, 2, 1]);
+    });
+
+    it('determinista: el reparto no usa seed ni aleatoriedad', () => {
+      const tracks = [
+        track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+        track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      ];
+      const segments = Array.from({ length: 6 }, () => segment(3));
+      const a = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+      const b = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+      expect(a.map((m) => m.track?.uri)).toEqual(b.map((m) => m.track?.uri));
+      // 6 slots, 2 tracks -> cada uno exactamente 3 veces.
+      expect(uriCounts(a)).toEqual([3, 3]);
+    });
+  });
+});
+
+describe('summarizeRepetitions', () => {
+  it('cuenta apariciones repetidas y canciones DISTINTAS que se repiten', () => {
+    // 1 track + 3 segmentos -> [strict, repeated, repeated]: 2 slots 'repeated'
+    // pero 1 sola cancion distinta repetida (la cifra honesta para el copy).
+    const tracks = [track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 })];
+    const segments = Array.from({ length: 3 }, () => segment(3));
+    const matched = matchTracksToSegments(segments, tracks, EMPTY_PREFERENCES);
+    const sum = summarizeRepetitions(matched);
+    expect(sum.repeatedSlots).toBe(2);
+    expect(sum.repeatedDistinct).toBe(1);
+    expect(sum.bestEffortSlots).toBe(0);
+    expect(sum.insufficientSlots).toBe(0);
+  });
+
+  it('cuenta slots best-effort', () => {
+    // Tempo 30 cae fuera de toda cadencia -> best-effort.
+    const matched = matchTracksToSegments(
+      [segment(3)],
+      [track({ tempoBpm: 30, energy: 0.7, valence: 0.55 })],
+      EMPTY_PREFERENCES,
+    );
+    const sum = summarizeRepetitions(matched);
+    expect(sum.bestEffortSlots).toBe(1);
+    expect(sum.repeatedSlots).toBe(0);
+  });
+
+  it('cuenta slots insufficient (catalogo vacio) y lista vacia -> todo cero', () => {
+    const sumEmptyCatalog = summarizeRepetitions(
+      matchTracksToSegments([segment(3)], [], EMPTY_PREFERENCES),
+    );
+    expect(sumEmptyCatalog.insufficientSlots).toBe(1);
+    expect(sumEmptyCatalog.repeatedDistinct).toBe(0);
+    expect(summarizeRepetitions([])).toEqual({
+      repeatedSlots: 0,
+      repeatedDistinct: 0,
+      bestEffortSlots: 0,
+      insufficientSlots: 0,
     });
   });
 });

@@ -90,6 +90,7 @@ function chooseTrack(
   preferredGenres: readonly string[],
   allTracks: readonly Track[],
   used: ReadonlySet<string>,
+  usageCount: ReadonlyMap<string, number>,
   seed: number | undefined,
   slotIndex: number,
 ): ChoiceResult | null {
@@ -134,11 +135,33 @@ function chooseTrack(
   }
 
   // 3. Repeated: catalogo entero usado o todos los frescos cayeron del floor.
-  //    Devolvemos el mejor del ranking original de cadencia.
-  const fallback = scoredCadenceCandidates[0];
-  if (fallback) {
-    return { track: fallback.track, score: fallback.score, quality: 'repeated' };
+  //    Las repeticiones son INEVITABLES aqui, asi que las REPARTIMOS en vez de
+  //    machacar siempre el top-1: elegimos el candidato de cadencia MENOS
+  //    emitido hasta ahora (round-robin determinista). Antes se devolvia
+  //    scoredCadenceCandidates[0] incondicional y una sola cancion (la de mayor
+  //    score) absorbia todas las repeticiones de la zona ("Roxette x14"). Ahora
+  //    cada copia inevitable cae en el track menos repetido.
+  //
+  //    Desempate (orden total, 100% determinista, sin seed): a igualdad de
+  //    usos gana el de mayor score; como scoredCadenceCandidates ya viene
+  //    ordenado por score desc, recorrerlo y quedarnos con el PRIMERO de menor
+  //    uso da exactamente "menor uso → mayor score → orden estable original".
+  let best: { track: Track; score: number } | null = null;
+  let bestUses = Number.POSITIVE_INFINITY;
+  for (const candidate of scoredCadenceCandidates) {
+    const uses = usageCount.get(candidate.track.uri) ?? 0;
+    if (uses < bestUses) {
+      best = candidate;
+      bestUses = uses;
+    }
   }
+  if (best) {
+    return { track: best.track, score: best.score, quality: 'repeated' };
+  }
+  // Defensivo e inalcanzable en la práctica: los callers cortan antes si
+  // `tracks` está vacío y findCandidates siempre devuelve >= 1 candidato con
+  // catálogo no vacío, así que el bucle de arriba siempre asigna `best`.
+  // Presente solo para satisfacer el tipo (`best` parte de null).
   return null;
 }
 
@@ -168,6 +191,10 @@ function matchOverlap(
   preferences: MatchPreferences,
 ): MatchedSegment[] {
   const used = new Set<string>();
+  // Cuantas veces se ha EMITIDO cada URI. `used` (booleano) sirve a las reglas
+  // 1-2 (no repetir mientras quede algo fresco); `usageCount` solo lo consulta
+  // la regla 3 para repartir las repeticiones inevitables (menos usado primero).
+  const usageCount = new Map<string, number>();
   const out: MatchedSegment[] = [];
   // slotIndex monotonico: cada chooseTrack consume una sub-semilla distinta.
   // No es lo mismo que `i` porque en overlap un track tapa varios segmentos.
@@ -197,6 +224,7 @@ function matchOverlap(
       preferences.preferredGenres,
       tracks,
       used,
+      usageCount,
       preferences.seed,
       slotIndex,
     );
@@ -209,6 +237,7 @@ function matchOverlap(
     }
 
     used.add(choice.track.uri);
+    usageCount.set(choice.track.uri, (usageCount.get(choice.track.uri) ?? 0) + 1);
 
     out.push({
       ...seg,
@@ -234,6 +263,8 @@ function matchDiscrete(
   preferences: MatchPreferences,
 ): MatchedSegment[] {
   const used = new Set<string>();
+  // Ver nota en matchOverlap: `usageCount` reparte las repeticiones (regla 3).
+  const usageCount = new Map<string, number>();
   const out: MatchedSegment[] = [];
   let slotIndex = 0;
 
@@ -260,6 +291,7 @@ function matchDiscrete(
         preferences.preferredGenres,
         tracks,
         used,
+        usageCount,
         preferences.seed,
         slotIndex,
       );
@@ -277,6 +309,7 @@ function matchDiscrete(
       }
 
       used.add(choice.track.uri);
+      usageCount.set(choice.track.uri, (usageCount.get(choice.track.uri) ?? 0) + 1);
 
       const trackDurationSec = Math.max(1, choice.track.durationMs / 1000);
       const remainingSec = seg.durationSec - coveredSec;
@@ -296,4 +329,66 @@ function matchDiscrete(
   }
 
   return out;
+}
+
+/**
+ * Resumen de calidad de una playlist ya casada. Fuente UNICA de verdad para
+ * los avisos: tanto el paso «Música» (preview) como el paso «Resultado» lo
+ * consumen, asi que ambos cuentan EXACTAMENTE lo mismo y nunca se
+ * desincronizan (no mas «sorpresa después»: lo que se avisa en Música es lo
+ * que aparece en Resultado).
+ *
+ * Funcion pura y determinista: misma `matched` → mismo resumen.
+ */
+export interface RepetitionSummary {
+  /** Slots marcados 'repeated' = apariciones de MÁS (2ª, 3ª… vez de una canción). */
+  repeatedSlots: number;
+  /**
+   * Canciones DISTINTAS que se repiten (URIs únicos con al menos un slot
+   * 'repeated'). Es la cifra honesta para el copy: «N canciones se repiten»,
+   * NO el número de apariciones (que es repeatedSlots).
+   */
+  repeatedDistinct: number;
+  /** Slots cubiertos con un track fuera de la cadencia ideal de la zona. */
+  bestEffortSlots: number;
+  /** Slots sin canción (track === null): el catálogo no cubre esa zona. */
+  insufficientSlots: number;
+}
+
+export function summarizeRepetitions(
+  matched: readonly MatchedSegment[],
+): RepetitionSummary {
+  let repeatedSlots = 0;
+  let bestEffortSlots = 0;
+  let insufficientSlots = 0;
+  const repeatedUris = new Set<string>();
+  for (const m of matched) {
+    switch (m.matchQuality) {
+      case 'repeated':
+        repeatedSlots++;
+        if (m.track) repeatedUris.add(m.track.uri);
+        break;
+      case 'best-effort':
+        bestEffortSlots++;
+        break;
+      case 'insufficient':
+        insufficientSlots++;
+        break;
+      case 'strict':
+        // El caso "bueno": no se cuenta. Se lista explícito para que el
+        // exhaustiveness check de abajo obligue a revisar este switch si
+        // MatchQuality crece con un nuevo miembro.
+        break;
+      default: {
+        const _exhaustive: never = m.matchQuality;
+        void _exhaustive;
+      }
+    }
+  }
+  return {
+    repeatedSlots,
+    repeatedDistinct: repeatedUris.size,
+    bestEffortSlots,
+    insufficientSlots,
+  };
 }

@@ -3,6 +3,7 @@ import {
   getAlternativesForSegment,
   moveTrackToSegment,
   replaceTrackInSegment,
+  summarizeRepetitions,
   type CrossZoneMode,
   type MatchPreferences,
   type MatchedSegment,
@@ -420,11 +421,16 @@ export function ResultStep({
   const totalMinutes = Math.round(routeMeta.totalDurationSec / 60);
   const validUriCount = matched.filter((m) => m.track !== null).length;
   const replacedCount = replacedIndices.size;
-  const repeatedCount = matched.filter((m) => m.matchQuality === 'repeated').length;
-  const insufficientCount = matched.filter(
-    (m) => m.track === null && m.matchQuality === 'insufficient',
-  ).length;
-  const bestEffortCount = matched.filter((m) => m.matchQuality === 'best-effort').length;
+  // Conteos derivados del mismo helper que usa MusicStep -> el aviso previo y
+  // este coinciden exactamente. `repeatedDistinct` (canciones distintas) es la
+  // cifra honesta para el copy; `repeatedSlots` (apariciones de mas) solo
+  // gobierna si se muestra el banner.
+  const {
+    repeatedSlots,
+    repeatedDistinct,
+    bestEffortSlots,
+    insufficientSlots,
+  } = summarizeRepetitions(matched);
 
   if (phase === 'done' && created !== null) {
     return (
@@ -443,7 +449,7 @@ export function ResultStep({
         title="Tu lista"
         subtitle="Revisa la lista, ajusta lo que quieras y créala en tu cuenta de Spotify."
       />
-      {repeatedCount > 0 && (
+      {repeatedSlots > 0 && (
         <div
           role="status"
           className="rounded-2xl border-2 border-tulipTree-300 bg-tulipTree-50 p-4 md:p-5 flex items-start gap-3"
@@ -455,9 +461,9 @@ export function ResultStep({
           />
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
-              {repeatedCount === 1
+              {repeatedDistinct === 1
                 ? '1 canción se repite en la lista'
-                : `${repeatedCount} canciones se repiten en la lista`}
+                : `${repeatedDistinct} canciones se repiten en la lista`}
             </h2>
             <p className="text-sm text-gris-700 mt-1">
               No había candidatos únicos suficientes en tu catálogo. Subiendo
@@ -466,7 +472,7 @@ export function ResultStep({
           </div>
         </div>
       )}
-      {insufficientCount > 0 && (
+      {insufficientSlots > 0 && (
         <div
           role="alert"
           className="rounded-2xl border-2 border-rosa-600 bg-rosa-100/40 p-4 md:p-5 flex items-start gap-3"
@@ -478,9 +484,9 @@ export function ResultStep({
           />
           <div className="min-w-0">
             <h2 className="text-base md:text-lg font-display font-semibold text-gris-900">
-              {insufficientCount === 1
+              {insufficientSlots === 1
                 ? '1 zona sin canciones disponibles en el catálogo'
-                : `${insufficientCount} zonas sin canciones disponibles`}
+                : `${insufficientSlots} zonas sin canciones disponibles`}
             </h2>
             <p className="text-sm text-gris-700 mt-1">
               Tu catálogo no tiene canciones con la cadencia adecuada. Vuelve a
@@ -489,7 +495,7 @@ export function ResultStep({
           </div>
         </div>
       )}
-      {bestEffortCount > 0 && <BestEffortBanner count={bestEffortCount} />}
+      {bestEffortSlots > 0 && <BestEffortBanner count={bestEffortSlots} />}
       <Card title="Crear en Spotify" titleIcon="playlist_add">
         <div className="space-y-3">
           {clientId === null && (
@@ -621,7 +627,7 @@ export function ResultStep({
         onCreate={() => void handleCreatePlaylist()}
         creating={phase === 'authorizing' || phase === 'exchanging' || phase === 'creating'}
         canCreate={
-          validUriCount > 0 && effectivePlaylistName.trim() !== '' && insufficientCount === 0
+          validUriCount > 0 && effectivePlaylistName.trim() !== '' && insufficientSlots === 0
         }
         hasSpotifySession={hasSpotifySession}
         {...(onEnterTVMode !== undefined ? { onEnterTVMode } : {})}
