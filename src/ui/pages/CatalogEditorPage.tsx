@@ -12,6 +12,7 @@ import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TrackPreviewButton } from '@ui/components/TrackPreviewButton';
 import { SyncStatusBadge } from '@ui/components/sync/SyncStatusBadge';
 import { downloadTextFile } from '@ui/utils/downloadFile';
+import { formatTrackDuration } from '@ui/utils/formatTrackDuration';
 import {
   getNativeCatalogPrefs,
   setNativeCatalogPrefs,
@@ -1106,6 +1107,10 @@ function TrackRow({
         >
           {Math.round(track.tempoBpm)}
           <span className="text-[10px] font-normal opacity-70"> BPM</span>
+        </span>
+        <span className="text-[10px] text-gris-400 inline-flex items-center gap-0.5">
+          <MaterialIcon name="schedule" size="small" className="text-gris-400" />
+          {formatTrackDuration(track.durationMs)}
         </span>
         {!checked && (
           <span className="text-[10px] text-rosa-600 font-semibold inline-flex items-center gap-0.5">
