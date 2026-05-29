@@ -25,3 +25,11 @@ export {
   type MacroGenre,
   type MacroGenreId,
 } from './genreCategories';
+export {
+  cleanTitleForDedup,
+  normalizeArtistsForDedup,
+  dedupKey,
+  sortByTitleThenArtist,
+  annotateDuplicates,
+  type AnnotatedItem,
+} from './duplicates';

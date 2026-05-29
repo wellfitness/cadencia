@@ -1,5 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { loadNativeTracks, serializeTracksToCsv, type Track } from '@core/tracks';
+import {
+  annotateDuplicates,
+  loadNativeTracks,
+  serializeTracksToCsv,
+  sortByTitleThenArtist,
+  type Track,
+} from '@core/tracks';
 import { Button } from '@ui/components/Button';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
@@ -16,6 +22,8 @@ import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
 import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { StatsTab } from '@ui/components/catalog/StatsTab';
 import { MyListsTab } from '@ui/components/catalog/MyListsTab';
+import { DuplicatesToggle } from '@ui/components/catalog/DuplicatesToggle';
+import { DuplicateBadge } from '@ui/components/catalog/DuplicateBadge';
 
 export interface CatalogEditorPageProps {
   /** Callback que vuelve al wizard. Lo inyecta App tras detectar la ruta. */
@@ -65,6 +73,22 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
   );
   const totalCount = allTracks.length;
 
+  // Deteccion de duplicados (versiones del mismo tema con URI distinta). El
+  // catalogo nativo tiene URIs unicas (all.csv viene pre-dedupado por URI en
+  // build), asi que indexar el tamano de grupo por URI es seguro.
+  const dupCountByUri = useMemo<Map<string, number>>(() => {
+    const m = new Map<string, number>();
+    for (const a of annotateDuplicates(allTracks, (t) => t)) {
+      m.set(a.item.uri, a.groupSize);
+    }
+    return m;
+  }, [allTracks]);
+  const duplicatesCount = useMemo(() => {
+    let n = 0;
+    for (const size of dupCountByUri.values()) if (size >= 2) n += 1;
+    return n;
+  }, [dupCountByUri]);
+
   const [activeTab, setActiveTab] = useState<Tab>(() => readInitialTab());
   const [dismissTarget, setDismissTarget] = useState<{ uri: string; name: string } | null>(
     null,
@@ -91,6 +115,7 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
   );
   const [bpmMin, setBpmMin] = useState<string>('');
   const [bpmMax, setBpmMax] = useState<string>('');
+  const [onlyDuplicates, setOnlyDuplicates] = useState<boolean>(false);
 
   // Pintamos el title de la pestaña para que el usuario distinga visualmente
   // entre la pestaña del wizard y esta — patron consistente con TVModeRoute.
@@ -154,7 +179,7 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
     const q = searchText.trim().toLowerCase();
     const minN = bpmMin.trim() === '' ? null : Number(bpmMin);
     const maxN = bpmMax.trim() === '' ? null : Number(bpmMax);
-    return allTracks.filter((t) => {
+    const filtered = allTracks.filter((t) => {
       if (q !== '') {
         const haystack =
           `${t.name} ${t.artists.join(' ')} ${t.album} ${t.genres.join(' ')}`.toLowerCase();
@@ -163,9 +188,17 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
       if (selectedSources.size > 0 && !selectedSources.has(t.source)) return false;
       if (minN !== null && Number.isFinite(minN) && t.tempoBpm < minN) return false;
       if (maxN !== null && Number.isFinite(maxN) && t.tempoBpm > maxN) return false;
+      if (onlyDuplicates && (dupCountByUri.get(t.uri) ?? 1) < 2) return false;
       return true;
     });
-  }, [allTracks, searchText, selectedSources, bpmMin, bpmMax]);
+    // Orden permanente por titulo -> artista: deja contiguas las versiones de
+    // un mismo tema, para localizarlas a ojo.
+    return sortByTitleThenArtist(
+      filtered,
+      (t) => t.name,
+      (t) => t.artists,
+    );
+  }, [allTracks, searchText, selectedSources, bpmMin, bpmMax, onlyDuplicates, dupCountByUri]);
 
   const visibleCount = filteredTracks.length;
   const includedCount = included.size;
@@ -220,6 +253,7 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
     setSelectedSources(new Set());
     setBpmMin('');
     setBpmMax('');
+    setOnlyDuplicates(false);
   };
 
   const handleDownload = (): void => {
@@ -247,7 +281,8 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
     searchText.trim() !== '' ||
     selectedSources.size > 0 ||
     bpmMin.trim() !== '' ||
-    bpmMax.trim() !== '';
+    bpmMax.trim() !== '' ||
+    onlyDuplicates;
 
   // Porcentaje incluido (0..100, redondeado) — alimenta la barrita
   // visual del header. Sin tracks, mostramos 0% en lugar de NaN.
@@ -387,6 +422,9 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
                 bpmMax={bpmMax}
                 onBpmMinChange={setBpmMin}
                 onBpmMaxChange={setBpmMax}
+                onlyDuplicates={onlyDuplicates}
+                onToggleOnlyDuplicates={() => setOnlyDuplicates((v) => !v)}
+                duplicatesCount={duplicatesCount}
                 filtersActive={filtersActive}
                 onClearFilters={clearFilters}
                 visibleCount={visibleCount}
@@ -422,6 +460,7 @@ export function CatalogEditorPage({ onClose }: CatalogEditorPageProps): JSX.Elem
                       <TrackRow
                         track={t}
                         checked={included.has(t.uri)}
+                        duplicateCount={dupCountByUri.get(t.uri) ?? 1}
                         onToggle={() => toggleIncluded(t.uri)}
                         onRequestDismiss={() =>
                           handleRequestDismiss(t.uri, t.name)
@@ -565,6 +604,10 @@ interface FiltersPanelProps {
   bpmMax: string;
   onBpmMinChange: (next: string) => void;
   onBpmMaxChange: (next: string) => void;
+  onlyDuplicates: boolean;
+  onToggleOnlyDuplicates: () => void;
+  /** Nº de canciones que pertenecen a algún grupo de duplicados. */
+  duplicatesCount: number;
   filtersActive: boolean;
   onClearFilters: () => void;
   visibleCount: number;
@@ -599,6 +642,9 @@ function FiltersPanel({
   bpmMax,
   onBpmMinChange,
   onBpmMaxChange,
+  onlyDuplicates,
+  onToggleOnlyDuplicates,
+  duplicatesCount,
   filtersActive,
   onClearFilters,
   visibleCount,
@@ -608,7 +654,10 @@ function FiltersPanel({
 }: FiltersPanelProps): JSX.Element {
   const [advancedOpenMobile, setAdvancedOpenMobile] = useState<boolean>(false);
   const advancedActive =
-    selectedSources.size > 0 || bpmMin.trim() !== '' || bpmMax.trim() !== '';
+    selectedSources.size > 0 ||
+    bpmMin.trim() !== '' ||
+    bpmMax.trim() !== '' ||
+    onlyDuplicates;
   const advancedCount =
     (advancedActive ? 1 : 0) + (searchText.trim() !== '' ? 1 : 0);
   return (
@@ -712,6 +761,14 @@ function FiltersPanel({
               className="w-16 px-2 py-1.5 text-sm rounded-lg border border-gris-300 bg-white focus:outline-none focus:ring-2 focus:ring-turquesa-400 focus:border-turquesa-400 min-h-[36px] tabular-nums"
             />
           </div>
+
+          {duplicatesCount > 0 && (
+            <DuplicatesToggle
+              active={onlyDuplicates}
+              count={duplicatesCount}
+              onToggle={onToggleOnlyDuplicates}
+            />
+          )}
 
           {filtersActive && (
             <button
@@ -934,6 +991,8 @@ function AllVisibleUncheckedBanner({
 interface TrackRowProps {
   track: Track;
   checked: boolean;
+  /** Tamaño del grupo de versiones del track (>=2 muestra el chip «N versiones»). */
+  duplicateCount: number;
   onToggle: () => void;
   /**
    * Descarta el track GLOBALMENTE (cross-source, persistido en
@@ -960,12 +1019,14 @@ interface TrackRowProps {
 function TrackRow({
   track,
   checked,
+  duplicateCount,
   onToggle,
   onRequestDismiss,
 }: TrackRowProps): JSX.Element {
   const checkboxId = useId();
   const visibleGenres = track.genres.slice(0, 3);
   const extraGenres = track.genres.length - visibleGenres.length;
+  const isDuplicate = duplicateCount >= 2;
 
   const containerClasses = checked
     ? 'bg-white border-gris-200 hover:border-turquesa-300 hover:shadow-sm'
@@ -1011,8 +1072,9 @@ function TrackRow({
             <span className="text-gris-400"> · {track.album}</span>
           )}
         </p>
-        {visibleGenres.length > 0 && (
-          <div className="flex flex-nowrap gap-1 mt-1 overflow-hidden">
+        {(visibleGenres.length > 0 || isDuplicate) && (
+          <div className="flex flex-nowrap items-center gap-1 mt-1 overflow-hidden">
+            <DuplicateBadge count={duplicateCount} />
             {visibleGenres.map((g) => (
               <span
                 key={g}

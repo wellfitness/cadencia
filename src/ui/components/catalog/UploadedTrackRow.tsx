@@ -1,11 +1,17 @@
 import type { Track } from '@core/tracks';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TrackPreviewButton } from '@ui/components/TrackPreviewButton';
+import { DuplicateBadge } from './DuplicateBadge';
 
 export interface UploadedTrackRowProps {
   track: Track;
   /** Si la canción está descartada globalmente (`dismissedTrackUris`). */
   dismissed: boolean;
+  /** Tamaño del grupo de versiones (>=2 muestra el chip «N versiones»). */
+  duplicateCount?: number;
+  /** Nombre de la lista de origen; vacío («») para no mostrar la insignia
+   *  (vista de una sola lista, donde el origen es obvio). */
+  listName?: string;
   /**
    * Alterna el estado de descarte. El padre conoce la URI y el estado
    * siguiente, así que esta fila solo dispara el toggle sin argumentos.
@@ -26,10 +32,14 @@ export interface UploadedTrackRowProps {
 export function UploadedTrackRow({
   track,
   dismissed,
+  duplicateCount = 1,
+  listName = '',
   onToggleDismiss,
 }: UploadedTrackRowProps): JSX.Element {
   const visibleGenres = track.genres.slice(0, 3);
   const extraGenres = track.genres.length - visibleGenres.length;
+  const isDuplicate = duplicateCount >= 2;
+  const hasMetaRow = visibleGenres.length > 0 || isDuplicate || listName !== '';
 
   const containerClasses = dismissed
     ? 'bg-gris-50 border-gris-200 opacity-75 hover:opacity-100 hover:border-gris-300'
@@ -53,8 +63,18 @@ export function UploadedTrackRow({
           {track.artists.join(', ')}
           {track.album !== '' && <span className="text-gris-400"> · {track.album}</span>}
         </p>
-        {visibleGenres.length > 0 && (
-          <div className="flex flex-nowrap gap-1 mt-1 overflow-hidden">
+        {hasMetaRow && (
+          <div className="flex flex-nowrap items-center gap-1 mt-1 overflow-hidden">
+            <DuplicateBadge count={duplicateCount} />
+            {listName !== '' && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gris-100 text-gris-600 truncate max-w-[120px]"
+                title={`Lista: ${listName}`}
+              >
+                <MaterialIcon name="queue_music" size="small" className="text-gris-400" />
+                {listName}
+              </span>
+            )}
             {visibleGenres.map((g) => (
               <span
                 key={g}

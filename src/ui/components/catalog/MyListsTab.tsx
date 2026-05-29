@@ -8,11 +8,26 @@ import {
   addDismissedUris,
   removeDismissedUris,
 } from '@core/csvs/dismissed';
+import { annotateDuplicates, sortByTitleThenArtist, type Track } from '@core/tracks';
 import { Button } from '@ui/components/Button';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
 import { FileDropzone } from '@ui/components/FileDropzone';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { UploadedTrackRow } from './UploadedTrackRow';
+import { DuplicatesToggle } from './DuplicatesToggle';
+
+/** Valor centinela del selector para la vista combinada de todas las listas. */
+const ALL_LISTS = '__all__';
+
+/** Una fila de la vista: un track con su lista de origen. `rowId` es estable
+ *  (incluye el índice dentro de su lista) para servir de `key` aunque la misma
+ *  URI aparezca en varias listas. */
+interface ViewItem {
+  rowId: string;
+  track: Track;
+  listId: string;
+  listName: string;
+}
 
 // Normaliza para búsqueda diacritic-insensitive ("Café" matchea "cafe").
 // Mismo criterio que el buscador de alternativas en `PlaylistTrackRow`.
@@ -52,32 +67,63 @@ export function MyListsTab(): JSX.Element {
   const [searchText, setSearchText] = useState<string>('');
   const [bpmMin, setBpmMin] = useState<string>('');
   const [bpmMax, setBpmMax] = useState<string>('');
+  const [onlyDuplicates, setOnlyDuplicates] = useState<boolean>(false);
   const [showUpload, setShowUpload] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(
     null,
   );
 
-  // Lista activa: la seleccionada o, si esa ya no existe (p. ej. tras borrar),
-  // la primera disponible. Null solo cuando no hay ninguna lista.
+  const isAllMode = selectedId === ALL_LISTS;
+
+  // Lista activa (modo «una lista»): la seleccionada o, si esa ya no existe
+  // (p. ej. tras borrar), la primera disponible. Null en modo «todas» o si no
+  // hay ninguna lista.
   const activeList = useMemo(
-    () => lists.find((l) => l.id === selectedId) ?? lists[0] ?? null,
-    [lists, selectedId],
+    () => (isAllMode ? null : lists.find((l) => l.id === selectedId) ?? lists[0] ?? null),
+    [isAllMode, lists, selectedId],
   );
 
-  const dismissedInList = useMemo(
-    () => (activeList?.tracks ?? []).reduce((n, t) => (dismissedSet.has(t.uri) ? n + 1 : n), 0),
-    [activeList, dismissedSet],
+  // Conjunto de la vista actual: todas las listas fusionadas (con su origen) o
+  // solo la lista activa. Cada item conserva de qué lista viene.
+  const viewItems = useMemo<ViewItem[]>(() => {
+    const source = isAllMode ? lists : activeList ? [activeList] : [];
+    const items: ViewItem[] = [];
+    for (const list of source) {
+      list.tracks.forEach((track, i) => {
+        items.push({
+          rowId: `${list.id}#${track.uri}#${i}`,
+          track,
+          listId: list.id,
+          listName: list.name,
+        });
+      });
+    }
+    return items;
+  }, [isAllMode, lists, activeList]);
+
+  // Anotación de duplicados sobre el conjunto de la vista (todas o una lista).
+  const annotated = useMemo(
+    () => annotateDuplicates(viewItems, (w) => w.track),
+    [viewItems],
+  );
+  const duplicatesCount = useMemo(
+    () => annotated.reduce((n, a) => (a.groupSize >= 2 ? n + 1 : n), 0),
+    [annotated],
+  );
+  const dismissedInView = useMemo(
+    () => viewItems.reduce((n, w) => (dismissedSet.has(w.track.uri) ? n + 1 : n), 0),
+    [viewItems, dismissedSet],
   );
 
-  // Filas visibles tras buscador + rango de BPM. No mutan la lista: filtran
-  // el render, igual que el editor nativo.
-  const filteredTracks = useMemo(() => {
-    const src = activeList?.tracks ?? [];
+  // Filas visibles tras buscador + BPM + «solo duplicados», ordenadas por
+  // título → artista (siempre): deja contiguas las versiones de un mismo tema.
+  const filteredAnnotated = useMemo(() => {
     const q = normalizeForSearch(searchText.trim());
     const minN = bpmMin.trim() === '' ? null : Number(bpmMin);
     const maxN = bpmMax.trim() === '' ? null : Number(bpmMax);
-    return src.filter((t) => {
+    const passed = annotated.filter((a) => {
+      const t = a.item.track;
       if (q !== '') {
         const haystack = normalizeForSearch(
           `${t.name} ${t.artists.join(' ')} ${t.album} ${t.genres.join(' ')}`,
@@ -86,12 +132,20 @@ export function MyListsTab(): JSX.Element {
       }
       if (minN !== null && Number.isFinite(minN) && t.tempoBpm < minN) return false;
       if (maxN !== null && Number.isFinite(maxN) && t.tempoBpm > maxN) return false;
+      if (onlyDuplicates && a.groupSize < 2) return false;
       return true;
     });
-  }, [activeList, searchText, bpmMin, bpmMax]);
+    return sortByTitleThenArtist(
+      passed,
+      (a) => a.item.track.name,
+      (a) => a.item.track.artists,
+    );
+  }, [annotated, searchText, bpmMin, bpmMax, onlyDuplicates]);
 
-  const visibleActive = filteredTracks.filter((t) => !dismissedSet.has(t.uri)).length;
-  const visibleDismissed = filteredTracks.length - visibleActive;
+  const visibleActive = filteredAnnotated.filter(
+    (a) => !dismissedSet.has(a.item.track.uri),
+  ).length;
+  const visibleDismissed = filteredAnnotated.length - visibleActive;
 
   const handleFile = async (file: File): Promise<void> => {
     setUploadError(null);
@@ -117,23 +171,31 @@ export function MyListsTab(): JSX.Element {
   };
 
   const handleDismissVisible = (): void => {
-    const uris = filteredTracks.filter((t) => !dismissedSet.has(t.uri)).map((t) => t.uri);
-    if (uris.length > 0) addDismissedUris(uris);
+    const uris = filteredAnnotated
+      .filter((a) => !dismissedSet.has(a.item.track.uri))
+      .map((a) => a.item.track.uri);
+    if (uris.length > 0) addDismissedUris([...new Set(uris)]);
   };
 
   const handleRecoverVisible = (): void => {
-    const uris = filteredTracks.filter((t) => dismissedSet.has(t.uri)).map((t) => t.uri);
-    if (uris.length > 0) removeDismissedUris(uris);
+    const uris = filteredAnnotated
+      .filter((a) => dismissedSet.has(a.item.track.uri))
+      .map((a) => a.item.track.uri);
+    if (uris.length > 0) removeDismissedUris([...new Set(uris)]);
   };
 
   const clearFilters = (): void => {
     setSearchText('');
     setBpmMin('');
     setBpmMax('');
+    setOnlyDuplicates(false);
   };
 
   const filtersActive =
-    searchText.trim() !== '' || bpmMin.trim() !== '' || bpmMax.trim() !== '';
+    searchText.trim() !== '' ||
+    bpmMin.trim() !== '' ||
+    bpmMax.trim() !== '' ||
+    onlyDuplicates;
 
   // ── Estado vacío: sin ninguna lista ──────────────────────────────────────
   if (lists.length === 0) {
@@ -168,10 +230,15 @@ export function MyListsTab(): JSX.Element {
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gris-400 pointer-events-none"
             />
             <select
-              value={activeList?.id ?? ''}
+              value={isAllMode ? ALL_LISTS : activeList?.id ?? ''}
               onChange={(e: ChangeEvent<HTMLSelectElement>) => setSelectedId(e.target.value)}
               className="w-full pl-9 pr-8 py-2 text-sm font-semibold rounded-lg border border-gris-300 bg-white focus:outline-none focus:ring-2 focus:ring-turquesa-400 focus:border-turquesa-400 min-h-[44px] appearance-none cursor-pointer"
             >
+              {lists.length > 1 && (
+                <option value={ALL_LISTS}>
+                  Todas las listas ({lists.reduce((n, l) => n + l.trackCount, 0)})
+                </option>
+              )}
               {lists.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name} ({l.trackCount})
@@ -187,12 +254,13 @@ export function MyListsTab(): JSX.Element {
         </label>
         <button
           type="button"
+          disabled={isAllMode || !activeList}
           onClick={() =>
             activeList && setPendingDelete({ id: activeList.id, name: activeList.name })
           }
           aria-label={activeList ? `Borrar lista «${activeList.name}»` : 'Borrar lista'}
-          title="Borrar esta lista"
-          className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg border border-gris-300 text-gris-500 hover:bg-rosa-50 hover:border-rosa-300 hover:text-rosa-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rosa-400"
+          title={isAllMode ? 'Elige una lista concreta para borrarla' : 'Borrar esta lista'}
+          className="shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-lg border border-gris-300 text-gris-500 hover:bg-rosa-50 hover:border-rosa-300 hover:text-rosa-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rosa-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gris-300 disabled:hover:text-gris-500"
         >
           <MaterialIcon name="delete_outline" size="small" />
         </button>
@@ -208,15 +276,27 @@ export function MyListsTab(): JSX.Element {
         </Button>
       </div>
 
-      {/* Resumen de la lista activa */}
-      {activeList && (
+      {/* Resumen de la vista (lista activa o todas) */}
+      {(activeList !== null || isAllMode) && (
         <p className="text-xs text-gris-600 tabular-nums" aria-live="polite">
-          <strong className="text-gris-800">{activeList.trackCount}</strong>{' '}
-          {activeList.trackCount === 1 ? 'canción' : 'canciones'}
-          {dismissedInList > 0 && (
+          <strong className="text-gris-800">{viewItems.length}</strong>{' '}
+          {viewItems.length === 1 ? 'canción' : 'canciones'}
+          {isAllMode && (
+            <span className="text-gris-500">
+              {' '}
+              en {lists.length} listas
+            </span>
+          )}
+          {dismissedInView > 0 && (
             <span className="text-rosa-600">
               {' · '}
-              {dismissedInList} {dismissedInList === 1 ? 'descartada' : 'descartadas'}
+              {dismissedInView} {dismissedInView === 1 ? 'descartada' : 'descartadas'}
+            </span>
+          )}
+          {duplicatesCount > 0 && (
+            <span className="text-tulipTree-700">
+              {' · '}
+              {duplicatesCount} con versiones
             </span>
           )}
         </p>
@@ -289,6 +369,13 @@ export function MyListsTab(): JSX.Element {
                 className="w-16 px-2 py-1.5 text-sm rounded-lg border border-gris-300 bg-white focus:outline-none focus:ring-2 focus:ring-turquesa-400 focus:border-turquesa-400 min-h-[36px] tabular-nums"
               />
             </div>
+            {duplicatesCount > 0 && (
+              <DuplicatesToggle
+                active={onlyDuplicates}
+                count={duplicatesCount}
+                onToggle={() => setOnlyDuplicates((v) => !v)}
+              />
+            )}
             {filtersActive && (
               <button
                 type="button"
@@ -302,7 +389,7 @@ export function MyListsTab(): JSX.Element {
           </div>
 
           {/* Acciones masivas sobre las visibles */}
-          {filteredTracks.length > 0 && (
+          {filteredAnnotated.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span className="text-xs text-gris-500 mr-1">Sobre las visibles:</span>
               <button
@@ -327,21 +414,30 @@ export function MyListsTab(): JSX.Element {
           )}
 
           {/* Filas */}
-          {filteredTracks.length === 0 ? (
+          {filteredAnnotated.length === 0 ? (
             <p className="text-sm text-gris-600 text-center py-6 rounded-lg border border-dashed border-gris-300 bg-gris-50">
               {filtersActive
                 ? 'Ningún tema cumple los filtros actuales.'
-                : 'Esta lista no tiene canciones.'}
+                : isAllMode
+                  ? 'No hay canciones en tus listas.'
+                  : 'Esta lista no tiene canciones.'}
             </p>
           ) : (
-            <ul className="space-y-1.5" role="list" aria-label={`${filteredTracks.length} canciones`}>
-              {filteredTracks.map((t) => {
+            <ul
+              className="space-y-1.5"
+              role="list"
+              aria-label={`${filteredAnnotated.length} canciones`}
+            >
+              {filteredAnnotated.map((a) => {
+                const t = a.item.track;
                 const dismissed = dismissedSet.has(t.uri);
                 return (
-                  <li key={t.uri}>
+                  <li key={a.item.rowId}>
                     <UploadedTrackRow
                       track={t}
                       dismissed={dismissed}
+                      duplicateCount={a.groupSize}
+                      listName={isAllMode ? a.item.listName : ''}
                       onToggleDismiss={() => handleToggleDismiss(t.uri, !dismissed)}
                     />
                   </li>
