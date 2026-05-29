@@ -2,7 +2,6 @@ import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'r
 import { loadNativeTracks, serializeTracksToCsv, type Track } from '@core/tracks';
 import { Button } from '@ui/components/Button';
 import { ConfirmDialog } from '@ui/components/ConfirmDialog';
-import { FileDropzone } from '@ui/components/FileDropzone';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { TrackPreviewButton } from '@ui/components/TrackPreviewButton';
 import { SyncStatusBadge } from '@ui/components/sync/SyncStatusBadge';
@@ -11,15 +10,12 @@ import {
   getNativeCatalogPrefs,
   setNativeCatalogPrefs,
 } from '@core/csvs/nativeCatalogPrefs';
-import {
-  createUploadedCsv,
-  deleteUploadedCsv,
-} from '@core/csvs/uploadedCsvs';
 import { addDismissedUri, removeDismissedUri, clearAllDismissed } from '@core/csvs/dismissed';
 import { useCadenciaData } from '@ui/state/cadenciaStore';
 import { hydrateUploadedCsvs } from '@ui/state/uploadedCsv';
 import { SpotifyAttribution } from '@ui/components/SpotifyAttribution';
 import { StatsTab } from '@ui/components/catalog/StatsTab';
+import { MyListsTab } from '@ui/components/catalog/MyListsTab';
 
 export interface CatalogEditorPageProps {
   /** Callback que vuelve al wizard. Lo inyecta App tras detectar la ruta. */
@@ -488,143 +484,6 @@ function SaveStatusIndicator({ status }: SaveStatusIndicatorProps): JSX.Element 
       <MaterialIcon name="cloud_done" size="small" />
       <span>Tus cambios se guardan automáticamente</span>
     </span>
-  );
-}
-
-/**
- * Tab "Mis listas": gestion de uploadedCsvs persistentes en cadenciaStore.
- * Subir nuevo, ver listado, borrar (con confirm).
- */
-function MyListsTab(): JSX.Element {
-  const cadenciaData = useCadenciaData();
-  const lists = useMemo(
-    () => hydrateUploadedCsvs(cadenciaData.uploadedCsvs),
-    [cadenciaData.uploadedCsvs],
-  );
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(
-    null,
-  );
-
-  const handleFile = async (file: File): Promise<void> => {
-    setUploadError(null);
-    try {
-      const text = await file.text();
-      // createUploadedCsv hace su propio parse para trackCount; aqui no
-      // duplicamos validacion — si el csv es invalido, trackCount sera 0
-      // y la card del listado lo mostrara.
-      createUploadedCsv({ name: file.name, csvText: text });
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Error al leer el archivo');
-    }
-  };
-
-  const handleConfirmDelete = (): void => {
-    if (!pendingDelete) return;
-    deleteUploadedCsv(pendingDelete.id);
-    setPendingDelete(null);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-dashed border-gris-300 bg-white p-4">
-        <h3 className="text-sm font-semibold text-gris-800 mb-2 flex items-center gap-1.5">
-          <MaterialIcon name="upload_file" size="small" className="text-turquesa-600" />
-          Subir nueva lista
-        </h3>
-        <FileDropzone
-          accept=".csv,text/csv"
-          acceptedLabel="CSV"
-          onFile={(f) => void handleFile(f)}
-          idlePrompt="Arrastra tu CSV de Spotify (Exportify) o pulsa para elegir"
-        />
-        {uploadError && (
-          <p className="mt-2 text-xs text-rosa-700" role="alert">
-            {uploadError}
-          </p>
-        )}
-        <p className="mt-2 text-xs text-gris-500">
-          ¿Cómo exportar tu lista?{' '}
-          <a
-            href="/ayuda/musica"
-            className="text-turquesa-700 hover:underline"
-            onClick={(e) => {
-              e.preventDefault();
-              window.location.href = '/ayuda/musica';
-            }}
-          >
-            Consulta la guía
-          </a>
-          .
-        </p>
-      </div>
-
-      {lists.length === 0 ? (
-        <div className="text-center text-gris-600 py-8 px-4 rounded-lg border border-dashed border-gris-300 bg-gris-50">
-          <MaterialIcon name="library_music" size="large" className="text-gris-400 mb-2" />
-          <p className="text-sm">No has subido ninguna lista todavía.</p>
-          <p className="text-xs mt-2 text-gris-500">
-            Sube un CSV de Spotify para tener canciones tuyas en futuras listas.
-          </p>
-        </div>
-      ) : (
-        <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3" role="list">
-          {lists.map((l) => (
-            <li
-              key={l.id}
-              className="rounded-lg border-2 border-gris-200 bg-white p-3 hover:border-turquesa-400 transition-colors"
-            >
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <h4 className="font-display text-sm md:text-base text-gris-800 leading-tight truncate">
-                  {l.name}
-                </h4>
-                <span className="text-[11px] text-gris-500 tabular-nums whitespace-nowrap">
-                  {l.trackCount} {l.trackCount === 1 ? 'canción' : 'canciones'}
-                </span>
-              </div>
-              {l.error !== undefined && (
-                <p className="text-xs text-rosa-700 mb-1" role="alert">
-                  {l.error}
-                </p>
-              )}
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setPendingDelete({ id: l.id, name: l.name })}
-                  aria-label={`Borrar lista ${l.name}`}
-                  className="px-3 py-1.5 rounded-md border border-gris-300 text-gris-600 hover:bg-rosa-50 hover:border-rosa-300 hover:text-rosa-700 text-xs min-h-[36px] inline-flex items-center gap-1.5"
-                >
-                  <MaterialIcon name="delete_outline" size="small" />
-                  Borrar
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <ConfirmDialog
-        open={pendingDelete !== null}
-        title="Borrar lista de música"
-        icon="delete_outline"
-        confirmLabel="Borrar"
-        confirmVariant="critical"
-        cancelLabel="Cancelar"
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setPendingDelete(null)}
-        message={
-          <>
-            <p>
-              <strong>"{pendingDelete?.name ?? ''}"</strong> se eliminará de tus
-              listas y dejará de estar disponible en futuras sesiones.
-            </p>
-            <p className="mt-2 text-gris-600">
-              Si tienes Drive conectado, el cambio se sincronizará a tus otros dispositivos.
-            </p>
-          </>
-        }
-      />
-    </div>
   );
 }
 

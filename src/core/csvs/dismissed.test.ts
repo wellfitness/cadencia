@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   addDismissedUri,
   removeDismissedUri,
+  addDismissedUris,
+  removeDismissedUris,
   isDismissed,
   listDismissed,
   clearAllDismissed,
@@ -46,5 +48,42 @@ describe('dismissedTrackUris CRUD', () => {
     addDismissedUri('spotify:track:bar');
     clearAllDismissed();
     expect(listDismissed()).toEqual([]);
+  });
+});
+
+describe('dismissedTrackUris en lote (acciones masivas)', () => {
+  beforeEach(() => clearCadenciaData());
+
+  it('addDismissedUris añade varias y deduplica contra lo existente', () => {
+    addDismissedUri('spotify:track:a');
+    addDismissedUris(['spotify:track:a', 'spotify:track:b', 'spotify:track:c']);
+    expect(listDismissed()).toEqual([
+      'spotify:track:a',
+      'spotify:track:b',
+      'spotify:track:c',
+    ]);
+  });
+
+  it('addDismissedUris con lista vacia no cambia nada', () => {
+    addDismissedUri('spotify:track:a');
+    addDismissedUris([]);
+    expect(listDismissed()).toEqual(['spotify:track:a']);
+  });
+
+  it('addDismissedUris no duplica URIs repetidas dentro del lote', () => {
+    addDismissedUris(['spotify:track:a', 'spotify:track:a', 'spotify:track:b']);
+    expect(listDismissed()).toEqual(['spotify:track:a', 'spotify:track:b']);
+  });
+
+  it('removeDismissedUris quita varias e ignora las ausentes', () => {
+    addDismissedUris(['spotify:track:a', 'spotify:track:b', 'spotify:track:c']);
+    removeDismissedUris(['spotify:track:a', 'spotify:track:c', 'spotify:track:nope']);
+    expect(listDismissed()).toEqual(['spotify:track:b']);
+  });
+
+  it('removeDismissedUris con lista vacia no cambia nada', () => {
+    addDismissedUris(['spotify:track:a', 'spotify:track:b']);
+    removeDismissedUris([]);
+    expect(listDismissed()).toEqual(['spotify:track:a', 'spotify:track:b']);
   });
 });
