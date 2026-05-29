@@ -32,8 +32,9 @@ export interface PlaylistTrackRowProps {
   matched: MatchedSegment;
   index: number;
   /**
-   * Alternativas validas para este slot (excluyendo todas las URIs ya en la
-   * playlist y la propia del segmento). Vacio o ausente -> boton deshabilitado.
+   * Alternativas para este slot: las libres (`usedAtIndex === null`) y las ya
+   * usadas en otros tramos (con su `usedAtIndex`, para moverlas aqui). Solo se
+   * excluye la cancion del propio segmento. Vacio o ausente -> sin opciones.
    */
   alternatives?: readonly AlternativeCandidate[];
   /** Llamado al elegir un track del dropdown. */

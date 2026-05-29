@@ -450,17 +450,72 @@ describe('moveTrackToSegment', () => {
     expect(result.matched[1]!.matchQuality).toBe('best-effort');
   });
 
-  it('origen sin relleno posible -> queda sin cancion (insufficient)', () => {
-    // 1 track, 2 segmentos -> el motor lo repite (strict + repeated). Mover
-    // a su otra copia deja el origen sin candidata libre.
-    const t = track({ tempoBpm: 80, energy: 0.7, valence: 0.6, durationMs: 60_000 });
-    const segments = [segment(3), segment(3)];
-    const matched = matchTracksToSegments(segments, [t], EMPTY_PREFERENCES);
-    const result = moveTrackToSegment(matched, 1, t.uri, [t], EMPTY_PREFERENCES);
+  it('cero repeticiones: mover una cancion REPETIDA neutraliza TODAS sus copias', () => {
+    // 2 tracks, 3 slots Z3 -> el motor repite uno: matched = [X, Y, X]. Este es
+    // el caso que ataca la feature (catalogo pequeño en Z1/Z2). Mover X a un
+    // tercer tramo NO debe dejar la otra copia viva (regla cardinal).
+    const tracks = [
+      track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments(
+      [segment(3), segment(3), segment(3)],
+      tracks,
+      EMPTY_PREFERENCES,
+    );
+    const repeatedUri = matched[0]!.track!.uri;
+    // Precondicion: la misma cancion ocupa los tramos 0 y 2.
+    expect(matched[2]!.track!.uri).toBe(repeatedUri);
+    expect(matched.filter((m) => m.track?.uri === repeatedUri).length).toBe(2);
+
+    // El usuario la mueve al tramo 1 (donde NO esta).
+    const result = moveTrackToSegment(matched, 1, repeatedUri, tracks, EMPTY_PREFERENCES);
     expect(result.moved).toBe(true);
-    expect(result.matched[1]!.track!.uri).toBe(t.uri);
-    expect(result.matched[0]!.track).toBeNull();
-    expect(result.matched[0]!.matchQuality).toBe('insufficient');
+    // Queda en el target y EN NINGUN otro tramo.
+    expect(result.matched[1]!.track!.uri).toBe(repeatedUri);
+    expect(result.matched.filter((m) => m.track?.uri === repeatedUri).length).toBe(1);
+    // Cero repeticiones global (ignorando huecos null).
+    const uris = result.matched.map((m) => m.track?.uri).filter((u): u is string => !!u);
+    expect(new Set(uris).size).toBe(uris.length);
+    // Ambos huecos de origen (0 y 2) se reorganizaron.
+    expect(result.changedIndices).toEqual([1, 0, 2]);
+  });
+
+  it('origen sin relleno posible -> ese hueco queda sin cancion (insufficient)', () => {
+    // [X, Y, X]: al mover X al tramo 1, el hueco 0 se rellena con Y (la
+    // desplazada del target), pero el hueco 2 ya no tiene candidata libre.
+    const tracks = [
+      track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments(
+      [segment(3), segment(3), segment(3)],
+      tracks,
+      EMPTY_PREFERENCES,
+    );
+    const repeatedUri = matched[0]!.track!.uri;
+    const result = moveTrackToSegment(matched, 1, repeatedUri, tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(true);
+    const insufficientCount = result.matched.filter(
+      (m) => m.track === null && m.matchQuality === 'insufficient',
+    ).length;
+    expect(insufficientCount).toBe(1);
+  });
+
+  it('no-op: el target ya contiene la cancion (mover sobre una de sus copias)', () => {
+    // [X, Y, X]: pedir mover X al tramo 0 (donde ya esta) es no-op.
+    const tracks = [
+      track({ tempoBpm: 80, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+      track({ tempoBpm: 85, energy: 0.7, valence: 0.55, durationMs: 60_000 }),
+    ];
+    const matched = matchTracksToSegments(
+      [segment(3), segment(3), segment(3)],
+      tracks,
+      EMPTY_PREFERENCES,
+    );
+    const repeatedUri = matched[0]!.track!.uri;
+    const result = moveTrackToSegment(matched, 0, repeatedUri, tracks, EMPTY_PREFERENCES);
+    expect(result.moved).toBe(false);
   });
 
   it('no-op: sourceUri no esta en la lista', () => {

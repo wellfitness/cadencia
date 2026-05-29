@@ -234,21 +234,24 @@ export function replaceTrackInSegment(
 }
 
 /**
- * Mueve la cancion `sourceUri` (que ya esta en algun tramo) al tramo `targetIndex`
- * y RELLENA el tramo de origen con la mejor alternativa libre. Pensado para
- * "cambiar de posicion" desde el dropdown "Otro tema" cuando el usuario elige
- * una cancion marcada como ya usada.
+ * Mueve la cancion `sourceUri` (que ya esta en la lista) al tramo `targetIndex`
+ * y RELLENA su(s) tramo(s) de origen con la mejor alternativa libre. Pensado
+ * para "cambiar de posicion" desde el dropdown "Otro tema" cuando el usuario
+ * elige una cancion marcada como ya usada.
  *
- * Garantia "cero repeticiones": tras mover, `sourceUri` aparece una sola vez
- * (en el target) y el relleno se elige con `rankAvailableCandidates`, que
- * prohibe todas las URIs en uso. La cancion desplazada del target queda libre
- * y el relleno PUEDE reutilizarla si es la mejor para el origen — degradando de
- * forma natural a un intercambio cuando eso es lo optimo, sin duplicar nunca.
+ * Garantia "cero repeticiones": tras mover, `sourceUri` aparece UNA sola vez
+ * (en el target). Si la cancion estaba duplicada por la politica `repeated`
+ * (varias copias cuando el catalogo es pequeño — justo el caso que esta feature
+ * ataca), se neutralizan TODAS sus copias y cada hueco se rellena. El relleno
+ * usa `rankAvailableCandidates` (solo-libres) excluyendo lo ya colocado, asi
+ * que nunca duplica; la cancion desplazada del target queda libre y puede
+ * reutilizarse si es la mejor para algun hueco (degrada a swap cuando es optimo).
  *
- * Funcion pura: misma entrada -> misma salida (el relleno es determinista).
+ * El relleno es secuencial: cada hueco ve los anteriores como usados, evitando
+ * duplicar entre rellenos. Funcion pura y determinista.
  *
  * Casos `moved=false` (lista sin cambios): `targetIndex` fuera de rango,
- * `sourceUri` no presente en `matched`, o origen == destino.
+ * `sourceUri` no presente en `matched`, o el target ya contiene `sourceUri`.
  */
 export function moveTrackToSegment(
   matched: readonly MatchedSegment[],
@@ -260,11 +263,16 @@ export function moveTrackToSegment(
   const target = matched[targetIndex];
   if (!target) return { matched: [...matched], moved: false, changedIndices: [] };
 
-  const sourceIndex = matched.findIndex((m) => m.track?.uri === sourceUri);
-  if (sourceIndex === -1 || sourceIndex === targetIndex) {
+  // TODAS las posiciones actuales de sourceUri (puede haber varias si 'repeated').
+  const sourceIndices = matched.reduce<number[]>((acc, m, i) => {
+    if (m.track?.uri === sourceUri) acc.push(i);
+    return acc;
+  }, []);
+  // Nada que mover si no esta, o si el target ya es una de sus posiciones.
+  if (sourceIndices.length === 0 || sourceIndices.includes(targetIndex)) {
     return { matched: [...matched], moved: false, changedIndices: [] };
   }
-  const sourceTrack = matched[sourceIndex]!.track!; // existe: lo localizamos por uri
+  const sourceTrack = matched[sourceIndices[0]!]!.track!; // existe: localizado por uri
 
   // 1. Colocar la cancion movida en el target, recomputando su calidad para la
   //    zona del target (strict si encaja, best-effort si no).
@@ -277,31 +285,35 @@ export function moveTrackToSegment(
     : 'best-effort';
   const targetScore = scoreTrack(sourceTrack, targetCriteria, preferences.preferredGenres);
 
-  const intermediate = matched.map((m, i) =>
+  let working: MatchedSegment[] = matched.map((m, i) =>
     i === targetIndex
       ? { ...m, track: sourceTrack, matchScore: targetScore, matchQuality: targetQuality }
       : m,
   );
 
-  // 2. Rellenar el origen con la mejor alternativa LIBRE. rankAvailableCandidates
-  //    prohibe todas las URIs presentes en `intermediate` (incluida sourceUri,
-  //    ya en el target) → nunca duplica. La cancion que estaba en el target ya
-  //    no aparece en `intermediate`, asi que es elegible como relleno.
-  const sourceSeg = matched[sourceIndex]!;
-  const bag = rankAvailableCandidates(intermediate, sourceIndex, tracks, preferences);
-  let filled: MatchedSegment;
-  if (bag && bag.ranked.length > 0) {
-    const pick = bag.ranked[0]!;
-    const quality: MatchQuality = passesCadenceFilter(pick.track.tempoBpm, bag.criteria)
-      ? 'strict'
-      : 'best-effort';
-    filled = { ...sourceSeg, track: pick.track, matchScore: pick.score, matchQuality: quality };
-  } else {
-    // No queda nada libre para el origen: queda sin cancion (la UI ya pinta ese
-    // estado con CTA "Subir mas temas").
-    filled = { ...sourceSeg, track: null, matchScore: 0, matchQuality: 'insufficient' };
+  // 2. Rellenar CADA hueco de origen con la mejor alternativa LIBRE.
+  //    `rankAvailableCandidates` prohibe todas las URIs presentes en `working`
+  //    (incluida sourceUri ya en el target y los rellenos previos) → nunca
+  //    duplica. La cancion desplazada del target ya no esta en `working`, asi
+  //    que es elegible como relleno.
+  for (const idx of sourceIndices) {
+    const sourceSeg = matched[idx]!;
+    const bag = rankAvailableCandidates(working, idx, tracks, preferences);
+    const filled: MatchedSegment =
+      bag && bag.ranked.length > 0
+        ? {
+            ...sourceSeg,
+            track: bag.ranked[0]!.track,
+            matchScore: bag.ranked[0]!.score,
+            matchQuality: passesCadenceFilter(bag.ranked[0]!.track.tempoBpm, bag.criteria)
+              ? 'strict'
+              : 'best-effort',
+          }
+        : // Nada libre para este hueco: queda sin cancion (la UI pinta el CTA
+          // "Subir mas temas").
+          { ...sourceSeg, track: null, matchScore: 0, matchQuality: 'insufficient' };
+    working = working.map((m, i) => (i === idx ? filled : m));
   }
 
-  const result = intermediate.map((m, i) => (i === sourceIndex ? filled : m));
-  return { matched: result, moved: true, changedIndices: [targetIndex, sourceIndex] };
+  return { matched: working, moved: true, changedIndices: [targetIndex, ...sourceIndices] };
 }

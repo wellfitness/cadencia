@@ -216,24 +216,35 @@ export function ResultStep({
 
   const handleReplaceWith = (index: number, uri: string): void => {
     // ¿La cancion elegida ya esta en OTRO tramo? Entonces el usuario la esta
-    // MOVIENDO aqui (mover + rellenar el hueco). Si esta libre, sustitucion
-    // normal. El propio track del tramo nunca llega aqui (se excluye del
-    // dropdown), asi que `sourceIndex` apunta siempre a otro slot.
-    const sourceIndex = matched.findIndex((m, j) => j !== index && m.track?.uri === uri);
-    if (sourceIndex !== -1) {
+    // MOVIENDO aqui (mover + rellenar el/los hueco(s)). Si esta libre,
+    // sustitucion normal. El propio track del tramo nunca llega aqui (se excluye
+    // del dropdown).
+    const isUsedElsewhere = matched.some((m, j) => j !== index && m.track?.uri === uri);
+    if (isUsedElsewhere) {
       const result = moveTrackToSegment(matched, index, uri, tracks, preferences);
       if (!result.moved) return;
       onMatchedChange(result.matched);
       const next = new Set(replacedIndices);
       result.changedIndices.forEach((ci) => next.add(ci));
       onReplacedIndicesChange(next);
-      const movedName = matched[sourceIndex]?.track?.name ?? 'la canción';
-      const filledName = result.matched[sourceIndex]?.track?.name;
-      setMoveNotice(
-        filledName !== undefined
-          ? `Movida «${movedName}» aquí · el tramo ${sourceIndex + 1} ahora suena «${filledName}»`
-          : `Movida «${movedName}» aquí · el tramo ${sourceIndex + 1} se quedó sin tema (sube más listas)`,
-      );
+      // Aviso de la cascada usando changedIndices como unica fuente de verdad:
+      // todos menos el target son huecos rellenados (>1 si la cancion estaba
+      // repetida en varios tramos).
+      const movedName = matched.find((m) => m.track?.uri === uri)?.track?.name ?? 'la canción';
+      const filledIndices = result.changedIndices.filter((ci) => ci !== index);
+      if (filledIndices.length === 1) {
+        const si = filledIndices[0]!;
+        const filledName = result.matched[si]?.track?.name;
+        setMoveNotice(
+          filledName !== undefined
+            ? `Movida «${movedName}» aquí · el tramo ${si + 1} ahora suena «${filledName}»`
+            : `Movida «${movedName}» aquí · el tramo ${si + 1} se quedó sin tema (sube más listas)`,
+        );
+      } else {
+        setMoveNotice(
+          `Movida «${movedName}» aquí · se rellenaron ${filledIndices.length} tramos que la repetían`,
+        );
+      }
       return;
     }
     const result = replaceTrackInSegment(matched, index, tracks, preferences, uri);
