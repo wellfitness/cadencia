@@ -132,6 +132,18 @@ export function cleanTitleForDedup(name: string): string {
 }
 
 /**
+ * `true` si el título trae un marcador de versión o un segmento «feat.»: es
+ * decir, si limpiarlo para dedup recorta algo más allá de la mera normalización
+ * (minúsculas, diacríticos, puntuación). Se usa al deduplicar el catálogo nativo
+ * para preferir la versión «limpia/original» como superviviente — p. ej. «Faded»
+ * gana a «Faded - Slowed Remix», y «Hey Mama» a «Hey Mama (feat. Nicki Minaj)».
+ */
+export function titleHasVersionMarker(name: string): boolean {
+  const plain = removePunctuationAndCollapse(stripDiacriticsLower(name));
+  return cleanTitleForDedup(name) !== plain;
+}
+
+/**
  * Normaliza la lista de artistas a una clave order-insensitive: cada artista
  * en minúsculas/sin tildes/sin puntuación, descartando vacíos, ordenados y
  * unidos con «|». Así «A; B» y «B; A» comparten clave.

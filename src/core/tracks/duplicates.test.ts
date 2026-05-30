@@ -5,6 +5,7 @@ import {
   dedupKey,
   sortByTitleThenArtist,
   annotateDuplicates,
+  titleHasVersionMarker,
   type AnnotatedItem,
 } from './duplicates';
 import type { Track } from './types';
@@ -202,5 +203,29 @@ describe('annotateDuplicates', () => {
     const ann = annotateDuplicates(wrapped, (w) => w.track);
     expect(ann[0]?.groupSize).toBe(2);
     expect(ann[1]?.groupSize).toBe(2);
+  });
+});
+
+describe('titleHasVersionMarker', () => {
+  it('marca sufijos de versión tras « - »', () => {
+    expect(titleHasVersionMarker('Faded - Slowed Remix')).toBe(true);
+    expect(titleHasVersionMarker('We Are The Champions - Remastered 2011')).toBe(true);
+    expect(titleHasVersionMarker('Take a Bow - Edit')).toBe(true);
+  });
+
+  it('marca segmentos «feat.» y paréntesis de versión', () => {
+    expect(titleHasVersionMarker('Hey Mama (feat. Nicki Minaj)')).toBe(true);
+    expect(titleHasVersionMarker('Halo [2011 Remaster]')).toBe(true);
+  });
+
+  it('no marca títulos limpios ni paréntesis sin palabra clave', () => {
+    expect(titleHasVersionMarker('Faded')).toBe(false);
+    expect(titleHasVersionMarker('Take a Bow')).toBe(false);
+    expect(titleHasVersionMarker('Song (Part 2)')).toBe(false);
+  });
+
+  it('es diacrítico/puntuación-insensible (no marca por tildes ni signos)', () => {
+    expect(titleHasVersionMarker('Café')).toBe(false);
+    expect(titleHasVersionMarker("I Knew You Were Trouble.")).toBe(false);
   });
 });
