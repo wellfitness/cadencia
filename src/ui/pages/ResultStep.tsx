@@ -342,9 +342,14 @@ export function ResultStep({
     try {
       const uris = extractUris(matched);
       const description = buildPlaylistDescription(routeMeta);
+      // Nombre final, calculado UNA vez: el tecleado por el usuario o el
+      // generado por defecto. Se reutiliza para Spotify y para el historial,
+      // evitando que dos `new Date()` distintos produzcan nombres divergentes.
+      const finalName =
+        effectivePlaylistName.trim() || buildPlaylistName(routeMeta.name, new Date());
       const playlist = await createPlaylistWithTracks({
         accessToken: tokens.accessToken,
-        name: effectivePlaylistName.trim() || buildPlaylistName(routeMeta.name, new Date()),
+        name: finalName,
         description,
         uris,
       });
@@ -363,6 +368,7 @@ export function ResultStep({
             replacedIndices,
             seed: preferences.seed ?? null,
             spotifyPlaylistId: playlist.id,
+            name: finalName,
           });
         }
       } catch (historyErr) {

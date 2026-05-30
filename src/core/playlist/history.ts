@@ -25,6 +25,8 @@ export interface CreatePlaylistHistoryInput {
   seed: number | null;
   spotifyPlaylistId?: string;
   savedSessionId?: string;
+  /** Nombre con el que se creó la playlist en Spotify. Vacío → no se guarda. */
+  name?: string;
 }
 
 const EMPTY_ZONE_DURATIONS: Record<HeartRateZone, number> = {
@@ -85,6 +87,10 @@ export function createPlaylistHistoryEntry(
   }
   if (input.savedSessionId !== undefined) {
     entry.savedSessionId = input.savedSessionId;
+  }
+  const trimmedName = input.name?.trim();
+  if (trimmedName !== undefined && trimmedName !== '') {
+    entry.name = trimmedName;
   }
 
   const data = loadCadenciaData();

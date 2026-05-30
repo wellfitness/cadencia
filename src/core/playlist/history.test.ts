@@ -194,4 +194,31 @@ describe('playlistHistory CRUD', () => {
     expect(created.spotifyPlaylistId).toBe('pl-123');
     expect(created.savedSessionId).toBe('sess-456');
   });
+
+  it('guarda el name de la playlist cuando se pasa', () => {
+    const segs = [segment(track('uri:1', 'A'), 2, 60)];
+    const created = createPlaylistHistoryEntry({
+      ...baseInput(segs),
+      name: 'Cadencia - Mi ruta - 2026-05-30',
+    });
+    expect(created.name).toBe('Cadencia - Mi ruta - 2026-05-30');
+    expect(getPlaylistHistoryEntry(created.id)?.name).toBe(
+      'Cadencia - Mi ruta - 2026-05-30',
+    );
+  });
+
+  it('name es opcional: sin pasarlo, la entrada no lo lleva', () => {
+    const created = createPlaylistHistoryEntry(
+      baseInput([segment(track('uri:1', 'A'), 2, 60)]),
+    );
+    expect(created.name).toBeUndefined();
+  });
+
+  it('name vacío o solo espacios no se guarda (queda undefined)', () => {
+    const created = createPlaylistHistoryEntry({
+      ...baseInput([segment(track('uri:1', 'A'), 2, 60)]),
+      name: '   ',
+    });
+    expect(created.name).toBeUndefined();
+  });
 });

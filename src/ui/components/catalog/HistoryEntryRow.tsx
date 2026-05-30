@@ -44,15 +44,20 @@ const MODE_LABEL: Record<'gpx' | 'session', string> = {
 export function HistoryEntryRow({ entry }: HistoryEntryRowProps): JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
   const replacedCount = entry.tracks.filter((t) => t.wasReplaced).length;
+  // Titular: el nombre con el que se guardó la lista. Las entradas anteriores a
+  // que guardáramos el nombre caen a la fecha como titular.
+  const headline = entry.name ?? formatDate(entry.createdAt);
+  const showDateInMeta = entry.name !== undefined;
 
   return (
     <li className="rounded-md border border-gris-200 bg-white p-3">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-gris-800">
-            {formatDate(entry.createdAt)}
+          <p className="text-sm font-semibold text-gris-800 truncate" title={headline}>
+            {headline}
           </p>
           <p className="text-xs text-gris-500 mt-0.5">
+            {showDateInMeta ? <>{formatDate(entry.createdAt)} · </> : null}
             {SPORT_LABEL[entry.sport]} · {MODE_LABEL[entry.mode]} ·{' '}
             <span className="tabular-nums">{formatDuration(entry.totalDurationSec)}</span> ·{' '}
             {entry.tracks.length}{' '}
@@ -109,9 +114,15 @@ export function HistoryEntryRow({ entry }: HistoryEntryRowProps): JSX.Element {
         onCancel={() => setConfirmDelete(false)}
         message={
           <p>
-            Vas a borrar la lista del{' '}
-            <strong>{formatDate(entry.createdAt)}</strong>. La playlist en
-            tu Spotify no se ve afectada — solo desaparece de tus estadísticas.
+            Vas a borrar{' '}
+            {entry.name !== undefined ? (
+              <strong>«{entry.name}»</strong>
+            ) : (
+              <>
+                la lista del <strong>{formatDate(entry.createdAt)}</strong>
+              </>
+            )}{' '}
+            de tus estadísticas. La playlist en tu Spotify no se ve afectada.
           </p>
         }
       />

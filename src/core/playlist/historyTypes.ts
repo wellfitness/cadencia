@@ -26,6 +26,12 @@ export interface PlaylistHistoryEntry {
   sport: Sport;
   /** 'gpx' = ruta outdoor; 'session' = sesion indoor por bloques. */
   mode: 'gpx' | 'session';
+  /**
+   * Nombre con el que se creo la playlist en Spotify (el que tecleo el usuario
+   * o el generado por defecto). Opcional: las entradas anteriores a esta
+   * version no lo tienen, y la UI cae a la fecha como titular.
+   */
+  name?: string;
   /** Suma de durationSec de todos los tracks. */
   totalDurationSec: number;
   /** Tiempo total acumulado por zona, en segundos. */
