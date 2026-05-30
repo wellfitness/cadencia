@@ -5,7 +5,9 @@ import {
   getUploadedCsv,
   updateUploadedCsv,
   deleteUploadedCsv,
+  removeTrackFromUploadedCsv,
 } from './uploadedCsvs';
+import { parseTrackCsv, serializeTracksToCsv, type Track } from '@core/tracks';
 import { clearCadenciaData } from '@ui/state/cadenciaStore';
 
 // CSV con todas las columnas que requiere parseTrackCsv (formato Exportify).
@@ -72,5 +74,89 @@ describe('uploadedCsvs CRUD', () => {
     const list = listUploadedCsvs();
     expect(list[0]?.id).toBe(b.id);
     expect(list[1]?.id).toBe(a.id);
+  });
+});
+
+function makeTrack(uri: string, name: string): Track {
+  return {
+    uri,
+    name,
+    album: '',
+    artists: ['Artista'],
+    genres: [],
+    tempoBpm: 120,
+    energy: 0.5,
+    valence: 0.5,
+    danceability: 0.5,
+    durationMs: 200_000,
+    source: 'user',
+  };
+}
+
+/** Lee y parsea el csvText vivo de una lista; lanza si no existe. */
+function urisOf(id: string): string[] {
+  const rec = getUploadedCsv(id);
+  if (rec === null) throw new Error('lista no encontrada');
+  return parseTrackCsv(rec.csvText, 'user').map((t) => t.uri);
+}
+
+describe('removeTrackFromUploadedCsv', () => {
+  beforeEach(() => clearCadenciaData());
+
+  it('quita la copia indicada y CONSERVA otra copia del mismo URI (deja una)', () => {
+    // La misma cancion (URI 1) aparece dos veces: en los indices 0 y 2.
+    const csv = serializeTracksToCsv([
+      makeTrack('spotify:track:1', 'A'),
+      makeTrack('spotify:track:2', 'B'),
+      makeTrack('spotify:track:1', 'A'),
+    ]);
+    const rec = createUploadedCsv({ name: 'L', csvText: csv });
+
+    const res = removeTrackFromUploadedCsv(rec.id, 2); // quita la 2a copia de A
+
+    expect(res).not.toBeNull();
+    // Queda UNA copia de la URI 1 (no se han ido las dos) + la URI 2.
+    expect(urisOf(rec.id)).toEqual(['spotify:track:1', 'spotify:track:2']);
+  });
+
+  it('quita por posicion, no por URI (respeta el indice exacto)', () => {
+    const csv = serializeTracksToCsv([
+      makeTrack('spotify:track:1', 'A'),
+      makeTrack('spotify:track:2', 'B'),
+      makeTrack('spotify:track:3', 'C'),
+    ]);
+    const rec = createUploadedCsv({ name: 'L', csvText: csv });
+
+    removeTrackFromUploadedCsv(rec.id, 1); // quita B
+
+    expect(urisOf(rec.id)).toEqual(['spotify:track:1', 'spotify:track:3']);
+  });
+
+  it('indice fuera de rango devuelve null y no altera la lista', () => {
+    const csv = serializeTracksToCsv([makeTrack('spotify:track:1', 'A')]);
+    const rec = createUploadedCsv({ name: 'L', csvText: csv });
+
+    expect(removeTrackFromUploadedCsv(rec.id, 5)).toBeNull();
+    expect(urisOf(rec.id)).toEqual(['spotify:track:1']);
+  });
+
+  it('lista inexistente devuelve null', () => {
+    expect(removeTrackFromUploadedCsv('no-existe', 0)).toBeNull();
+  });
+
+  it('devuelve prevCsvText y el nombre, permitiendo deshacer (restaurar)', () => {
+    const csv = serializeTracksToCsv([
+      makeTrack('spotify:track:1', 'A'),
+      makeTrack('spotify:track:2', 'B'),
+    ]);
+    const rec = createUploadedCsv({ name: 'L', csvText: csv });
+
+    const res = removeTrackFromUploadedCsv(rec.id, 0);
+    expect(res?.removedName).toBe('A');
+    expect(urisOf(rec.id)).toEqual(['spotify:track:2']);
+
+    // Deshacer: restaurar el csvText previo.
+    if (res !== null) updateUploadedCsv(rec.id, { csvText: res.prevCsvText });
+    expect(urisOf(rec.id)).toEqual(['spotify:track:1', 'spotify:track:2']);
   });
 });

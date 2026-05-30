@@ -1,5 +1,5 @@
 import { loadCadenciaData, saveCadenciaData } from '@ui/state/cadenciaStore';
-import { parseTrackCsv } from '@core/tracks';
+import { parseTrackCsv, serializeTracksToCsv, type Track } from '@core/tracks';
 import type { UploadedCsvRecord } from '@core/sync/types';
 
 /**
@@ -104,6 +104,48 @@ export function updateUploadedCsv(
   data.updatedAt = now;
   saveCadenciaData(data);
   return updated;
+}
+
+export interface RemovedTrack {
+  /** csvText anterior, para deshacer restaurando la lista completa. */
+  prevCsvText: string;
+  /** Nombre de la cancion quitada (para el aviso de deshacer). */
+  removedName: string;
+}
+
+/**
+ * Quita la cancion en la posicion `trackIndex` (orden de parseo) de la lista
+ * `id`, reescribiendo su CSV. A diferencia del descarte global por URI, opera
+ * **por copia**: si la misma cancion esta repetida dentro de la lista o existe
+ * en otras listas, las demas copias se conservan — asi el usuario puede quitar
+ * duplicados dejando al menos una.
+ *
+ * Devuelve el csvText previo (para deshacer, restaurandolo tal cual) y el
+ * nombre quitado, o null si la lista no existe, su CSV no parsea, o el indice
+ * esta fuera de rango.
+ *
+ * Nota: reescribe el CSV en el formato canonico de `serializeTracksToCsv` (solo
+ * las columnas que el motor usa); las columnas no modeladas del export original
+ * no se preservan, lo cual es irrelevante para el uso en la app.
+ */
+export function removeTrackFromUploadedCsv(
+  id: string,
+  trackIndex: number,
+): RemovedTrack | null {
+  const record = getUploadedCsv(id);
+  if (record === null) return null;
+  let tracks: Track[];
+  try {
+    tracks = parseTrackCsv(record.csvText, 'user');
+  } catch {
+    return null;
+  }
+  const removed = tracks[trackIndex];
+  if (removed === undefined) return null; // indice fuera de rango (o negativo)
+  const prevCsvText = record.csvText;
+  const next = tracks.filter((_, i) => i !== trackIndex);
+  updateUploadedCsv(id, { csvText: serializeTracksToCsv(next) });
+  return { prevCsvText, removedName: removed.name };
 }
 
 /** Borrado logico (tombstone). El item viaja via sync antes de purgarse. */

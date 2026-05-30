@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { clearCadenciaData } from '@ui/state/cadenciaStore';
-import { createUploadedCsv } from '@core/csvs/uploadedCsvs';
-import { addDismissedUri, listDismissed } from '@core/csvs/dismissed';
+import {
+  createUploadedCsv,
+  getUploadedCsv,
+  listUploadedCsvs,
+} from '@core/csvs/uploadedCsvs';
+import { parseTrackCsv } from '@core/tracks';
 import { MyListsTab } from './MyListsTab';
 
 interface Row {
@@ -19,6 +23,13 @@ function makeCsv(rows: readonly Row[]): string {
     (r) => `${r.uri},${r.name},Album,${r.artist},rock,0.5,0.6,0.5,${r.tempo},180000`,
   );
   return [header, ...lines].join('\n');
+}
+
+/** URIs vivas de una lista, leídas del store y parseadas. */
+function listUris(id: string): string[] {
+  const rec = getUploadedCsv(id);
+  if (rec === null) throw new Error('lista no encontrada');
+  return parseTrackCsv(rec.csvText, 'user').map((t) => t.uri);
 }
 
 const csvA = makeCsv([
@@ -60,23 +71,49 @@ describe('MyListsTab (editor con selector)', () => {
     expect(screen.queryByText('Alpha')).toBeNull();
   });
 
-  it('descartar una canción la añade a dismissedTrackUris', () => {
-    createUploadedCsv({ name: 'Lista A', csvText: csvA });
+  it('quitar una canción la elimina de su lista (conservando las demás)', () => {
+    const a = createUploadedCsv({ name: 'Lista A', csvText: csvA });
     render(<MyListsTab />);
 
-    fireEvent.click(screen.getByRole('button', { name: /no quiero «Alpha»/i }));
+    fireEvent.click(screen.getByRole('button', { name: /quitar «Alpha»/i }));
 
-    expect(listDismissed()).toContain('spotify:track:alpha');
+    expect(listUris(a.id)).toEqual(['spotify:track:beta']);
   });
 
-  it('recuperar una canción descartada la quita de dismissedTrackUris', () => {
-    createUploadedCsv({ name: 'Lista A', csvText: csvA });
-    addDismissedUri('spotify:track:alpha');
+  it('«Deshacer» restaura la canción quitada', () => {
+    const a = createUploadedCsv({ name: 'Lista A', csvText: csvA });
     render(<MyListsTab />);
 
-    fireEvent.click(screen.getByRole('button', { name: /recuperar «Alpha»/i }));
+    fireEvent.click(screen.getByRole('button', { name: /quitar «Alpha»/i }));
+    fireEvent.click(screen.getByRole('button', { name: /deshacer/i }));
 
-    expect(listDismissed()).not.toContain('spotify:track:alpha');
+    expect(listUris(a.id)).toEqual(['spotify:track:alpha', 'spotify:track:beta']);
+  });
+
+  it('en «Todas las listas», quitar una copia conserva la otra (deja al menos una)', () => {
+    // La MISMA canción (mismo URI) en dos listas distintas: el caso del bug.
+    const dup = makeCsv([
+      { uri: 'spotify:track:alpha', name: 'Alpha', artist: 'Banda Uno', tempo: 120 },
+    ]);
+    createUploadedCsv({ name: 'Lista A', csvText: dup });
+    createUploadedCsv({ name: 'Lista B', csvText: dup });
+    render(<MyListsTab />);
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '__all__' } });
+
+    // Dos filas «Alpha» (una por lista), cada una con su botón Quitar.
+    const quitar = screen.getAllByRole('button', { name: /quitar «Alpha»/i });
+    expect(quitar).toHaveLength(2);
+
+    const [first] = quitar;
+    if (first === undefined) throw new Error('no hay botón Quitar');
+    fireEvent.click(first);
+
+    // Sigue existiendo UNA copia de Alpha entre todas las listas (no se fueron las dos).
+    const allUris = listUploadedCsvs().flatMap((l) =>
+      parseTrackCsv(l.csvText, 'user').map((t) => t.uri),
+    );
+    expect(allUris.filter((u) => u === 'spotify:track:alpha')).toHaveLength(1);
   });
 
   it('el buscador filtra por nombre', () => {
@@ -99,29 +136,11 @@ describe('MyListsTab (editor con selector)', () => {
     expect(screen.queryByText('Alpha')).toBeNull(); // 120 BPM
   });
 
-  it('«descartar todas las visibles» descarta todas las activas mostradas', () => {
-    createUploadedCsv({ name: 'Lista A', csvText: csvA });
-    render(<MyListsTab />);
-
-    fireEvent.click(screen.getByRole('button', { name: /descartar todas/i }));
-
-    expect(listDismissed()).toContain('spotify:track:alpha');
-    expect(listDismissed()).toContain('spotify:track:beta');
-  });
-
-  it('muestra cuántas canciones están descartadas', () => {
-    createUploadedCsv({ name: 'Lista A', csvText: csvA });
-    addDismissedUri('spotify:track:beta');
-    render(<MyListsTab />);
-
-    expect(screen.getByText(/1 descartada/)).toBeInTheDocument();
-  });
-
   it('una lista con CSV inválido muestra el error y no canciones', () => {
     createUploadedCsv({ name: 'Lista rota', csvText: 'cabecera,sin,columnas\n1,2,3' });
     render(<MyListsTab />);
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /no quiero/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /quitar/i })).toBeNull();
   });
 });

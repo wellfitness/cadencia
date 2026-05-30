@@ -26,53 +26,48 @@ const track = makeTrack({
   album: 'Steppenwolf',
   genres: ['rock', 'classic rock'],
   tempoBpm: 128,
+  durationMs: 225_000,
 });
 
 describe('UploadedTrackRow', () => {
-  it('en estado activo muestra el tema y un botón para descartarlo', () => {
-    render(<UploadedTrackRow track={track} dismissed={false} onToggleDismiss={vi.fn()} />);
+  it('muestra el tema, artista, BPM, duración y un botón para quitarlo', () => {
+    render(<UploadedTrackRow track={track} onRemove={vi.fn()} />);
 
     expect(screen.getByText('Born to Be Wild')).toBeInTheDocument();
     expect(screen.getByText('Steppenwolf')).toBeInTheDocument();
     expect(screen.getByText(/128/)).toBeInTheDocument();
+    expect(screen.getByText('3:45')).toBeInTheDocument();
     expect(screen.getByText('rock')).toBeInTheDocument();
-    // El control de descarte está presente; no hay marca de "fuera".
-    expect(screen.getByRole('button', { name: /no quiero/i })).toBeInTheDocument();
-    expect(screen.queryByText('fuera')).toBeNull();
-    expect(screen.queryByRole('button', { name: /recuperar/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /quitar/i })).toBeInTheDocument();
   });
 
-  it('clic en "No la quiero" invoca onToggleDismiss', () => {
-    const onToggle = vi.fn();
-    render(<UploadedTrackRow track={track} dismissed={false} onToggleDismiss={onToggle} />);
+  it('clic en "Quitar" invoca onRemove', () => {
+    const onRemove = vi.fn();
+    render(<UploadedTrackRow track={track} onRemove={onRemove} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /no quiero/i }));
+    fireEvent.click(screen.getByRole('button', { name: /quitar/i }));
 
-    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onRemove).toHaveBeenCalledTimes(1);
   });
 
-  it('en estado descartado muestra la marca "fuera" y un botón para recuperarla', () => {
-    render(<UploadedTrackRow track={track} dismissed onToggleDismiss={vi.fn()} />);
-
-    expect(screen.getByText('fuera')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /recuperar/i })).toBeInTheDocument();
-    // Ya no se ofrece descartar lo que ya está descartado.
-    expect(screen.queryByRole('button', { name: /no quiero/i })).toBeNull();
+  it('muestra el chip de versiones cuando duplicateCount >= 2', () => {
+    render(<UploadedTrackRow track={track} duplicateCount={3} onRemove={vi.fn()} />);
+    expect(screen.getByText(/3 versiones/i)).toBeInTheDocument();
   });
 
-  it('clic en "Recuperar" invoca onToggleDismiss', () => {
-    const onToggle = vi.fn();
-    render(<UploadedTrackRow track={track} dismissed onToggleDismiss={onToggle} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /recuperar/i }));
-
-    expect(onToggle).toHaveBeenCalledTimes(1);
+  it('no muestra el chip de versiones cuando duplicateCount < 2', () => {
+    render(<UploadedTrackRow track={track} duplicateCount={1} onRemove={vi.fn()} />);
+    expect(screen.queryByText(/versiones/i)).toBeNull();
   });
 
-  it('el nombre del tema descartado se marca como tachado (señal no-solo-color)', () => {
-    render(<UploadedTrackRow track={track} dismissed onToggleDismiss={vi.fn()} />);
+  it('muestra la insignia de lista de origen cuando se pasa listName', () => {
+    render(<UploadedTrackRow track={track} listName="Mi Rock" onRemove={vi.fn()} />);
+    expect(screen.getByText('Mi Rock')).toBeInTheDocument();
+  });
 
-    const name = screen.getByText('Born to Be Wild');
-    expect(name.className).toContain('line-through');
+  it('no muestra insignia de lista cuando listName está vacío', () => {
+    render(<UploadedTrackRow track={track} listName="" onRemove={vi.fn()} />);
+    // El único texto adicional sería la lista; sin ella, no hay nodo "Lista:".
+    expect(screen.queryByTitle(/^Lista:/)).toBeNull();
   });
 });
