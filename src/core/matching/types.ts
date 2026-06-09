@@ -30,6 +30,20 @@ export const EMPTY_PREFERENCES: MatchPreferences = {
 };
 
 /**
+ * True si las preferencias contienen alguna decisión real del usuario.
+ *
+ * `seed` se ignora deliberadamente: se genera de forma aleatoria en el primer
+ * montaje del wizard, así que un `EMPTY_PREFERENCES + seed` no representa
+ * ninguna elección. Mismo contrato que `hasUserInputData`: la capa de
+ * persistencia guarda `null` cuando no hay decisión real, para que estados
+ * fabricados en el montaje nunca compitan en el merge LWW contra las
+ * preferencias reales sincronizadas en Drive.
+ */
+export function hasMusicPreferenceData(prefs: MatchPreferences): boolean {
+  return prefs.preferredGenres.length > 0 || prefs.allEnergetic;
+}
+
+/**
  * Criterios musicales para una combinacion (zona, cadenceProfile, sport).
  *
  * **Filtro EXCLUYENTE: cadencia.** Un track encaja si su tempoBpm cae en

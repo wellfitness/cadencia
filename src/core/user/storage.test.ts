@@ -4,14 +4,12 @@ import {
   clearUserInputsFromLocal,
   clearUserInputsFromSession,
   isPersistentStorageEnabled,
-  loadUserInputs,
   loadUserInputsFromLocal,
   loadUserInputsFromSession,
-  saveUserInputs,
   saveUserInputsToLocal,
   saveUserInputsToSession,
 } from './storage';
-import { EMPTY_USER_INPUTS, type UserInputsRaw } from './userInputs';
+import { type UserInputsRaw } from './userInputs';
 
 const SESSION_KEY = 'vatios:userInputs:v1';
 const LOCAL_KEY = 'vatios:userInputs:persistent:v1';
@@ -153,45 +151,15 @@ describe('storage – localStorage (opt-in)', () => {
   });
 });
 
-describe('storage – API compuesta load/save/clear', () => {
+describe('storage – clearAllUserInputs (limpieza legacy)', () => {
   beforeEach(() => {
     sessionStorage.clear();
     localStorage.clear();
   });
 
-  it('saveUserInputs escribe ambos storages (session y local)', () => {
-    // Filosofia simplificada: la persistencia local es ON por defecto. El
-    // segundo parametro `persistent` de la API previa se elimino — siempre
-    // se persiste a localStorage. La privacidad sigue intacta (es el
-    // navegador del usuario, no un servidor); el usuario puede borrar
-    // explicitamente desde /preferencias.
-    saveUserInputs(SAMPLE);
-    expect(loadUserInputsFromSession()).toEqual(SAMPLE);
-    expect(loadUserInputsFromLocal()).toEqual(SAMPLE);
-  });
-
-  it('loadUserInputs prioriza local sobre session', () => {
-    const sessionData: UserInputsRaw = { ...EMPTY_USER_INPUTS, weightKg: 60 };
-    const localData: UserInputsRaw = { ...EMPTY_USER_INPUTS, weightKg: 80 };
-    saveUserInputsToSession(sessionData);
-    saveUserInputsToLocal(localData);
-    const loaded = loadUserInputs();
-    expect(loaded).not.toBeNull();
-    if (loaded === null) return;
-    expect(loaded.weightKg).toBe(80);
-  });
-
-  it('loadUserInputs cae a session si local esta vacio', () => {
+  it('borra ambos storages legacy para que la migracion no resucite datos borrados', () => {
     saveUserInputsToSession(SAMPLE);
-    expect(loadUserInputs()).toEqual(SAMPLE);
-  });
-
-  it('loadUserInputs devuelve null si ninguno tiene datos', () => {
-    expect(loadUserInputs()).toBeNull();
-  });
-
-  it('clearAllUserInputs borra ambos storages', () => {
-    saveUserInputs(SAMPLE);
+    saveUserInputsToLocal(SAMPLE);
     clearAllUserInputs();
     expect(loadUserInputsFromSession()).toBeNull();
     expect(loadUserInputsFromLocal()).toBeNull();

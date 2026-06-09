@@ -5,6 +5,7 @@ export {
   BIOLOGICAL_SEXES,
   DEFAULTS,
   SPORTS,
+  hasUserInputData,
 } from './userInputs';
 export type {
   UserInputsRaw,
@@ -25,7 +26,5 @@ export {
   saveUserInputsToLocal,
   clearUserInputsFromLocal,
   isPersistentStorageEnabled,
-  loadUserInputs,
-  saveUserInputs,
   clearAllUserInputs,
 } from './storage';

@@ -8,7 +8,8 @@ import type {
   SyncedData,
   UploadedCsvRecord,
 } from './types';
-import { EMPTY_USER_INPUTS } from '../user/userInputs';
+import { EMPTY_USER_INPUTS, hasUserInputData } from '../user/userInputs';
+import { EMPTY_PREFERENCES, hasMusicPreferenceData } from '../matching/types';
 
 function session(
   id: string,
@@ -90,6 +91,129 @@ describe('mergeData — atomic LWW por seccion', () => {
     const remote = userInputsAt(65, '2026-04-29T11:00:00Z');
     const { merged } = mergeData(local, remote);
     expect(merged.updatedAt).toBe('2026-04-29T11:00:00.000Z');
+  });
+});
+
+describe('mergeData — proteccion anti-vacio (userInputs)', () => {
+  // El escenario del bug real: un dispositivo "joven" (dev con StrictMode,
+  // wizard recien abierto, storage limpiado) escribia un userInputs todo-null
+  // con timestamp fresco, que ganaba el LWW y machacaba los datos buenos del
+  // Drive. La regla anti-vacio invierte ese resultado.
+  function vacuousAt(ts: string): SyncedData {
+    const d = emptySyncedData();
+    d.userInputs = { ...EMPTY_USER_INPUTS };
+    d._sectionMeta.userInputs = { updatedAt: ts };
+    d.updatedAt = ts;
+    return d;
+  }
+
+  function nullAt(ts: string): SyncedData {
+    const d = emptySyncedData();
+    d.userInputs = null;
+    d._sectionMeta.userInputs = { updatedAt: ts };
+    d.updatedAt = ts;
+    return d;
+  }
+
+  it('un objeto vacuo local mas reciente NO derrota a datos reales remotos', () => {
+    const local = vacuousAt('2026-06-10T10:00:00Z');
+    const remote = userInputsAt(70, '2026-06-01T10:00:00Z');
+    const { merged, conflicts } = mergeData(local, remote);
+    expect(merged.userInputs?.weightKg).toBe(70);
+    // La meta restaurada es la de los datos, no la del vacuo.
+    expect(merged._sectionMeta.userInputs?.updatedAt).toBe('2026-06-01T10:00:00Z');
+    expect(conflicts.some((c) => c.section === 'userInputs')).toBe(true);
+  });
+
+  it('un objeto vacuo remoto mas reciente NO derrota a datos reales locales', () => {
+    const local = userInputsAt(70, '2026-06-01T10:00:00Z');
+    const remote = vacuousAt('2026-06-10T10:00:00Z');
+    const { merged } = mergeData(local, remote);
+    expect(merged.userInputs?.weightKg).toBe(70);
+  });
+
+  it('sport solo (eleccion del paso 0) cuenta como vacuo y no machaca datos', () => {
+    const local = emptySyncedData();
+    local.userInputs = { ...EMPTY_USER_INPUTS, sport: 'bike' };
+    local._sectionMeta.userInputs = { updatedAt: '2026-06-10T10:00:00Z' };
+    const remote = userInputsAt(70, '2026-06-01T10:00:00Z');
+    const { merged } = mergeData(local, remote);
+    expect(merged.userInputs?.weightKg).toBe(70);
+  });
+
+  it('null explicito mas reciente SI gana (forget multi-dispositivo)…', () => {
+    const local = userInputsAt(70, '2026-06-01T10:00:00Z');
+    const remote = nullAt('2026-06-10T10:00:00Z');
+    const { merged } = mergeData(local, remote);
+    expect(merged.userInputs).toBeNull();
+  });
+
+  it('…pero los datos descartados por el null quedan en el conflict log', () => {
+    const local = userInputsAt(70, '2026-06-01T10:00:00Z');
+    const remote = nullAt('2026-06-10T10:00:00Z');
+    const { conflicts } = mergeData(local, remote);
+    const safety = conflicts.find((c) => c.section === 'userInputs');
+    expect(safety).toBeDefined();
+    expect((safety?.loserValue as { weightKg: number }).weightKg).toBe(70);
+  });
+
+  it('vacuo vs vacuo: LWW normal sin conflicto de proteccion', () => {
+    const local = vacuousAt('2026-06-10T10:00:00Z');
+    const remote = vacuousAt('2026-06-01T10:00:00Z');
+    const { merged, conflicts } = mergeData(local, remote);
+    expect(merged.userInputs).toEqual({ ...EMPTY_USER_INPUTS });
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it('el merge converge: re-mergear el resultado contra el lado vacuo es estable', () => {
+    const vacuous = vacuousAt('2026-06-10T10:00:00Z');
+    const data = userInputsAt(70, '2026-06-01T10:00:00Z');
+    const first = mergeData(vacuous, data).merged;
+    const second = mergeData(vacuous, first).merged;
+    expect(second.userInputs?.weightKg).toBe(70);
+  });
+});
+
+describe('mergeData — proteccion anti-vacio (musicPreferences)', () => {
+  it('EMPTY_PREFERENCES + seed aleatorio reciente no machaca generos guardados', () => {
+    const local = emptySyncedData();
+    local.musicPreferences = { ...EMPTY_PREFERENCES, seed: 12345 };
+    local._sectionMeta.musicPreferences = { updatedAt: '2026-06-10T10:00:00Z' };
+    const remote = emptySyncedData();
+    remote.musicPreferences = { preferredGenres: ['pop', 'rock'], allEnergetic: true };
+    remote._sectionMeta.musicPreferences = { updatedAt: '2026-06-01T10:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.musicPreferences?.preferredGenres).toEqual(['pop', 'rock']);
+  });
+
+  it('null explicito reciente (limpiar seleccion) si gana', () => {
+    const local = emptySyncedData();
+    local.musicPreferences = { preferredGenres: ['pop'], allEnergetic: false };
+    local._sectionMeta.musicPreferences = { updatedAt: '2026-06-01T10:00:00Z' };
+    const remote = emptySyncedData();
+    remote.musicPreferences = null;
+    remote._sectionMeta.musicPreferences = { updatedAt: '2026-06-10T10:00:00Z' };
+    const { merged } = mergeData(local, remote);
+    expect(merged.musicPreferences).toBeNull();
+  });
+});
+
+describe('helpers de contenido real', () => {
+  it('hasUserInputData ignora sport y detecta cualquier dato fisiologico', () => {
+    expect(hasUserInputData({ ...EMPTY_USER_INPUTS })).toBe(false);
+    expect(hasUserInputData({ ...EMPTY_USER_INPUTS, sport: 'run' })).toBe(false);
+    expect(hasUserInputData({ ...EMPTY_USER_INPUTS, weightKg: 70 })).toBe(true);
+    expect(hasUserInputData({ ...EMPTY_USER_INPUTS, sex: 'female' })).toBe(true);
+    expect(hasUserInputData({ ...EMPTY_USER_INPUTS, bikeType: 'road' })).toBe(true);
+  });
+
+  it('hasMusicPreferenceData ignora el seed', () => {
+    expect(hasMusicPreferenceData({ ...EMPTY_PREFERENCES })).toBe(false);
+    expect(hasMusicPreferenceData({ ...EMPTY_PREFERENCES, seed: 99 })).toBe(false);
+    expect(
+      hasMusicPreferenceData({ preferredGenres: ['pop'], allEnergetic: false }),
+    ).toBe(true);
+    expect(hasMusicPreferenceData({ preferredGenres: [], allEnergetic: true })).toBe(true);
   });
 });
 

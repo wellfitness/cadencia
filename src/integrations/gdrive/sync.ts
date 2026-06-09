@@ -11,7 +11,7 @@ import {
 } from './drive-api';
 import type { MergeConflict } from '@core/sync/merge';
 import { mergeData, deepEqual } from '@core/sync/merge';
-import { calculateDataRichness, hasNoLocalMeta } from '@core/sync/richness';
+import { calculateDataRichness, hasNoLocalMeta, isEmptyData } from '@core/sync/richness';
 import { cleanExpiredTombstones } from '@core/sync/tombstones';
 import type { SyncStatus, SyncedData } from '@core/sync/types';
 import { loadCadenciaData, saveCadenciaData } from '@ui/state/cadenciaStore';
@@ -192,10 +192,17 @@ export function clearConflicts(): void {
 /**
  * Guarda el SyncedData local antes de aplicar remote o merge. Permite
  * recuperacion manual si un merge inesperado deja datos en peor estado.
- * Ocupa una sola entrada: cada sync sobreescribe el anterior.
+ * Ocupa una sola entrada: cada sync sobreescribe el anterior, CON UNA
+ * EXCEPCION: un snapshot vacio nunca sobreescribe uno con datos. Sin esta
+ * guarda, el backup se degradaba en dos ciclos (sync con datos → sync tras
+ * la perdida) y la red de seguridad ya solo contenia el estado danado.
  */
 function saveBackup(data: SyncedData): void {
   try {
+    if (isEmptyData(data)) {
+      const existing = getBackup();
+      if (existing !== null && !isEmptyData(existing)) return;
+    }
     localStorage.setItem(BACKUP_KEY, JSON.stringify(data));
   } catch {
     // No critico: el sync funciona sin backup. Si localStorage esta lleno
@@ -284,7 +291,16 @@ async function doInit(): Promise<void> {
       // podia abrir el modal de Google sin que el usuario lo hubiese pedido.
       const token = getCachedToken();
       if (token) {
-        await pull(token);
+        // _syncing durante el pull inicial: sin el flag, un cambio local
+        // temprano (usuario rapido en el wizard) disparaba un doPush en
+        // paralelo con este pull — dos escrituras concurrentes sobre el
+        // mismo archivo con estados distintos.
+        _syncing = true;
+        try {
+          await pull(token);
+        } finally {
+          _syncing = false;
+        }
         markHealthy();
         startPolling();
         notify('synced');
@@ -350,7 +366,14 @@ export async function connect(): Promise<{ email: string }> {
     connectedAt: new Date().toISOString(),
     syncHealth: 'healthy',
   });
-  await pull(result.token);
+  // Mismo guard que en init: el sync inicial de connect no debe solaparse
+  // con un push debounceado de cambios hechos justo antes de conectar.
+  _syncing = true;
+  try {
+    await pull(result.token);
+  } finally {
+    _syncing = false;
+  }
   markHealthy();
   startPolling();
   notify('synced');
@@ -514,13 +537,19 @@ async function pull(token: string): Promise<void> {
     return;
   }
 
-  // Capturar driveVersionChanged ANTES de actualizar el cache (paridad con
-  // Oraculo). No se usa para forzar logica distinta —siempre pasamos por
-  // mergeData— pero queda registrado en el log diagnostico.
   const driveVersionChanged =
     state.fileVersion !== undefined && file.version !== state.fileVersion;
 
-  setSyncState({ fileId: file.id, fileVersion: file.version });
+  // CRITICO: el cache de fileVersion NO se actualiza hasta que el merge se
+  // haya aplicado con exito (mas abajo). Antes se cacheaba aqui, antes de
+  // readFile: si la descarga o el merge fallaban a mitad (red movil, 5xx,
+  // cierre de pestana), la version remota quedaba marcada como "ya vista" —
+  // el polling no volvia a detectar el cambio y el siguiente push, al ver
+  // las versiones iguales, hacia updateFile ciego SIN merge, machacando en
+  // Drive los datos remotos que este dispositivo nunca llego a recibir.
+  // Cachear solo el fileId es seguro: evita re-busquedas sin afectar a la
+  // deteccion de cambios.
+  setSyncState({ fileId: file.id });
   const remote = await readFile(token, file.id);
   const local = loadCadenciaData();
 
@@ -604,10 +633,14 @@ async function push(token: string): Promise<void> {
     } catch {
       meta = null;
     }
-    if (meta && state.fileVersion && meta.version !== state.fileVersion) {
-      // CAPA 1: version mismatch → otro dispositivo escribio entre medias
+    if (meta && (!state.fileVersion || meta.version !== state.fileVersion)) {
+      // CAPA 1: version mismatch → otro dispositivo escribio entre medias.
+      // Tambien entra aqui cuando fileVersion es undefined (un pull anterior
+      // fallo a mitad y nunca llegamos a ver el contenido remoto): subir a
+      // ciegas sin haber mergeado machacaria datos que no conocemos.
       console.warn(
-        `[Cadencia ↔ Drive] Version mismatch en push (local=${state.fileVersion}, remote=${meta.version}). ` +
+        `[Cadencia ↔ Drive] Version desconocida o mismatch en push ` +
+          `(local=${state.fileVersion ?? '∅'}, remote=${meta.version}). ` +
           'Disparando pullAndMerge para no perder cambios remotos.',
       );
       await pullAndMerge(token, state.fileId);
@@ -767,8 +800,20 @@ function debouncedPush(): void {
 }
 
 async function doPush(): Promise<void> {
-  if (_syncing) return;
-  if (Date.now() - _lastSyncAt < GDRIVE_CONFIG.SYNC_COOLDOWN_MS) return;
+  if (_syncing) {
+    // Hay un sync en curso (pull inicial, polling…): no descartar el cambio
+    // pendiente — re-agendar el push para cuando el ciclo actual termine.
+    // Antes se hacia `return` a secas y el cambio local se quedaba sin subir
+    // hasta el siguiente evento, dejando ventanas donde Drive iba por detras.
+    debouncedPush();
+    return;
+  }
+  if (Date.now() - _lastSyncAt < GDRIVE_CONFIG.SYNC_COOLDOWN_MS) {
+    // En cooldown: re-agendar en vez de descartar. El debounce (2s) acaba
+    // saliendo de la ventana de cooldown (5s) en 2-3 ciclos como mucho.
+    debouncedPush();
+    return;
+  }
   _syncing = true;
   try {
     const token = await getTokenSilent();

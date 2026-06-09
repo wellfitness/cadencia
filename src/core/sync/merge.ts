@@ -6,6 +6,8 @@ import type {
   UploadedCsvRecord,
 } from './types';
 import { emptySyncedData } from './schema';
+import { hasUserInputData } from '../user/userInputs';
+import { hasMusicPreferenceData } from '../matching/types';
 
 /**
  * Convierte una cadena ISO a timestamp numérico. Devuelve -Infinity si la
@@ -96,6 +98,69 @@ function getMetaTime(data: SyncedData, section: AtomicSection): number {
 }
 
 /**
+ * Secciones atomicas con proteccion anti-vacio. Para estas, un "objeto sin
+ * contenido real" (todo-null / sin decision del usuario) NUNCA derrota por
+ * LWW a un valor con datos, aunque su timestamp sea mas reciente.
+ *
+ * Razon: los objetos vacuos no los produce ninguna decision del usuario —
+ * los fabrican montajes iniciales, StrictMode o versiones antiguas de la app
+ * (una PWA cacheada puede seguir emitiendolos durante dias tras un deploy).
+ * El borrado EXPLICITO viaja como `null` (handleForget / RESET confirmado)
+ * y si respeta el LWW normal: un null mas reciente gana y se propaga.
+ *
+ * La regla es simetrica (depende del contenido, no del lado), asi que el
+ * merge converge en ambas direcciones: el dispositivo que fabrico el vacuo
+ * recibira los datos reales en su proximo pull.
+ *
+ * Cuando el borrado explicito (null) gana sobre datos reales, el valor
+ * perdedor se registra en el conflict log como red de seguridad: si el
+ * borrado fue un error, los datos siguen siendo recuperables desde
+ * `cadencia:gdrive:conflicts`.
+ */
+function applyAntiVacuousRule<K extends 'userInputs' | 'musicPreferences'>(
+  merged: SyncedData,
+  local: SyncedData,
+  remote: SyncedData,
+  section: K,
+  hasData: (value: NonNullable<SyncedData[K]>) => boolean,
+  conflicts: MergeConflict[],
+): void {
+  const winnerIsLocal = getMetaTime(local, section) > getMetaTime(remote, section);
+  const winner = merged[section];
+  const loser = winnerIsLocal ? remote[section] : local[section];
+  const loserMeta = winnerIsLocal
+    ? remote._sectionMeta[section]
+    : local._sectionMeta[section];
+  const winnerMeta = merged._sectionMeta[section];
+
+  if (loser === null || loser === undefined) return;
+  if (!hasData(loser as NonNullable<SyncedData[K]>)) return;
+
+  if (winner !== null && !hasData(winner as NonNullable<SyncedData[K]>)) {
+    // Inversion: el vacuo "gano" el LWW pero pierde por contenido.
+    merged[section] = loser as SyncedData[K] as never;
+    if (loserMeta) merged._sectionMeta[section] = loserMeta;
+    conflicts.push({
+      section,
+      loserValue: winner,
+      loserTimestamp: winnerMeta?.updatedAt ?? new Date(0).toISOString(),
+      winnerTimestamp: loserMeta?.updatedAt ?? new Date(0).toISOString(),
+      resolvedAt: new Date().toISOString(),
+    });
+  } else if (winner === null) {
+    // Borrado explicito legitimo: se respeta, pero los datos descartados
+    // quedan en el conflict log para recuperacion manual.
+    conflicts.push({
+      section,
+      loserValue: loser,
+      loserTimestamp: loserMeta?.updatedAt ?? new Date(0).toISOString(),
+      winnerTimestamp: winnerMeta?.updatedAt ?? new Date(0).toISOString(),
+      resolvedAt: new Date().toISOString(),
+    });
+  }
+}
+
+/**
  * Combina dos `SyncedData` con estrategia LWW por seccion. En empate
  * exacto wins remote (idempotencia tras pull-merge-push) y se anota
  * conflicto si los valores difieren.
@@ -133,6 +198,21 @@ export function mergeData(local: SyncedData, remote: SyncedData): MergeResult {
       }
     }
   }
+
+  // Proteccion por contenido sobre el resultado del LWW (ver doc de
+  // applyAntiVacuousRule). Solo userInputs y musicPreferences: en el resto
+  // de secciones atomicas el "vaciado" es una accion legitima del usuario
+  // sin canal null separado (ej. limpiar canciones descartadas) y debe
+  // propagarse tal cual.
+  applyAntiVacuousRule(merged, local, remote, 'userInputs', hasUserInputData, conflicts);
+  applyAntiVacuousRule(
+    merged,
+    local,
+    remote,
+    'musicPreferences',
+    hasMusicPreferenceData,
+    conflicts,
+  );
 
   // Array merge por id, LWW por item. Tombstones (deletedAt) participan
   // como una version mas: gana la mas reciente. Una version sin deletedAt

@@ -1,26 +1,21 @@
 import { EMPTY_USER_INPUTS, type UserInputsRaw } from './userInputs';
 
 /**
- * Wrapper de almacenamiento del navegador para los datos fisiologicos del
- * usuario. Aislado aqui para que el resto del core no toque APIs del DOM
- * (cada acceso esta protegido con try/catch para sobrevivir a restricciones
- * de almacenamiento — modo privado, cuota llena, WebView restringida, etc.).
+ * Storage LEGACY de los datos fisiologicos (keys `vatios:userInputs:*`).
  *
- * Hay dos backends:
+ * Desde la migracion al cadenciaStore (`cadencia:data:v1`, ver
+ * `@ui/state/cadenciaStore`) este modulo ya NO tiene productores en la app:
+ * la unica fuente de verdad es el cadenciaStore, que persiste en
+ * localStorage y sobrevive al redirect OAuth de Spotify sin necesitar
+ * sessionStorage. Se conserva exclusivamente para:
  *
- * - sessionStorage (siempre activo): los datos viven mientras la pestana
- *   este abierta. Es el comportamiento por defecto y el que sobrevive al
- *   redirect del OAuth de Spotify dentro de la misma pestana.
+ *  - `migrateLegacyStorageOnce` (main.tsx): mover una unica vez los datos
+ *    de instalaciones antiguas al cadenciaStore.
+ *  - `clearAllUserInputs`: limpiar restos legacy cuando el usuario borra
+ *    sus datos, para que la migracion no los resucite.
  *
- * - localStorage (opt-in explicito): el usuario marca "Recordar mis datos
- *   en este dispositivo" y los datos persisten entre sesiones. Sigue siendo
- *   100% cliente — los datos nunca salen del navegador del usuario. La key
- *   contiene un wrapper { version, inputs } para soportar migraciones
- *   futuras del shape de UserInputsRaw sin perder los datos persistidos.
- *
- * La flag de opt-in NO es una key separada: la presencia misma de la key en
- * localStorage senaliza que el opt-in esta activo. Esto evita estados
- * inconsistentes (flag=true sin datos o viceversa).
+ * Cada acceso esta protegido con try/catch para sobrevivir a restricciones
+ * de almacenamiento (modo privado, cuota llena, WebView restringida).
  */
 
 const SESSION_KEY = 'vatios:userInputs:v1';
@@ -168,42 +163,11 @@ export function isPersistentStorageEnabled(): boolean {
   }
 }
 
-// === API compuesta (load/save/clear con estrategia automatica) ===
-
 /**
- * Carga los datos del usuario aplicando la estrategia "local primero,
- * session despues": si el opt-in esta activo, prevalece lo que haya en
- * localStorage; si no, cae a sessionStorage. Util como inicializador del
- * reducer de App.tsx en el primer render.
- */
-export function loadUserInputs(): UserInputsRaw | null {
-  const fromLocal = loadUserInputsFromLocal();
-  if (fromLocal !== null) return fromLocal;
-  return loadUserInputsFromSession();
-}
-
-/**
- * Persiste los datos del usuario. Escribe a AMBOS backends:
- *  - sessionStorage (necesario para sobrevivir al OAuth redirect de Spotify
- *    dentro de la misma pestana).
- *  - localStorage (para que los datos sigan ahi entre sesiones).
- *
- * Antes existia un segundo parametro `persistent` opt-in: si era false, solo
- * se escribia session. Resultado: usuarios que rellenaban sus datos y cerraban
- * la pestana los perdian, aunque hubieran conectado Drive. Ahora la persistencia
- * local es ON por defecto; el usuario puede borrar sus datos cuando quiera
- * desde /preferencias -> «Borrar mis datos guardados» o desde la zona de
- * peligro. La privacidad sigue intacta: localStorage es del navegador del
- * usuario, no de un servidor.
- */
-export function saveUserInputs(inputs: UserInputsRaw): void {
-  saveUserInputsToSession(inputs);
-  saveUserInputsToLocal(inputs);
-}
-
-/**
- * Borra los datos del usuario en ambos storages. Util para la accion
- * "Olvidar mis datos guardados" o tras un reset completo del wizard.
+ * Borra los datos del usuario en ambos storages legacy. La usan «Olvidar
+ * mis datos» y «Borrar todo» en /preferencias para que ningun resto en las
+ * keys `vatios:*` pueda resucitar via `migrateLegacyStorageOnce` datos que
+ * el usuario decidio borrar.
  */
 export function clearAllUserInputs(): void {
   clearUserInputsFromSession();

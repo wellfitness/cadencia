@@ -96,6 +96,33 @@ export const EMPTY_USER_INPUTS: UserInputsRaw = {
   bikeType: null,
 };
 
+/**
+ * True si el usuario ha informado al menos un dato fisiológico real.
+ *
+ * `sport` se ignora deliberadamente: es una elección de navegación del paso 0
+ * del wizard, no un dato introducido en el formulario. Sin esta distinción,
+ * elegir «ciclismo» en un dispositivo recién abierto produciría un objeto
+ * «con datos» que el sync LWW propagaría machacando los datos fisiológicos
+ * reales guardados en Drive.
+ *
+ * Contrato con la capa de persistencia: un formulario sin datos reales se
+ * persiste como `null` (mismo significado semántico que «sin datos»), nunca
+ * como objeto todo-null. Así el estado fabricado por montajes iniciales,
+ * StrictMode o hidrataciones nunca compite en el merge contra datos reales.
+ */
+export function hasUserInputData(inputs: UserInputsRaw): boolean {
+  return (
+    inputs.weightKg !== null ||
+    inputs.ftpWatts !== null ||
+    inputs.maxHeartRate !== null ||
+    inputs.restingHeartRate !== null ||
+    inputs.birthYear !== null ||
+    inputs.sex !== null ||
+    inputs.bikeWeightKg !== null ||
+    inputs.bikeType !== null
+  );
+}
+
 /** Defaults aplicados cuando el usuario no toca el campo. */
 export const DEFAULTS = {
   bikeType: 'gravel' as const satisfies BikeType,

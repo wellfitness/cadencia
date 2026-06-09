@@ -25,7 +25,7 @@ import { BIKE_TYPE_LABELS } from '@core/power';
 import { getTopMacroGenres, loadNativeTracks, migrateLegacyGenres } from '@core/tracks';
 import { EMPTY_PREFERENCES, type MatchPreferences } from '@core/matching';
 import { useGenreCoverage } from '@ui/hooks/useGenreCoverage';
-import { clearUserInputsFromLocal } from '@core/user';
+import { clearAllUserInputs } from '@core/user';
 import { updateSection } from '@ui/state/cadenciaStore';
 
 export interface MyPreferencesPageProps {
@@ -102,6 +102,10 @@ export function MyPreferencesPage({ onClose }: MyPreferencesPageProps): JSX.Elem
         cancelLabel="Cancelar"
         onConfirm={() => {
           clearCadenciaData();
+          // Las keys legacy `vatios:*` tambien: si quedaran restos, la
+          // migracion one-shot los re-importaria al cadenciaStore en el
+          // proximo arranque, resucitando datos que el usuario borro.
+          clearAllUserInputs();
           setConfirmWipe(false);
         }}
         onCancel={() => setConfirmWipe(false)}
@@ -160,7 +164,11 @@ function PersistenceSection({ data }: SectionProps): JSX.Element {
   const [confirmForget, setConfirmForget] = useState<boolean>(false);
 
   const handleForget = (): void => {
-    clearUserInputsFromLocal();
+    // Limpia tambien session y local legacy (`vatios:*`): si quedara
+    // cualquier resto, migrateLegacyStorageOnce lo resucitaria en el
+    // proximo arranque con timestamp fresco, deshaciendo este borrado
+    // incluso en los demas dispositivos via sync.
+    clearAllUserInputs();
     updateSection('userInputs', null);
     setConfirmForget(false);
   };

@@ -16,8 +16,17 @@ function readClientId(): string {
 export const GDRIVE_CONFIG = {
   /** Scope minimo: carpeta oculta de la app, invisible en Drive del usuario. */
   SCOPE: 'https://www.googleapis.com/auth/drive.appdata',
-  /** Nombre del unico archivo que la app crea en appDataFolder. */
-  FILE_NAME: 'cadencia_data.json',
+  /**
+   * Nombre del unico archivo que la app crea en appDataFolder.
+   *
+   * En desarrollo (`pnpm dev`) se usa un archivo SEPARADO: el localStorage
+   * de 127.0.0.1:5173 se limpia constantemente al depurar, y si dev y
+   * produccion compartieran archivo, cada sesion de desarrollo actuaria
+   * como un "dispositivo fantasma" recien vaciado cuyas escrituras (con
+   * timestamp fresco) machacarian via LWW los datos reales del usuario.
+   * Los tests E2E/unit tambien caen en la rama dev, lo cual es deseable.
+   */
+  FILE_NAME: import.meta.env.DEV ? 'cadencia_data.dev.json' : 'cadencia_data.json',
   /** Client ID Web inyectado por Vite desde .env.local */
   CLIENT_ID: readClientId(),
   /** API endpoints */

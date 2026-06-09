@@ -1,8 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   EMPTY_USER_INPUTS,
-  loadUserInputs,
-  saveUserInputs,
+  hasUserInputData,
   validateUserInputs,
   type UserInputsRaw,
 } from '@core/user';
@@ -18,6 +17,7 @@ import { TestSetupDialog } from '@ui/components/session-builder/TestSetupDialog'
 import {
   EMPTY_PREFERENCES,
   computeMatchSignature,
+  hasMusicPreferenceData,
   matchTracksToSegments,
   type CrossZoneMode,
   type MatchPreferences,
@@ -223,44 +223,44 @@ function WizardApp(): JSX.Element {
 
   // State del usuario lifteado aqui para que pasos posteriores (Ruta, Resultado)
   // puedan leerlo y, en el caso de Resultado, editarlo en linea sin volver atras.
-  // Estrategia de hidratacion: cadenciaStore (nuevo SoT con sync Drive) primero,
-  // legacy storage despues. La migracion one-shot en main.tsx asegura que los
-  // datos antiguos viajen al cadenciaStore en el primer arranque tras el deploy.
+  // cadenciaStore es la UNICA fuente de verdad: la migracion one-shot en
+  // main.tsx ya movio cualquier dato del storage legacy (keys `vatios:*`)
+  // antes de que este componente monte.
   const [inputs, dispatch] = useReducer(
     userInputsReducer,
     null,
-    (): UserInputsRaw =>
-      loadCadenciaData().userInputs ?? loadUserInputs() ?? EMPTY_USER_INPUTS,
+    (): UserInputsRaw => loadCadenciaData().userInputs ?? EMPTY_USER_INPUTS,
   );
 
   // currentYear cacheado en una sesion (no cambia significativamente durante el uso normal).
   const [currentYear] = useState(() => new Date().getFullYear());
 
-  // Persistencia debounceada. Por defecto siempre activa: sessionStorage,
-  // localStorage legacy y cadenciaStore (SoT del motor de sync con Drive)
-  // se mantienen sincronizados en cada cambio. Filosofia simplificada:
-  // localStorage es del navegador del usuario, no un servidor — la promesa
-  // de privacidad sigue intacta y el comportamiento default «recordar» es
-  // lo que cualquiera espera de una herramienta como esta. Para borrar
-  // todo, /preferencias ofrece «Borrar mis datos guardados».
+  // Persistencia debounceada al cadenciaStore (SoT del motor de sync con
+  // Drive). Filosofia: localStorage es del navegador del usuario, no un
+  // servidor — la promesa de privacidad sigue intacta y el comportamiento
+  // default «recordar» es lo que cualquiera espera de una herramienta como
+  // esta. Para borrar todo, /preferencias ofrece «Borrar mis datos guardados».
   //
-  // CRITICO: el primer render se salta. La inicializacion del reducer con
-  // EMPTY_USER_INPUTS (cuando cadenciaStore esta vacio en un dispositivo
-  // nuevo) no es un cambio del usuario y NO debe escribir en cadenciaStore.
-  // Si lo hiciera, `updateSection` bumpearia `_sectionMeta.userInputs.updatedAt`
-  // al instante presente — y eso luego ganaria en el merge LWW frente a
-  // los datos buenos del Drive (que tienen meta anterior), aplastando la
-  // sincronizacion. Solo persistimos cuando el usuario dispatch a un cambio
-  // real desde el form, o cuando llega un HYDRATE tras pull.
-  const skipFirstInputsEffect = useRef(true);
+  // CRITICO — normalizacion a null: un formulario sin ningun dato fisiologico
+  // real (hasUserInputData ignora `sport`, que es navegacion del paso 0, no
+  // un dato) se persiste como `null`, NUNCA como objeto todo-null. Esto hace
+  // el efecto seguro por contenido, sin guards de orden de render:
+  //  - Montaje inicial con store vacio (reducer arranca EMPTY): null → null,
+  //    deepEqual en updateSection lo convierte en no-op. No se bumpea
+  //    `_sectionMeta.userInputs.updatedAt`, asi que el estado fabricado del
+  //    montaje jamas gana el merge LWW frente a los datos reales de Drive.
+  //  - StrictMode (doble invocacion de efectos en dev): ambas pasadas son
+  //    no-op por la misma razon. El guard anterior (`skipFirstRef`) se rompia
+  //    exactamente aqui: el ref sobrevivia al remontaje y la segunda pasada
+  //    persistia el estado inicial vacio con timestamp fresco, que viajaba a
+  //    Drive machacando los datos buenos. Ese era el origen del bug de
+  //    «mis datos se borran y Drive se sobreescribe».
+  //  - RESET explicito del formulario (dialogo «¿Borrar todos tus datos?»):
+  //    persiste null con meta nueva — borrado intencional que SI debe ganar
+  //    el LWW y propagarse a otros dispositivos.
   useEffect(() => {
-    if (skipFirstInputsEffect.current) {
-      skipFirstInputsEffect.current = false;
-      return;
-    }
     const id = setTimeout(() => {
-      saveUserInputs(inputs);
-      updateSection('userInputs', inputs);
+      updateSection('userInputs', hasUserInputData(inputs) ? inputs : null);
     }, 300);
     return () => clearTimeout(id);
   }, [inputs]);
@@ -323,17 +323,19 @@ function WizardApp(): JSX.Element {
 
   // Sync musicPreferences -> cadenciaStore en cada cambio. cadenciaStore
   // es el SoT que el motor de Drive sync observa para propagar entre
-  // dispositivos. Mismo motivo que con userInputs: el primer render se
-  // salta para no bumpear `_sectionMeta.musicPreferences.updatedAt` con
-  // el valor inicial (que puede ser EMPTY_PREFERENCES + seed random si
-  // cadenciaStore estaba vacio).
-  const skipFirstMusicEffect = useRef(true);
+  // dispositivos. Misma normalizacion que userInputs: sin decision real del
+  // usuario (hasMusicPreferenceData ignora el seed, que es aleatorio del
+  // montaje) se persiste null → no-op cuando el store ya esta en null. Asi
+  // el `EMPTY_PREFERENCES + seed random` del primer render nunca bumpea
+  // `_sectionMeta.musicPreferences.updatedAt` ni compite en el merge LWW
+  // contra los generos guardados en Drive. El seed sigue viajando dentro de
+  // musicPreferences cuando hay generos marcados, y para el reload del OAuth
+  // lo cubre wizardStorage (sessionStorage).
   useEffect(() => {
-    if (skipFirstMusicEffect.current) {
-      skipFirstMusicEffect.current = false;
-      return;
-    }
-    updateSection('musicPreferences', musicPreferences);
+    updateSection(
+      'musicPreferences',
+      hasMusicPreferenceData(musicPreferences) ? musicPreferences : null,
+    );
   }, [musicPreferences]);
 
   // Rehidratacion tras un pull desde Drive. Sin este efecto, los estados
@@ -348,9 +350,24 @@ function WizardApp(): JSX.Element {
       if (!detail?.data) return;
       if (detail.data.userInputs) {
         dispatch({ type: 'HYDRATE', value: detail.data.userInputs });
+      } else {
+        // Borrado remoto explicito («Olvidar mis datos» en otro dispositivo):
+        // vaciar tambien el formulario local. Sin esto la UI seguia mostrando
+        // datos que ya no existian y cualquier edicion los re-persistia,
+        // deshaciendo el borrado del otro dispositivo.
+        dispatch({ type: 'RESET' });
       }
       if (detail.data.musicPreferences) {
         setMusicPreferences(detail.data.musicPreferences);
+      } else {
+        // Mismo caso para preferencias: conservamos el seed local (aleatorio
+        // de esta sesion, no es un dato del usuario) y vaciamos la decision.
+        setMusicPreferences((prev) => {
+          if (!hasMusicPreferenceData(prev)) return prev;
+          return prev.seed !== undefined
+            ? { ...EMPTY_PREFERENCES, seed: prev.seed }
+            : EMPTY_PREFERENCES;
+        });
       }
     };
     window.addEventListener('cadencia-data-applied-from-remote', handler);
