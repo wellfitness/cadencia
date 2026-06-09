@@ -15,6 +15,7 @@ import { FileDropzone } from '@ui/components/FileDropzone';
 import { GenrePills } from '@ui/components/GenrePills';
 import { MaterialIcon } from '@ui/components/MaterialIcon';
 import { PlaylistPreviewRow } from '@ui/components/PlaylistPreviewRow';
+import { SpotifyConnectCard } from '@ui/components/SpotifyConnectCard';
 import { useGenreCoverage } from '@ui/hooks/useGenreCoverage';
 import type { UploadedCsv } from '@ui/state/uploadedCsv';
 import type { MusicSourceMode } from '@ui/state/wizardStorage';
@@ -292,6 +293,8 @@ export function MusicStep({
           </div>
         )}
       </Card>
+
+      <SpotifyConnectCard />
 
       <PreferencesSummary preferences={preferences} />
 

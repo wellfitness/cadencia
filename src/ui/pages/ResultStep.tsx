@@ -19,23 +19,18 @@ import { exportZwo, gpxToEditableSessionPlan, sanitizeFilename } from '@core/ses
 import { loadNativeTracks, type Track } from '@core/tracks';
 import type { ValidatedUserInputs, ValidationResult } from '@core/user';
 import {
+  beginSpotifyAuthorization,
   clearAuthFlow,
   clearTokens,
-  computeCodeChallenge,
   createPlaylistWithTracks,
   exchangeCodeForTokens,
-  generateCodeVerifier,
-  generateState,
-  getAuthorizationUrl,
   getRedirectUri,
   loadAuthFlow,
   loadTokens,
   refreshAccessToken,
   getSpotifyClientId,
-  saveAuthFlow,
   saveTokens,
   tokensAreFresh,
-  SPOTIFY_SCOPES,
   SpotifyAuthorizationError,
   type CreatedPlaylist,
 } from '@integrations/spotify';
@@ -309,20 +304,11 @@ export function ResultStep({
     }
     let tokens = loadTokens();
     if (!tokens) {
-      // Inicia el flow OAuth
+      // Sin sesion: arrancamos el login (full-page redirect). Misma funcion que
+      // usa MusicStep para la conexion anticipada, asi el comportamiento del
+      // OAuth es identico se dispare donde se dispare.
       setPhase('authorizing');
-      const verifier = generateCodeVerifier();
-      const challenge = await computeCodeChallenge(verifier);
-      const state = generateState();
-      saveAuthFlow({ codeVerifier: verifier, state });
-      const url = getAuthorizationUrl({
-        clientId: effectiveClientId,
-        redirectUri: getRedirectUri(),
-        codeChallenge: challenge,
-        state,
-        scopes: SPOTIFY_SCOPES,
-      });
-      window.location.assign(url);
+      await beginSpotifyAuthorization(effectiveClientId);
       return;
     }
     if (!tokensAreFresh(tokens)) {

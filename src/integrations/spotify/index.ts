@@ -25,6 +25,7 @@ export {
   tokenHasScopes,
 } from './storage';
 export { getAuthorizationUrl, exchangeCodeForTokens, refreshAccessToken } from './auth';
+export { beginSpotifyAuthorization, buildSpotifyAuthorizationUrl } from './authFlow';
 export {
   createPlaylist,
   addTracksToPlaylist,
