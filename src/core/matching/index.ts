@@ -18,3 +18,4 @@ export {
   type MoveResult,
 } from './replaceTrack';
 export { analyzePoolCoverage, type PoolCoverage, type ZoneCoverage } from './poolCoverage';
+export { computeMatchSignature } from './signature';

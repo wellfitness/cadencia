@@ -17,6 +17,7 @@ import type { GpxTrack } from '@core/gpx/types';
 import { TestSetupDialog } from '@ui/components/session-builder/TestSetupDialog';
 import {
   EMPTY_PREFERENCES,
+  computeMatchSignature,
   matchTracksToSegments,
   type CrossZoneMode,
   type MatchPreferences,
@@ -434,17 +435,35 @@ function WizardApp(): JSX.Element {
   // los dropdowns de "Otro tema" necesitan el mismo modo coherente.
   const crossZoneMode: CrossZoneMode = sourceType === 'session' ? 'discrete' : 'overlap';
 
-  // Matching base: se calcula cuando cambian inputs reales del matching
-  // (ruta, pool, preferencias, sourceType). Se omite en el primer render
-  // para preservar matchedList persistido en sessionStorage tras un refresh.
-  // Cuando se recalcula, los cambios manuales (replacedIndices) se pierden
-  // porque la base cambio — el usuario debera reaplicarlos si los queria.
-  const isFirstMatchEffectRef = useRef(true);
+  // Matching base: se recalcula cuando cambian de VALOR los inputs reales del
+  // matching (ruta, pool, preferencias, crossZoneMode). Comparamos una firma
+  // de contenido en vez de las referencias de las deps: tras el full-reload
+  // del OAuth de Spotify, `loadCadenciaData()` devuelve objetos nuevos y el
+  // `livePool` memoizado cambia de referencia con contenido identico — eso NO
+  // debe regenerar la base ni descartar las ediciones manuales del usuario
+  // (matchedList + replacedIndices rehidratados de sessionStorage).
+  //
+  // Cuando un input cambia de verdad (otro genero, nueva seed, otra fuente de
+  // musica, pull de Drive con datos nuevos), la firma cambia y se recalcula,
+  // descartando los replacedIndices porque la base es otra — comportamiento
+  // intencionado: el usuario reaplicara sus sustituciones sobre la lista nueva.
+  const lastMatchSignatureRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (isFirstMatchEffectRef.current) {
-      isFirstMatchEffectRef.current = false;
+    const signature = computeMatchSignature(
+      routeSegments,
+      livePool,
+      musicPreferences,
+      crossZoneMode,
+    );
+    if (lastMatchSignatureRef.current === undefined) {
+      // Primer render: adoptamos la firma de los inputs que produjeron el
+      // matchedList rehidratado, sin recalcular. Asi las ediciones sobreviven
+      // a cualquier reload mientras el contenido de los inputs no cambie.
+      lastMatchSignatureRef.current = signature;
       return;
     }
+    if (signature === lastMatchSignatureRef.current) return;
+    lastMatchSignatureRef.current = signature;
     if (routeSegments === null) {
       setMatchedList(null);
       setReplacedIndices(new Set());
