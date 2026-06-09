@@ -60,6 +60,7 @@ const TVModeRoute = lazy(() =>
 import { writeHandoff } from '@core/tv/tvHandoff';
 import { buildSpotifyTVHandoff } from '@ui/lib/spotifyTVHandoff';
 import { userInputsReducer } from '@ui/state/userInputsReducer';
+import { decideMatchListAction } from '@ui/state/matchLifecycle';
 import { hydrateUploadedCsvs, type UploadedCsv } from '@ui/state/uploadedCsv';
 import { navigateBack, navigateInApp, usePathname } from '@ui/utils/navigation';
 import {
@@ -435,19 +436,23 @@ function WizardApp(): JSX.Element {
   // los dropdowns de "Otro tema" necesitan el mismo modo coherente.
   const crossZoneMode: CrossZoneMode = sourceType === 'session' ? 'discrete' : 'overlap';
 
-  // Matching base: se recalcula cuando cambian de VALOR los inputs reales del
-  // matching (ruta, pool, preferencias, crossZoneMode). Comparamos una firma
-  // de contenido en vez de las referencias de las deps: tras el full-reload
-  // del OAuth de Spotify, `loadCadenciaData()` devuelve objetos nuevos y el
-  // `livePool` memoizado cambia de referencia con contenido identico — eso NO
-  // debe regenerar la base ni descartar las ediciones manuales del usuario
-  // (matchedList + replacedIndices rehidratados de sessionStorage).
+  // Matching base. Dos objetivos que coexisten (ver decideMatchListAction):
   //
-  // Cuando un input cambia de verdad (otro genero, nueva seed, otra fuente de
-  // musica, pull de Drive con datos nuevos), la firma cambia y se recalcula,
-  // descartando los replacedIndices porque la base es otra — comportamiento
-  // intencionado: el usuario reaplicara sus sustituciones sobre la lista nueva.
+  //  1. PRESERVAR las ediciones manuales tras el full-reload del OAuth: la
+  //     lista se rehidrata de sessionStorage y NO debe regenerarse aunque el
+  //     `livePool` memoizado cambie de referencia con el mismo contenido. Por
+  //     eso en renders posteriores solo se regenera si la FIRMA de contenido
+  //     (computeMatchSignature) cambia, no su referencia.
+  //
+  //  2. GARANTIZAR «hay ruta ⟹ hay lista»: si en el primer render hay ruta
+  //     pero la lista no vino rehidratada, se genera. Sin esto Resultado se
+  //     quedaria en «Genera la lista antes» para siempre.
+  //
+  // matchedList se lee via ref para no meterlo en las deps del efecto (evita
+  // un bucle: generar la lista dispararia el efecto de nuevo).
   const lastMatchSignatureRef = useRef<string | undefined>(undefined);
+  const matchedListRef = useRef(matchedList);
+  matchedListRef.current = matchedList;
   useEffect(() => {
     const signature = computeMatchSignature(
       routeSegments,
@@ -455,20 +460,21 @@ function WizardApp(): JSX.Element {
       musicPreferences,
       crossZoneMode,
     );
-    if (lastMatchSignatureRef.current === undefined) {
-      // Primer render: adoptamos la firma de los inputs que produjeron el
-      // matchedList rehidratado, sin recalcular. Asi las ediciones sobreviven
-      // a cualquier reload mientras el contenido de los inputs no cambie.
-      lastMatchSignatureRef.current = signature;
-      return;
-    }
-    if (signature === lastMatchSignatureRef.current) return;
+    const action = decideMatchListAction({
+      isInitialRun: lastMatchSignatureRef.current === undefined,
+      signatureChanged: signature !== lastMatchSignatureRef.current,
+      hasMatchedList: matchedListRef.current !== null,
+      hasRoute: routeSegments !== null,
+    });
     lastMatchSignatureRef.current = signature;
-    if (routeSegments === null) {
+    if (action === 'skip') return;
+    if (action === 'clear') {
       setMatchedList(null);
       setReplacedIndices(new Set());
       return;
     }
+    // 'generate' — decideMatchListAction garantiza que hay ruta aqui.
+    if (routeSegments === null) return;
     const fresh = matchTracksToSegments(routeSegments, livePool, musicPreferences, {
       crossZoneMode,
     });
